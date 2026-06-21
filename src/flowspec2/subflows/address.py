@@ -18,6 +18,14 @@ from . import SubflowBuild
 
 _AUX = ["address_confirmed", "address_needs_confirmation", "address_attempts"]
 
+# The payload_schema the engine hands to constrained decoding so a generic LLM
+# driver knows to extract the free-text address into the `address` key.
+_ADDRESS_SCHEMA = {
+    "type": "object",
+    "properties": {"address": {"type": "string", "description": "Endereço completo: rua/avenida, número e bairro."}},
+    "required": ["address"],
+}
+
 
 class AddressSubflow:
     name = "address"
@@ -58,11 +66,13 @@ class AddressSubflow:
                 state.data["address_attempts"] = n
                 state.agent_response = AgentResponse(
                     description="Não encontrei esse endereço. Pode informar rua, número e bairro?",
+                    payload_schema=_ADDRESS_SCHEMA,
                     error_message=result.get("error"),
                 )
                 return state
             state.agent_response = AgentResponse(
-                description="Qual o endereço completo (rua, número, bairro)?"
+                description="Qual o endereço completo (rua, número, bairro)?",
+                payload_schema=_ADDRESS_SCHEMA,
             )
             return state
 
