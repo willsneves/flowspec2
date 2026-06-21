@@ -55,7 +55,10 @@ def _transitive_dependents(slots: dict[str, Any]) -> dict[str, set[str]]:
         for req in cfg.get("requires", []) or []:
             direct.setdefault(req, set()).add(slot)
     dependents: dict[str, set[str]] = {}
-    for slot in slots:
+    # Iterate the union of declared slots and every slot named as a `requires`
+    # target: subflow-contributed slots (e.g. `address`) are required by top-level
+    # slots but are not keys of the document's `slots` block.
+    for slot in set(slots) | set(direct):
         seen: set[str] = set()
         stack = list(direct.get(slot, set()))
         while stack:
