@@ -10,6 +10,7 @@ See ``docs/DESIGN.md`` for the format rationale and the construct→primitive ma
 
 from __future__ import annotations
 
+from .backends import BackendConfig, make_registry
 from .compiler import CompiledFlow, compile_flow
 from .models import AgentResponse, ServiceMetadata, ServiceState
 from .runtime import FlowRuntime
@@ -33,5 +34,7 @@ __all__ = [
     "default_tool_registry",
     "SubflowRegistry",
     "default_subflows",
+    "BackendConfig",
+    "make_registry",
     "__version__",
 ]

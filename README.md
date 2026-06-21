@@ -34,6 +34,28 @@ asyncio.run(main())
 
 `rt.as_tool()` returns a `multi_step_service`-style callable `(service_name, user_id, payload) -> dict` an outer agent dispatches to.
 
+## Real backends
+
+Tools (`geocode`, `cpf_lookup`, `get_user_info`, `sgrc_open_ticket`) default to in-memory fakes so the suite runs offline. Swap in real HTTP backends — `make_registry` overlays them onto the fakes per configured URL (partial config falls back per-tool, and the terminal's idempotency replay cache is preserved):
+
+```python
+from flowspec2 import FlowRuntime
+from flowspec2.backends import BackendConfig, make_registry
+
+cfg = BackendConfig.from_env()      # FLOWSPEC2_GEOCODE_URL / _CPF_LOOKUP_URL / _GOVBR_ENRICH_URL / _SGRC_URL / _API_KEY
+rt = FlowRuntime(doc, tools=make_registry(cfg))
+```
+
+Install the HTTP extra with `uv sync --extra http`. The SGRC adapter maps HTTP semantics onto the terminal outcome trichotomy: **2xx → `success`**, **5xx / timeout / connection error → `retryable`** (the terminal node preserves state and re-fires next turn), **4xx → `fatal`** (resets). Backends are injectable (`transport=`) so they're tested offline with `httpx.MockTransport` — no network. Point each URL at a real Prefeitura endpoint (or a thin adapter conforming to the contracts in `backends/http.py`).
+
+## CLI
+
+```bash
+flowspec2 validate examples/reparo_luminaria.flow.json   # JSON-Schema validate
+flowspec2 graph    examples/reparo_luminaria.flow.json   # list compiled node ids
+flowspec2 mermaid  examples/reparo_luminaria.flow.json   # export the compiled graph as mermaid
+```
+
 ## What it compiles
 
 | flowspec2 construct | LangGraph primitive |
@@ -63,8 +85,9 @@ src/flowspec2/
   runtime.py       FlowRuntime: validate · compile · execute · as_tool (+ auto_flow short-circuit)
   schema.py        load + JSON-Schema validation
   interactive.py   buttons / list / flow envelope builders (Meta limits)
-  tools.py         ToolRegistry + injectable backends
-  subflows/        address@1 · identification@2 · sgrc_ticket (reusable, versioned)
+  tools.py         ToolRegistry + injectable fake backends + idempotency replay
+  backends/        BackendConfig + make_registry + httpx HTTP tools (real integrations)
+  subflows/        address@1 · identification@2 (reusable, versioned)
   flowspec-2.schema.json
 examples/          reparo_luminaria.flow.json · reparo_buraco.flow.json
 tests/             schema · domains · predicates · luminária E2E · authorability
