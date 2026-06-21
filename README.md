@@ -11,7 +11,10 @@ You write one self-contained JSON document per service flow. A running agent loa
 ```bash
 uv sync --extra dev          # creates .venv with langgraph + pydantic + jsonschema + pytest
 uv run pytest                # run the suite (drives the luminária flow turn-by-turn)
+uv run python examples/simulate.py   # 6 real citizen conversations over the HTTP backends
 ```
+
+`examples/simulate.py` prints turn-by-turn transcripts of the reparo_luminaria flow as realistic conversations over the real HTTP backends (deterministic geocoder + SGRC via `MockTransport`): the production WhatsApp-Flow path, an address correction, gov.br auth, the praça→quadra branch, an SGRC outage (503 → retryable → recovers), and a duplicate submission that fires the side effect exactly once.
 
 ## Quickstart
 
