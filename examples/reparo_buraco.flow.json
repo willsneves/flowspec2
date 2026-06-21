@@ -1,0 +1,53 @@
+{
+  "schema": "flowspec/2",
+  "flow": "reparo_buraco",
+  "version": "1.0.0",
+  "service": { "id": "18999", "codigo_servico_1746": "18999" },
+  "route": {
+    "description": "Reparo de buraco, cratera ou afundamento na via pública ou calçada.",
+    "trigger_phrases": ["buraco na rua", "cratera na pista", "asfalto esburacado", "calçada afundada"]
+  },
+  "config": { "address_required": true, "identification_required": false, "max_attempts": 3 },
+  "domains": {
+    "BuracoTipo": { "type": "categorical", "values": ["Buraco no asfalto", "Cratera", "Afundamento", "Calçada danificada"], "normalize": { "accent_fold": true, "synonyms": { "buraco": "Buraco no asfalto", "cratera enorme": "Cratera", "calcada quebrada": "Calçada danificada" } } },
+    "Tamanho": { "type": "categorical", "values": ["Pequeno", "Médio", "Grande"], "normalize": { "number_words": true, "accent_fold": true, "synonyms": { "enorme": "Grande", "pequenininho": "Pequeno" } } },
+    "SimNao": { "type": "bool", "normalize": { "affirmation": true } }
+  },
+  "slots": {
+    "buraco_tipo": { "domain": "BuracoTipo", "persist": "data", "required": true },
+    "buraco_tamanho": { "domain": "Tamanho", "persist": "data", "required": true },
+    "ticket_data_confirmed": { "domain": "SimNao", "persist": "data" }
+  },
+  "path": [
+    { "step": "collect_tipo", "slot": "buraco_tipo", "prompt": { "text": "Qual o tipo de problema na via?", "extract_hint": "infer from photo if sent" }, "interactive": { "kind": "list", "field": "buraco_tipo", "from_domain": "BuracoTipo" } },
+    { "step": "collect_tamanho", "slot": "buraco_tamanho", "prompt": { "text": "Qual o tamanho aproximado?" }, "interactive": { "kind": "buttons", "field": "buraco_tamanho", "from_domain": "Tamanho" } },
+    { "use": "address@1" },
+    { "use": "identification@2" },
+    { "step": "confirm_ticket_data", "confirm": "ticket_data_confirmed", "correctable": true, "prompt": { "text": "Confirma a abertura do chamado?" }, "interactive": { "kind": "buttons", "field": "confirmacao", "from_domain": "SimNao" } },
+    { "terminal": true }
+  ],
+  "uses": [
+    { "ref": "address@1", "with": { "required": true, "needs_confirmation": true } },
+    { "ref": "identification@2", "with": { "required": false } }
+  ],
+  "confirm": {
+    "step": "confirm_ticket_data",
+    "slot": "ticket_data_confirmed",
+    "on_confirm": "open_ticket",
+    "correctable": ["buraco_tipo", "buraco_tamanho", "address", "cpf", "email", "name"]
+  },
+  "terminal": {
+    "step": "open_ticket",
+    "tool": "sgrc_open_ticket",
+    "idempotent": true,
+    "input": [ { "param": "tipoBuraco", "slot": "buraco_tipo" }, { "param": "tamanho", "slot": "buraco_tamanho" }, { "param": "endereco", "slot": "address" }, { "param": "solicitante", "slot": "cpf" } ],
+    "outputs": { "protocol_id": "result.protocolo" },
+    "outcomes": { "success": { "reset_next": true }, "retryable": { "preserve_state": true }, "fatal": { "reset_next": true } }
+  },
+  "capabilities": {
+    "media_in": { "analyze": ["image"], "route_by": "workflow_sugerido" },
+    "media_out": ["location"],
+    "handoff": { "target": "1746" },
+    "session_reset": true
+  }
+}
