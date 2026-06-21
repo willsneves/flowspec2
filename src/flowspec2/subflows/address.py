@@ -12,7 +12,7 @@ from typing import Any
 from ..domains import parse_affirmation
 from ..interactive import options_from_domain
 from ..models import AgentResponse, ServiceState
-from ..nodes import NEXT, FlowContext, NodeDesc
+from ..nodes import NEXT, FlowContext, NodeDesc, clear_cascade
 from langgraph.graph import END
 from . import SubflowBuild
 
@@ -34,8 +34,10 @@ class AddressSubflow:
         # ── collect_address ──────────────────────────────────────────────
         async def collect(state: ServiceState) -> ServiceState:
             if state.data.get("correction_requested") == "address":
-                for key in ["address", *_AUX]:
-                    state.data.pop(key, None)
+                # clear address + its aux + every requires-dependent (quadra,
+                # ponto_referencia) so a corrected address never submits stale
+                # downstream data.
+                clear_cascade(state, "address", ctx)
                 state.data.pop("correction_requested", None)
             if state.data.get("address") and state.data.get("address_confirmed"):
                 state.agent_response = None

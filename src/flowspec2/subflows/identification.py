@@ -181,6 +181,11 @@ class IdentificationSubflow:
             if state.data.get("correction_requested") == "cpf":
                 for key in ["cpf", "cadastro_verificado", "identificacao_pulada", "cpf_attempts"]:
                     state.data.pop(key, None)
+                # Persist the method so the NEXT turn's select node re-enters the
+                # subflow instead of short-circuiting to done (the citizen may have
+                # been "anonimo" before correcting). correction_requested is consumed
+                # this turn, so the flip must outlive it.
+                state.data["identification_method"] = "cpf"
                 state.data.pop("correction_requested", None)
             if state.data.get("cpf") or state.data.get("identificacao_pulada"):
                 state.agent_response = None

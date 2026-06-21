@@ -59,6 +59,8 @@ class FlowRuntime:
         source = af.get("on_submit_source", "whatsapp_flow")
         if payload.get("_source") == source:
             return False  # this turn IS the Flow submission
+        if state.internal.get("_started"):
+            return False  # mid-flow (e.g. a correction cleared the gating slot) — never re-send
         return evaluate(af["send_when"], state, self.compiled.ctx.config)
 
     def _flow_sent_state(self, af: dict[str, Any], state: ServiceState) -> ServiceState:
@@ -124,6 +126,7 @@ class FlowRuntime:
             payload = self._apply_alias_map(af.get("alias_map", {}) or {}, payload)
 
         state.payload = payload
+        state.internal["_started"] = True  # the graph is about to run; corrections now route through it
         result = await self.compiled.graph.ainvoke(state)
         final = result if isinstance(result, ServiceState) else ServiceState(**result)
 
