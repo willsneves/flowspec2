@@ -16,6 +16,22 @@ uv run python examples/simulate.py   # 6 real citizen conversations over the HTT
 
 `examples/simulate.py` prints turn-by-turn transcripts of the reparo_luminaria flow as realistic conversations over the real HTTP backends (deterministic geocoder + SGRC via `MockTransport`): the production WhatsApp-Flow path, an address correction, gov.br auth, the praça→quadra branch, an SGRC outage (503 → retryable → recovers), and a duplicate submission that fires the side effect exactly once.
 
+## LLM-driven (the engine side)
+
+The simulations above feed already-extracted tokens. To exercise the *non-deterministic execution* side — a real LLM doing the work the format leaves open — there's a Gemini driver (`flowspec2.llm.GeminiAgent`, model `gemini-2.5-flash`, the model the production bot uses):
+
+```bash
+uv sync --extra llm                       # google-genai
+export GEMINI_API_KEY=...
+uv run python examples/llm_bot.py         # the citizen speaks free text; the LLM routes + extracts
+```
+
+The LLM does exactly two non-deterministic jobs, the rails hold everything else:
+- **route** — decide whether the citizen's free-text opener enters the flow (from `route.description`);
+- **extract** — read the messy message and the node's `payload_schema` / interactive options, and produce the **closed token** for the slot.
+
+flowspec2's validators then enforce the rail: an out-of-domain extraction is rejected and the node re-asks. The transcript shows the boundary per turn: `👤 free text → 🧠 LLM extraction → 🤖 the rail's next state`. The driver is a thin protocol (`route` + `extract`), so any provider can implement it. The gated integration tests (`FLOWSPEC2_RUN_LLM_TESTS=1`) run it against a live Gemini; the default suite stays offline.
+
 ## Quickstart
 
 ```python
