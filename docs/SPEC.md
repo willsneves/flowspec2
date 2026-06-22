@@ -14,7 +14,7 @@ discretion). The boundary is positional — there is no `isRail` tag.
 | `schema` | ✓ | RAIL | const `"flowspec/2"`. |
 | `flow` | ✓ | RAIL | stable id == `service_name`; StateManager + checkpointer + registry key. `^[a-z][a-z0-9_]*$`. |
 | `version` | ✓ | RAIL | semver of this document (`x.y.z`). |
-| `service` | | RAIL | service-identity metadata (SGRC/1746 ids); seeded into state, never a node. |
+| `service` | | RAIL | service-identity metadata (SGRC/1746 ids + `slugs`); seeded into state, never a node. `service.slugs` lists the catalog slug(s) this flow serves so a host can auto-expose the flow by scanning JSONs — add a flow by dropping its JSON, no host code change. |
 | `route` | ✓ | LLM | the entry hook the outer agent uses to pick this flow. |
 | `config` | | RAIL | guardrail booleans (`address_required`, `reference_point_required`, `identification_required`, `max_attempts`). |
 | `entry` | | RAIL | best-effort, non-blocking init tool (e.g. knowledge load). |

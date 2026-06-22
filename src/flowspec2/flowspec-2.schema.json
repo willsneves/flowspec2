@@ -17,7 +17,8 @@
         "id": { "type": "string", "description": "SGRC/1746 service id, e.g. '18131'." },
         "codigo_servico_1746": { "type": "string" },
         "knowledge_service_id": { "type": "string", "description": "Knowledge-hub id for best-effort context load." },
-        "identificacao_obrigatoria_1746": { "type": "boolean", "default": false }
+        "identificacao_obrigatoria_1746": { "type": "boolean", "default": false },
+        "slugs": { "type": "array", "items": { "type": "string" }, "description": "RAIL. Catalog/service-detail slug(s) this flow serves. A host app auto-exposes the guided flow for any service whose slug is listed here, so adding a guided flow is just dropping a JSON with its slug(s) — no host code change. Several slugs may point at one flow." }
       }
     },
     "route": {
