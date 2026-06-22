@@ -146,7 +146,8 @@
       }
     },
     "PontoReferencia": {
-      "type": "free_text"
+      "type": "free_text",
+      "optional": true
     },
     "SimNao": {
       "type": "bool",
