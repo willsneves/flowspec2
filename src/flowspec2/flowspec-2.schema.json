@@ -72,7 +72,8 @@
               "emoji_veto": { "type": "boolean", "default": false },
               "synonyms": { "description": "Map of free-text -> token. Each target MUST be a member of values (or true/false for bool).", "type": "object", "additionalProperties": { "type": ["string", "null", "boolean"] } }
             }
-          }
+          },
+          "optional": { "description": "free_text only: accept an empty answer as a valid skip (stored as \"\"), instead of re-asking. Lets a host advertise the slot as skippable.", "type": "boolean", "default": false }
         },
         "allOf": [ { "if": { "properties": { "type": { "const": "categorical" } }, "required": ["type"] }, "then": { "required": ["values"] } } ]
       }

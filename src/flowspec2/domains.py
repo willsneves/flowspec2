@@ -190,10 +190,14 @@ def _name_validator(_spec: dict[str, Any]) -> DomainValidator:
     return validate
 
 
-def _free_text_validator(_spec: dict[str, Any]) -> DomainValidator:
+def _free_text_validator(spec: dict[str, Any]) -> DomainValidator:
+    optional = bool(spec.get("optional"))
+
     def validate(raw: Any) -> str:
         value = str(raw or "").strip()
         if not value:
+            if optional:  # empty is a valid skip for an optional free-text slot
+                return ""
             raise ValueError("texto vazio")
         return value
 
