@@ -25,6 +25,15 @@ def _is_refusal(text: str) -> bool:
     return bool(norm) and any(tok in norm for tok in _REFUSAL)
 
 
+# Exact-token skip for the optional contact slots (email/name/cpf). Exact match —
+# not substring — so a real value like "skipper@x.com" is never read as a skip.
+_SKIP_TOKENS = {"pular", "skip", "nao", "nenhum", "passar", "proximo", "depois"}
+
+
+def _is_skip(text: str) -> bool:
+    return normalize_text(text) in _SKIP_TOKENS
+
+
 def _normalize_method(raw: str) -> Optional[str]:
     norm = normalize_text(raw)
     if "govbr" in norm or "gov.br" in norm or norm == "gov" or "gov br" in norm:
@@ -193,7 +202,7 @@ class IdentificationSubflow:
             pay = state.payload or {}
             if "cpf" in pay:
                 raw = pay["cpf"]
-                if (raw is None or str(raw).strip() == "") and not required:
+                if (raw is None or str(raw).strip() == "" or _is_skip(str(raw))) and not required:
                     state.data["identificacao_pulada"] = True
                     state.agent_response = None
                     return state
@@ -260,7 +269,7 @@ class IdentificationSubflow:
             pay = state.payload or {}
             if "email" in pay:
                 raw = pay["email"]
-                if raw is None or str(raw).strip() == "":
+                if raw is None or str(raw).strip() == "" or _is_skip(str(raw)):
                     state.data["email_processed"] = True
                     state.agent_response = None
                     return state
@@ -306,7 +315,7 @@ class IdentificationSubflow:
             pay = state.payload or {}
             if "name" in pay:
                 raw = pay["name"]
-                if raw is None or str(raw).strip() == "":
+                if raw is None or str(raw).strip() == "" or _is_skip(str(raw)):
                     state.data["name_processed"] = True
                     state.agent_response = None
                     return state
