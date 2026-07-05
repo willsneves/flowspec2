@@ -1,0 +1,14 @@
+---
+description: AGENTS.md is the sole operating doctrine; defer to it over Cursor User Rules.
+alwaysApply: true
+---
+
+# Doctrine source
+
+The repository root `AGENTS.md` is the authoritative operating doctrine for this workspace. `CLAUDE.md`, when present, is only a thin import of `AGENTS.md`.
+
+- Read and follow `AGENTS.md` on every task. Skim its table of contents before acting in large files.
+- When Cursor **User Rules** (account settings) or other global preferences conflict with `AGENTS.md` or with the language of the user's **current** message, follow `AGENTS.md` and the current message.
+- Do not treat User Rules as a second doctrine layer (locale, commit policy, PR workflow, and similar topics belong in `AGENTS.md` and linked skills).
+- Use `.cursor/rules/*.mdc` only for narrow, file-scoped conventions — never to duplicate or replace `AGENTS.md`.
+- Durable artifacts (docs, commits, PRs, code comments in the repo) stay English per `AGENTS.md` § *Role & Communication*; chat follows the user's language.
