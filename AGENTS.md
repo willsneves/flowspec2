@@ -122,11 +122,11 @@ For files with a TOC (`README.md`, `AGENTS.md`, `CLAUDE.md`, TOC-headed source),
 
 Before implementation or state change:
 
-- **Orient first** — follow [Context Loading](#context-loading); inspect only enough obvious code/config/docs to confirm the request. Research, audits, broad searches, deep analysis wait for *"continue"*. Respect [Safety](#safety).
-- **Understand** — say *"Understood"* with a concise, context-grounded task statement, then **stop**; wait for *"continue"* (or equivalent).
-- **Still unclear** — ask one focused clarifying question; wait for the answer before asking another.
+- **Orient first** — follow [Context Loading](#context-loading); inspect only enough obvious code/config to confirm the request. Research, audits, deep analysis wait for *"continue"*. Respect [Safety](#safety).
+- **Understand** — say *"Understood"* with a concise task statement, then **stop**; wait for *"continue"*.
+- **Still unclear** — ask one focused clarifying question; wait for the answer.
 
-This gate applies to every task. After continuation, [Planning vs Executing](#planning-vs-executing) and [Verification](#verification) govern.
+This gate governs interactive work; autonomous runs — plan mode, subagents, or a *proceed* brief — supply the go-ahead and skip it. After continuation, [Planning vs Executing](#planning-vs-executing) and [Verification](#verification) govern.
 
 <!-- /section:task-acknowledgement -->
 <!-- section:planning-vs-executing -->
@@ -196,7 +196,7 @@ A task is *done* only when every applicable box is checked; "mostly done" is deb
 - **Docs** — updated for changed behavior; new endpoints, env vars, CLI flags, models documented (see [Documentation](#documentation)).
 - **PR description** — what changed, why, how tested, rollback plan, even for single-commit PRs.
 - **Noticed improvements** — out-of-scope issues appended per [Code Review Scope](#code-review-scope).
-- **Reviews — advisory, never a gate** — every reviewer (`claude`, `codex`, `codex-copilot`) runs in the background; none gates a commit, merge, or task at hand. Dispatch strategically (review task 1 while doing task 2), never as a foreground/blocking call or idle-wait; consider each finding, then fix or dismiss (`skills/reviews/SKILL.md`).
+- **Reviews — advisory, never a gate** — every reviewer (`claude`, `codex`) runs in the background; none gates a commit, merge, or task at hand. Dispatch strategically (review task 1 while doing task 2), never as a foreground/blocking call or idle-wait; consider each finding, then fix or dismiss (`skills/reviews/SKILL.md`).
 
 <!-- /section:definition-of-done -->
 <!-- section:session-handoff -->
@@ -251,7 +251,7 @@ Each needs fresh confirmation; prior-session approval never carries forward.
 Prefer dedicated tools over shell; reserve shell for operations no dedicated tool covers.
 
 - **File ops** — harness glob/grep/read/edit/write over shell `find`/`grep`/`cat`/`sed`/`echo >`; dedicated tools respect permission scoping, ignore lists, harness hooks.
-- **Subagents** — don't spawn for work completable directly (refactoring a function in view, a single grep). Do spawn when fanning out across items, when work needs isolated context, or when parallel reads beat sequential. A direct grep often beats a search subagent for known patterns.
+- **Subagents** — delegate by default; lead integrates, reviews, verifies. Use Haiku 4.5 for quick checks, Sonnet 5 `xhigh` for routine implementation, Opus 4.8 `xhigh` for complex work and critical review, and Fable 5 `max` for the hardest/longest architecture, subtle correctness, and deep synthesis.
 - **External data** — use the harness's web-fetch/search tool, never `curl` to third-party hosts; transcript must capture the request.
 - **Search/retrieval budget** — re-call web-fetch/search only when the prior result missed the question, a required fact is missing, or coverage is the goal. Don't re-search to polish phrasing.
 - **Structured data** — prefer MCP servers for database, API, service access; fall back to shell only if no MCP server exposes it.
@@ -306,7 +306,7 @@ Detect the runtime shape before proposing commands:
 Harnesses differ in mechanics; the principles are shared:
 
 - **Harness files map 1:1 at each scope** — project automation in `.claude/` ↔ `.codex/` (committed); personal config in `~/.claude/` ↔ `~/.codex/` (uncommitted).
-- **Config precedence: machine-local > project > user-global > defaults** — applies to every layered surface. Per-harness merge rules in `docs/harnesses.md` § *Config Precedence*; `make audit-config-precedence` enforces it.
+- **Config layering is harness-specific** — never infer cross-harness precedence. Rules live in `docs/harnesses.md` § *Config Precedence*; `make audit-config-precedence` enforces structure.
 - **Hooks live with their dependencies** — a hook invoking a user-global skill (e.g. `~/.claude/skills/update-toc/`) lives in user-global settings; one invoking a repo-local script in project settings.
 - **Hooks fire on harness events, not arbitrary disk writes** — design idempotent; assume multiple fires on one file.
 - **Skill metadata is load-bearing** — descriptions and triggers let other agents decide relevance; keep them specific and falsifiable.

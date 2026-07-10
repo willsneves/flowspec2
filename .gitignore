@@ -108,6 +108,12 @@ dist/
 .claude/skills/plan-documentation
 .agents/skills/plan-documentation
 .cursor/skills/plan-documentation
+.claude/skills/model-release
+.agents/skills/model-release
+.cursor/skills/model-release
+.claude/skills/behavior-review
+.agents/skills/behavior-review
+.cursor/skills/behavior-review
 .claude/skills/version
 .agents/skills/version
 .cursor/skills/version
