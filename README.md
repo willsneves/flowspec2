@@ -3,17 +3,17 @@
 Table of Contents:
 
 - Install: 41 <!-- section:install -->
-- LLM-driven (the engine side): 63 <!-- section:llm-driven -->
-- Quickstart: 105 <!-- section:quickstart -->
-- Real backends: 129 <!-- section:real-backends -->
-- Error correlation: 146 <!-- section:error-correlation -->
-- CLI: 169 <!-- section:cli -->
-- What it compiles: 200 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 226 <!-- section:example -->
-    - The flowspec/2 document: 233 <!-- section:example-document -->
-    - Compiled LangGraph: 871 <!-- section:example-compiled-langgraph -->
-- Layout: 987 <!-- section:layout -->
-- Status: 1021 <!-- section:status -->
+- LLM-driven (the engine side): 68 <!-- section:llm-driven -->
+- Quickstart: 110 <!-- section:quickstart -->
+- Real backends: 134 <!-- section:real-backends -->
+- Error correlation: 151 <!-- section:error-correlation -->
+- CLI: 174 <!-- section:cli -->
+- What it compiles: 205 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 231 <!-- section:example -->
+    - The flowspec/2 document: 238 <!-- section:example-document -->
+    - Compiled LangGraph: 876 <!-- section:example-compiled-langgraph -->
+- Layout: 992 <!-- section:layout -->
+- Status: 1026 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -43,6 +43,7 @@ experiment and its loss accounting.
 ```bash
 uv sync                      # install the runtime package
 make ci                      # locked lint, format check, type checks, and offline tests
+make package-check           # build, inspect, and smoke-test the installed wheel
 uv run python examples/simulate.py   # 6 real citizen conversations over the HTTP backends
 ```
 
@@ -54,6 +55,10 @@ a signed, minimal Distroless Node runtime pinned by digest. The checker
 container runs without a shell or package manager and has no network,
 capabilities, writable root filesystem, or writable project mount. Docker is
 therefore the only additional prerequisite for `make typecheck` and `make ci`.
+GitHub Actions runs that same gate across every supported Python minor and runs
+`make package-check` separately. The workflow has read-only repository
+permissions, never loads secrets or live-model tests, and pins every Action and
+the uv toolchain to immutable versions.
 
 `examples/simulate.py` prints turn-by-turn transcripts of the reparo_luminaria flow as realistic conversations over the real HTTP backends (deterministic geocoder + SGRC via `MockTransport`): the production WhatsApp-Flow path, an address correction, gov.br auth, the praça→quadra branch, an SGRC outage (503 → retryable → recovers), and a duplicate submission replayed without a second backend call in the same registry. Durable cross-process exactly-once behavior remains a host-storage responsibility.
 
