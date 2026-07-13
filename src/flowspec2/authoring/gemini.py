@@ -197,7 +197,11 @@ class GeminiAuthor:
                 config=provider_configuration,
             )
         except Exception as provider_error:
-            status_code = getattr(provider_error, "status_code", None)
+            status_code = getattr(
+                provider_error,
+                "status_code",
+                getattr(provider_error, "code", None),
+            )
             status_suffix = f", status={status_code}" if isinstance(status_code, int) else ""
             raise GeminiAuthorError(
                 "Gemini author request failed for "
