@@ -423,10 +423,11 @@ decoding is an optimization and not the trust boundary.
 
 The provider-neutral authoring harness evaluates a source adapter with the same
 scenario corpus, runtime profile, and deterministic checker. An injected author
-receives the task description, canonical complete profile contract, prior
-source, and aggregate diagnostics; a
-bounded correction protocol records every attempt without hiding invalid source
-behind an adapter.
+receives an oracle-free task projection, canonical complete profile contract,
+prior source, and aggregate diagnostics; the evaluator-private case containing
+the reference flow and assertions is not reachable through the request object
+graph. A bounded correction protocol records every attempt without hiding
+invalid source behind an adapter.
 
 Each case combines expected validity with positive required constructs and
 forbidden constructs such as arbitrary expressions, scripts, manual graph
@@ -437,7 +438,9 @@ outcome, and profile identifier. The installed reference corpus has a closed
 manifest with case integrity digests. A live provider run records the report,
 exact source captures, corpus/profile identities, provider configuration,
 prompt identity, package version, and repository revision in one canonical
-content-addressed evidence envelope. Network use requires an explicit CLI
+content-addressed evidence envelope. Every Gemini capture also records the
+provider-reported effective model version rather than treating the requested
+model alias as the executed identity. Network use requires an explicit CLI
 opt-in; a configured credential alone is never consent.
 
 The included corpus is a deterministic infrastructure baseline, not evidence

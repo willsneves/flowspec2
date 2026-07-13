@@ -8,6 +8,8 @@ from dataclasses import replace
 import pytest
 
 from flowspec2.authoring import (
+    AUTHORING_EVIDENCE_FORMAT,
+    AuthoredSource,
     AuthoringBenchmarkEvidence,
     AuthoringProviderProvenance,
     AuthoringRequest,
@@ -37,8 +39,8 @@ def _evidence() -> AuthoringBenchmarkEvidence:
         for benchmark_case in corpus.cases
     }
 
-    def fixture_author(authoring_request: AuthoringRequest) -> str:
-        return expected_sources[authoring_request.benchmark_case.identifier]
+    def fixture_author(authoring_request: AuthoringRequest) -> AuthoredSource:
+        return AuthoredSource(expected_sources[authoring_request.task.identifier])
 
     recording_author = RecordingAuthor(fixture_author)
     profile = reference_profile()
@@ -68,11 +70,15 @@ def test_evidence_is_canonical_deterministic_and_defensively_projected() -> None
     assert first_evidence.to_json() == second_evidence.to_json()
     evidence_document = json.loads(first_evidence.to_json())
     assert evidence_document["digest"] == first_evidence.digest
+    assert evidence_document["format"] == AUTHORING_EVIDENCE_FORMAT
     assert evidence_document["corpus"] == first_evidence.corpus.metadata()
     assert evidence_document["provider"]["generation_configuration"] == {
         "seed": 0,
         "temperature": 0.0,
     }
+    assert all(
+        capture["effective_model_version"] is None for capture in evidence_document["captures"]
+    )
     evidence_document["provider"]["model"] = "mutated"
     assert json.loads(first_evidence.to_json())["provider"]["model"] == "fake-model"
 
@@ -93,6 +99,14 @@ def test_evidence_digest_changes_with_reproducibility_inputs() -> None:
             evidence,
             provider=replace(evidence.provider, prompt_digest="2" * 64),
         ).digest
+        != evidence.digest
+    )
+    versioned_capture = replace(
+        evidence.captures[0],
+        effective_model_version="provider-model-001",
+    )
+    assert (
+        replace(evidence, captures=(versioned_capture, *evidence.captures[1:])).digest
         != evidence.digest
     )
 
@@ -116,7 +130,7 @@ def test_recording_author_rejects_duplicate_attempt_identity() -> None:
     profile = reference_profile()
     benchmark_case = corpus.cases[0]
     authoring_request = AuthoringRequest(
-        benchmark_case=benchmark_case,
+        task=benchmark_case.authoring_task(),
         format_identifier="flowspec/2",
         profile_identifier=profile.identifier,
         profile_contract_json=profile.canonical_json(),
@@ -124,11 +138,21 @@ def test_recording_author_rejects_duplicate_attempt_identity() -> None:
         previous_source=None,
         previous_diagnostics=(),
     )
-    recording_author = RecordingAuthor(lambda _request: benchmark_case.expected_flow_json)
+    recording_author = RecordingAuthor(
+        lambda _request: AuthoredSource(benchmark_case.expected_flow_json)
+    )
 
     recording_author(authoring_request)
     with pytest.raises(ValueError, match="duplicate authoring capture"):
         recording_author(authoring_request)
+
+
+def test_gemini_evidence_requires_effective_model_versions() -> None:
+    evidence = _evidence()
+    gemini_provider = replace(evidence.provider, identifier="google_gemini")
+
+    with pytest.raises(ValueError, match="effective model versions"):
+        replace(evidence, provider=gemini_provider)
 
 
 def test_provider_provenance_rejects_secret_configuration_fields() -> None:

@@ -5,10 +5,10 @@ Table of Contents:
 - Purpose: 24 <!-- section:purpose -->
 - Evaluation contract: 39 <!-- section:evaluation-contract -->
 - Author integration: 89 <!-- section:author-integration -->
-- Structured-output projection: 165 <!-- section:structured-output-projection -->
-- Conformance kit: 192 <!-- section:conformance-kit -->
-- Interpreting reports: 218 <!-- section:interpreting-reports -->
-- Format promotion: 250 <!-- section:format-promotion -->
+- Structured-output projection: 176 <!-- section:structured-output-projection -->
+- Conformance kit: 203 <!-- section:conformance-kit -->
+- Interpreting reports: 229 <!-- section:interpreting-reports -->
+- Format promotion: 263 <!-- section:format-promotion -->
 
 <!-- /section:toc -->
 
@@ -88,16 +88,24 @@ in separately captured reports.
 
 ## Author integration
 
-An author is any callable from `AuthoringRequest` to a source string. The
-initial request contains the case, source-format identifier, runtime-profile
-identifier, and canonical complete profile contract. A repair request
-additionally contains the exact prior source and its ordered machine
-diagnostics.
+An author is any callable from `AuthoringRequest` to `AuthoredSource`. The
+request contains an oracle-free `AuthoringTask`, source-format identifier,
+runtime-profile identifier, and canonical complete profile contract. A repair
+request additionally contains the exact prior source and its ordered machine
+diagnostics. `AuthoredSource` carries the exact source plus the provider-reported
+effective model version when the transport exposes one.
+
+`AuthoringBenchmarkCase` is evaluator-private. The author-facing request object
+graph contains only the task identifier and prompt, so the reference flow,
+required constructs, forbidden constructs, and feature tags are structurally
+unreachable from the model transport rather than merely omitted by prompt
+convention.
 
 ```python
 from collections.abc import Callable
 
 from flowspec2.authoring import (
+    AuthoredSource,
     AuthoringBenchmarkCase,
     AuthoringRequest,
     RequiredFlowConstruct,
@@ -106,7 +114,7 @@ from flowspec2.authoring import (
 
 
 def evaluate(
-    model_author: Callable[[AuthoringRequest], str],
+    model_author: Callable[[AuthoringRequest], AuthoredSource],
     reviewed_reference_flow: dict[str, object],
 ) -> str:
     cases = (
@@ -147,7 +155,10 @@ task, normative schema, exact runtime-profile contract, prior source, and repair
 diagnostics. The complete reference flow and required-construct oracle remain
 evaluator-only. The provider returns the closed authoring projection;
 `flow_document_json` is preserved verbatim so malformed model source becomes a
-benchmark attempt and can be repaired rather than silently normalized.
+benchmark attempt and can be repaired rather than silently normalized. Every
+response must also expose the effective model version reported by Gemini; a
+missing version fails the transport instead of silently substituting the
+requested model alias.
 
 The CLI requires explicit network consent even when a key is configured:
 
@@ -235,14 +246,16 @@ shared executable JSON representation.
 
 `AuthoringBenchmarkEvidence` stores the report and its provenance in one
 canonical content-addressed envelope. It includes the exact emitted sources,
-provider and model identifiers, closed non-secret generation configuration,
+provider and requested-model identifiers, provider-reported effective model
+version for every Gemini attempt, closed non-secret generation configuration,
 provider SDK, prompt format and digest, package and operator-supplied repository
 revision, source-adapter contract, corpus identity and digest, and exact runtime
-profile identity and digest. It deliberately excludes timestamps, hostnames,
-latency, request IDs, credentials, and other operational fields that would make
-equivalent semantic evidence unequal. Captures must align exactly with every
-reported case and correction attempt, including matching source hashes, before
-the artifact can serialize.
+profile identity and digest. The current envelope contract is
+`flowspec2/authoring-benchmark-evidence@2`. It deliberately excludes timestamps,
+hostnames, latency, request IDs, credentials, and other operational fields that
+would make equivalent semantic evidence unequal. Captures must align exactly
+with every reported case and correction attempt, including matching source
+hashes, before the artifact can serialize.
 
 <!-- /section:interpreting-reports -->
 <!-- section:format-promotion -->

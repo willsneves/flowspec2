@@ -9,9 +9,11 @@ from pathlib import Path
 import pytest
 
 from flowspec2.authoring import (
+    AuthoredSource,
     AuthoringProviderProvenance,
     AuthoringRequest,
     GeminiAuthorError,
+    load_reference_authoring_corpus,
 )
 from flowspec2.cli import main
 
@@ -20,9 +22,16 @@ class FakeCliAuthor:
     def __init__(self, *, valid_source: bool = True) -> None:
         self.valid_source = valid_source
         self.closed = False
+        self.expected_sources = {
+            benchmark_case.identifier: benchmark_case.expected_flow_json
+            for benchmark_case in load_reference_authoring_corpus().cases
+        }
 
-    def __call__(self, authoring_request: AuthoringRequest) -> str:
-        return authoring_request.benchmark_case.expected_flow_json if self.valid_source else "{}"
+    def __call__(self, authoring_request: AuthoringRequest) -> AuthoredSource:
+        source = (
+            self.expected_sources[authoring_request.task.identifier] if self.valid_source else "{}"
+        )
+        return AuthoredSource(source, effective_model_version="fake-model-001")
 
     def provenance(self) -> AuthoringProviderProvenance:
         return AuthoringProviderProvenance.from_configuration(
@@ -103,6 +112,9 @@ def test_cli_writes_canonical_evidence_with_exact_captures(
     assert evidence_document["provider"]["model"] == "fake-model"
     assert evidence_document["captures"]
     assert all(capture["authored_source"] for capture in evidence_document["captures"])
+    assert {capture["effective_model_version"] for capture in evidence_document["captures"]} == {
+        "fake-model-001"
+    }
     assert "GEMINI_API_KEY" not in serialized_evidence
     assert fake_author.closed is True
     standard_output = capsys.readouterr().out
@@ -138,7 +150,7 @@ def test_cli_provider_failure_does_not_leak_cause_or_write_partial_output(
     sentinel_secret = "sentinel-provider-secret"
 
     class FailingAuthor(FakeCliAuthor):
-        def __call__(self, _authoring_request: AuthoringRequest) -> str:
+        def __call__(self, _authoring_request: AuthoringRequest) -> AuthoredSource:
             try:
                 raise RuntimeError(sentinel_secret)
             except RuntimeError as provider_error:
