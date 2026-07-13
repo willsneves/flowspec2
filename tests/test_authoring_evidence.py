@@ -9,6 +9,7 @@ from dataclasses import replace
 import jsonschema
 import pytest
 
+from flowspec2 import __version__
 from flowspec2.authoring import (
     AUTHORING_EVIDENCE_FORMAT,
     AuthoredSource,
@@ -56,7 +57,7 @@ def _evidence() -> AuthoringBenchmarkEvidence:
         profile=profile,
     )
     return AuthoringBenchmarkEvidence(
-        package_version="0.1.0",
+        package_version=__version__,
         repository_revision="revision-under-test",
         benchmark_limits=AuthoringBenchmarkLimits(),
         corpus=corpus,
