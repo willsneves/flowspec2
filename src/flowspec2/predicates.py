@@ -30,11 +30,7 @@ NAMESPACES = ("slots", "internal", "payload", "config", "address")
 
 
 def _is_ref(value: Any) -> bool:
-    return (
-        isinstance(value, str)
-        and "." in value
-        and value.split(".", 1)[0] in NAMESPACES
-    )
+    return isinstance(value, str) and "." in value and value.split(".", 1)[0] in NAMESPACES
 
 
 def _resolve(ref: str, state: ServiceState, config: dict[str, Any]) -> Any:
@@ -62,17 +58,17 @@ def evaluate(pred: dict[str, Any], state: ServiceState, config: dict[str, Any]) 
     """Evaluate a predicate against state + config. Pure, side-effect free."""
     if not isinstance(pred, dict) or len(pred) != 1:
         raise ValueError(f"predicate must be a single-key object, got {pred!r}")
-    (op, val), = pred.items()
+    ((op, val),) = pred.items()
 
     if op == "in":
         ref, options = val
         return _operand(ref, state, config) in options
     if op == "eq":
         left, right = val
-        return _operand(left, state, config) == _operand(right, state, config)
+        return bool(_operand(left, state, config) == _operand(right, state, config))
     if op == "ne":
         left, right = val
-        return _operand(left, state, config) != _operand(right, state, config)
+        return bool(_operand(left, state, config) != _operand(right, state, config))
     if op == "is_present":
         resolved = _resolve(val, state, config)
         return resolved is not None and resolved != ""

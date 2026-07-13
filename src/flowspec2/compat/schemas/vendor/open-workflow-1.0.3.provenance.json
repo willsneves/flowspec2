@@ -1,0 +1,13 @@
+{
+  "artifact": "open-workflow-1.0.3.workflow.yaml",
+  "license_artifact": "open-workflow-1.0.3.LICENSE",
+  "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+  "license_spdx": "Apache-2.0",
+  "retrieved_at": "2026-07-13",
+  "schema_sha256": "df3326da907e17e743e9d9e888839481d1557abdf91c592e74f27506ff523f0b",
+  "source_commit": "9b5b1da29e9d4fff2358580241e11aab22704a16",
+  "source_path": "schema/workflow.yaml",
+  "source_repository": "https://github.com/serverlessworkflow/specification",
+  "source_url": "https://raw.githubusercontent.com/serverlessworkflow/specification/9b5b1da29e9d4fff2358580241e11aab22704a16/schema/workflow.yaml",
+  "version": "1.0.3"
+}

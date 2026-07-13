@@ -70,7 +70,9 @@ def build_list(
     }
 
 
-def build_flow(flow_id: str, body: str, cta: str = "Preencher", flow_token: str = "") -> dict[str, Any]:
+def build_flow(
+    flow_id: str, body: str, cta: str = "Preencher", flow_token: str = ""
+) -> dict[str, Any]:
     return {
         "status": "ok",
         "type": "interactive",
@@ -99,7 +101,10 @@ def build_cta_url(body: str, url: str, display_text: str) -> dict[str, Any]:
         "interactive": {
             "type": "cta_url",
             "body": {"text": body[:BODY_MAX]},
-            "action": {"name": "cta_url", "parameters": {"display_text": display_text[:BUTTON_TITLE_MAX], "url": url}},
+            "action": {
+                "name": "cta_url",
+                "parameters": {"display_text": display_text[:BUTTON_TITLE_MAX], "url": url},
+            },
         },
     }
 
@@ -150,7 +155,11 @@ def options_from_domain(
             return {"body": body, "field": field, "buttons": buttons}
         rows_meta = {r["value"]: r.get("description", "") for r in spec.get("rows", [])}
         rows = [
-            {"id": str(v).lower(), "title": str(v)[:ROW_TITLE_MAX], "description": rows_meta.get(v, "")[:ROW_DESC_MAX]}
+            {
+                "id": str(v).lower(),
+                "title": str(v)[:ROW_TITLE_MAX],
+                "description": rows_meta.get(v, "")[:ROW_DESC_MAX],
+            }
             for v in values
         ]
         return {"body": body, "field": field, "sections": [{"title": "Opções", "rows": rows}]}

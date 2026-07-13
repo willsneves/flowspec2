@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from typing import Any, Awaitable, Callable
 
 Tool = Callable[..., Awaitable[dict[str, Any]]]
@@ -53,8 +52,6 @@ class ToolRegistry:
 
 # ── default fake backends ────────────────────────────────────────────────────
 
-_CPF_RE = re.compile(r"\D")
-
 
 async def _fake_hub_search(**kwargs: Any) -> dict[str, Any]:
     """Best-effort knowledge load (entry.tool). Never blocks the flow."""
@@ -72,7 +69,9 @@ async def _fake_geocode(address: str = "", **_: Any) -> dict[str, Any]:
     if not text:
         return {"status": "not_found", "error": "endereço vazio"}
     folded = text.lower()
-    kind = "praca" if ("praca" in folded or "praça" in folded or folded.startswith("praça")) else "rua"
+    kind = (
+        "praca" if ("praca" in folded or "praça" in folded or folded.startswith("praça")) else "rua"
+    )
     return {
         "status": "ok",
         "needs_confirmation": True,
@@ -87,7 +86,6 @@ async def _fake_geocode(address: str = "", **_: Any) -> dict[str, Any]:
 
 async def _fake_cpf_lookup(cpf: str = "", **_: Any) -> dict[str, Any]:
     """Look up a citizen's registry by CPF (identification backend)."""
-    digits = _CPF_RE.sub("", cpf or "")
     return {"status": "ok", "name": "", "email": "", "phones": []}
 
 
@@ -99,7 +97,11 @@ async def _fake_govbr_enrich(cpf: str = "", **_: Any) -> dict[str, Any]:
 async def _fake_sgrc_open_ticket(**inputs: Any) -> dict[str, Any]:
     """Open an SGRC ticket (terminal.tool). Returns a protocol id."""
     digest = hashlib.sha256(json.dumps(inputs, sort_keys=True, default=str).encode()).hexdigest()
-    return {"status": "success", "protocolo": f"SGRC-{digest[:10].upper()}", "message": "Chamado aberto com sucesso."}
+    return {
+        "status": "success",
+        "protocolo": f"SGRC-{digest[:10].upper()}",
+        "message": "Chamado aberto com sucesso.",
+    }
 
 
 def default_tool_registry() -> ToolRegistry:

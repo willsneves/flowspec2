@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from conftest import step
+from conftest import require_agent_response, step
+
 from flowspec2.subflows.identification import _is_skip
 
 
@@ -42,13 +43,13 @@ async def test_pular_skips_optional_email_and_name(luminaria):
     st = await step(luminaria, st, {"cpf": "11144477735"})
 
     # at the e-mail step: "pular" must skip it deterministically, not validate
-    assert "e-mail" in st.agent_response.description.lower()
+    assert "e-mail" in require_agent_response(st).description.lower()
     st = await step(luminaria, st, {"email": "pular"})
     assert st.data.get("email_processed") is True
     assert "email" not in st.data  # nothing stored on skip
 
     # and the name step likewise
-    assert "nome" in st.agent_response.description.lower()
+    assert "nome" in require_agent_response(st).description.lower()
     st = await step(luminaria, st, {"name": "pular"})
     assert st.data.get("name_processed") is True
     assert "name" not in st.data

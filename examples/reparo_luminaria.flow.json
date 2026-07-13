@@ -1,7 +1,7 @@
 {
   "schema": "flowspec/2",
   "flow": "reparo_luminaria",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "service": {
     "id": "18131",
     "codigo_servico_1746": "18131",
@@ -538,27 +538,58 @@
     "session_reset": true,
     "await_external": {
       "kind": "cta_url",
+      "step": "authenticate_govbr",
       "resume_on": "govbr_token",
+      "prompt": {
+        "text": "Para se identificar pelo gov.br, toque no botão de login que enviei. 🔐",
+        "verbatim": true
+      },
+      "interactive": {
+        "kind": "cta_url",
+        "field": "govbr_token",
+        "out_of_band": true,
+        "next_step": "authenticate_govbr"
+      },
       "on_resume": {
         "set": {
           "cpf": "$token.cpf",
           "name": "$token.nome",
-          "email": "$token.email"
+          "email": "$token.email",
+          "govbr_authenticated": true,
+          "cadastro_verificado": true
         },
-        "enrich": "get_user_info"
+        "enrich": {
+          "tool": "get_user_info",
+          "optional": true,
+          "input": {
+            "cpf": "$token.cpf"
+          },
+          "set": {
+            "phone": "$result.phones.0"
+          }
+        }
       },
       "timeout": {
-        "goto": "collect_cpf"
+        "goto": "collect_cpf",
+        "set": {
+          "identification_method": "cpf"
+        }
       },
       "recovery": {
         "abort": {
-          "goto": "select_identification_method"
+          "goto": "select_identification_method",
+          "set": {
+            "identification_method": null
+          }
         },
         "resend": {
           "goto": "authenticate_govbr"
         },
         "switch": {
-          "goto": "collect_cpf"
+          "goto": "collect_cpf",
+          "set": {
+            "identification_method": "cpf"
+          }
         }
       }
     }

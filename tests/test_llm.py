@@ -28,22 +28,42 @@ def test_enum_of_plain_and_anyof_nullable():
 def test_fields_spec_from_payload_schema():
     ar = AgentResponse(
         description="?",
-        payload_schema={"type": "object", "properties": {"luminaria_defeito": {"enum": ["Apagada", "Piscando"]}}, "required": ["luminaria_defeito"]},
+        payload_schema={
+            "type": "object",
+            "properties": {"luminaria_defeito": {"enum": ["Apagada", "Piscando"]}},
+            "required": ["luminaria_defeito"],
+        },
     )
     assert _fields_spec(ar) == [("luminaria_defeito", "closed", ["Apagada", "Piscando"])]
 
 
 def test_fields_spec_falls_back_to_interactive_buttons():
-    ar = AgentResponse(description="?", interactive={"field": "confirmacao", "buttons": [{"id": "sim", "title": "Sim"}, {"id": "nao", "title": "Não"}]})
+    ar = AgentResponse(
+        description="?",
+        interactive={
+            "field": "confirmacao",
+            "buttons": [{"id": "sim", "title": "Sim"}, {"id": "nao", "title": "Não"}],
+        },
+    )
     assert _fields_spec(ar) == [("confirmacao", "bool", None)]
-    ar2 = AgentResponse(description="?", interactive={"field": "identification_method", "buttons": [{"id": "cpf", "title": "CPF"}, {"id": "govbr", "title": "Gov.br"}]})
+    ar2 = AgentResponse(
+        description="?",
+        interactive={
+            "field": "identification_method",
+            "buttons": [{"id": "cpf", "title": "CPF"}, {"id": "govbr", "title": "Gov.br"}],
+        },
+    )
     assert _fields_spec(ar2) == [("identification_method", "closed", ["cpf", "govbr"])]
 
 
 # ── gated integration tests (real Gemini) ───────────────────────────────────
 
-_RUN_LLM = bool(os.environ.get("GEMINI_API_KEY")) and os.environ.get("FLOWSPEC2_RUN_LLM_TESTS") == "1"
-pytestmark_integration = pytest.mark.skipif(not _RUN_LLM, reason="set GEMINI_API_KEY + FLOWSPEC2_RUN_LLM_TESTS=1")
+_RUN_LLM = (
+    bool(os.environ.get("GEMINI_API_KEY")) and os.environ.get("FLOWSPEC2_RUN_LLM_TESTS") == "1"
+)
+pytestmark_integration = pytest.mark.skipif(
+    not _RUN_LLM, reason="set GEMINI_API_KEY + FLOWSPEC2_RUN_LLM_TESTS=1"
+)
 
 
 def _conversational(doc: dict) -> dict:
@@ -69,7 +89,22 @@ def test_gemini_extracts_closed_token():
     agent = GeminiAgent()
     ar = AgentResponse(
         description="Qual o problema na luminária?",
-        payload_schema={"type": "object", "properties": {"luminaria_defeito": {"enum": ["Apagada", "Piscando", "Acesa de dia", "Pendurada", "Danificada", "Com ruído"]}}, "required": ["luminaria_defeito"]},
+        payload_schema={
+            "type": "object",
+            "properties": {
+                "luminaria_defeito": {
+                    "enum": [
+                        "Apagada",
+                        "Piscando",
+                        "Acesa de dia",
+                        "Pendurada",
+                        "Danificada",
+                        "Com ruído",
+                    ]
+                }
+            },
+            "required": ["luminaria_defeito"],
+        },
     )
     out = agent.extract("tá tudo escuro, a luz não acende faz dias", ar)
     assert out.get("luminaria_defeito") == "Apagada"
@@ -86,14 +121,14 @@ async def test_gemini_drives_full_conversation(luminaria_doc):
     state = rt.new_state("llm-e2e")
     state = await rt.execute(state, {})  # enter -> asks defect
     for msg in [
-        "a luz tá apagada",          # defect -> Apagada
-        "é uma luminária só",        # quantidade -> uma (no intercaladas branch)
-        "fica na rua",               # localizacao -> Rua (quadra gated off)
+        "a luz tá apagada",  # defect -> Apagada
+        "é uma luminária só",  # quantidade -> uma (no intercaladas branch)
+        "fica na rua",  # localizacao -> Rua (quadra gated off)
         "Rua das Acácias, 50, Centro",  # address
-        "sim, pode confirmar",       # confirm address
-        "perto da escola",           # ponto de referência
+        "sim, pode confirmar",  # confirm address
+        "perto da escola",  # ponto de referência
         "prefiro não me identificar",  # anonimo
-        "pode abrir o chamado",      # confirm ticket -> open
+        "pode abrir o chamado",  # confirm ticket -> open
     ]:
         if state.status == "completed":
             break

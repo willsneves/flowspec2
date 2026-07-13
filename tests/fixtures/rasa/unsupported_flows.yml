@@ -1,0 +1,12 @@
+flows:
+  unsupported_flow:
+    description: Contains control flow outside the portable profile.
+    run_pattern_completed: false
+    if: slots.category is not null
+    persisted_slots:
+      - category
+    steps:
+      - collect: category
+        next: submit_report
+      - id: submit_report
+        action: action_submit_report

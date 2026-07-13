@@ -18,19 +18,26 @@ sentinel (the compiler resolves it to the following node in sequence).
 
 from __future__ import annotations
 
+import copy
+import logging
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Final, Optional, cast
 
-from langgraph.graph import END
+from langgraph.graph import END as LANGGRAPH_END
 from pydantic import BaseModel
 
 from .domains import make_slot_model, normalize_text, parse_affirmation
 from .interactive import options_from_domain
 from .models import AgentResponse, ServiceState
+from .observability import SnowflakeIdGenerator, log_event
 from .predicates import evaluate
 from .tools import ToolRegistry
 
+END: Final[str] = LANGGRAPH_END
 NEXT = "__NEXT__"  # router sentinel: "the next node in the flat sequence"
+_MISSING = object()
+
+logger = logging.getLogger(__name__)
 
 NodeFn = Callable[[ServiceState], Awaitable[ServiceState]]
 RouterFn = Callable[[ServiceState], str]
@@ -52,11 +59,20 @@ class FlowContext:
     slots: dict[str, Any]
     config: dict[str, Any]
     tools: ToolRegistry
+    log_id_generator: SnowflakeIdGenerator
+    await_external: Optional[dict[str, Any]] = None
     slot_models: dict[str, type[BaseModel]] = field(default_factory=dict)
-    dependents: dict[str, set[str]] = field(default_factory=dict)  # slot -> slots that (transitively) require it
-    derive_readers: dict[str, list[str]] = field(default_factory=dict)  # slot -> derive writes-keys reading it
+    await_external_nodes: set[str] = field(default_factory=set)
+    dependents: dict[str, set[str]] = field(
+        default_factory=dict
+    )  # slot -> slots that (transitively) require it
+    derive_readers: dict[str, list[str]] = field(
+        default_factory=dict
+    )  # slot -> derive writes-keys reading it
     node_for_slot: dict[str, str] = field(default_factory=dict)  # slot -> node id that collects it
-    slot_aux: dict[str, list[str]] = field(default_factory=dict)  # slot -> extra data keys to clear with it
+    slot_aux: dict[str, list[str]] = field(
+        default_factory=dict
+    )  # slot -> extra data keys to clear with it
 
     def model_for(self, slot: str) -> type[BaseModel]:
         if slot not in self.slot_models:
@@ -75,6 +91,7 @@ class FlowContext:
 
 
 # ── shared helpers ───────────────────────────────────────────────────────────
+
 
 def _att_key(slot: str) -> str:
     return f"_attempts_{slot}"
@@ -111,17 +128,271 @@ def _dig(obj: Any, path: str) -> Any:
     return cur
 
 
-def _handle_node_error(state: ServiceState, exc: Exception) -> ServiceState:
+def _dig_binding(source: Any, path: str) -> Any:
+    current = source
+    for segment in path.split("."):
+        if isinstance(current, dict):
+            if segment not in current:
+                return _MISSING
+            current = current[segment]
+        elif isinstance(current, list) and segment.isdigit():
+            index = int(segment)
+            if index >= len(current):
+                return _MISSING
+            current = current[index]
+        else:
+            return _MISSING
+    return current
+
+
+def _resolve_bindings(
+    bindings: dict[str, Any],
+    namespace: str,
+    source: Any,
+) -> dict[str, Any]:
+    """Resolve one bounded namespace into a private pending-write mapping.
+
+    Missing optional source paths produce no write. The compiler rejects every
+    other ``$`` namespace before graph construction, so runtime evaluation stays
+    deliberately smaller than an expression language.
+    """
+    prefix = f"${namespace}."
+    resolved: dict[str, Any] = {}
+    for target, binding in bindings.items():
+        if isinstance(binding, str) and binding.startswith("$"):
+            if not binding.startswith(prefix):
+                raise ValueError(f"{target!r} must use the {prefix} namespace")
+            mapped = _dig_binding(source, binding.removeprefix(prefix))
+            if mapped is _MISSING:
+                continue
+            resolved[target] = copy.deepcopy(mapped)
+        else:
+            resolved[target] = copy.deepcopy(binding)
+    return resolved
+
+
+def _handle_node_error(
+    state: ServiceState,
+    exc: Exception,
+    *,
+    ctx: FlowContext,
+    operation: str,
+) -> ServiceState:
+    log_id = log_event(
+        logger,
+        logging.ERROR,
+        "Flow node failed",
+        operation=operation,
+        log_id_generator=ctx.log_id_generator,
+        context={"flow": state.service_name, "error_type": type(exc).__name__},
+        exc_info=True,
+    )
     prior = state.agent_response or AgentResponse()
     prior.error_message = str(exc)
+    prior.log_id = log_id
     state.agent_response = prior
     state.status = "error"
     return state
 
 
+# ── external suspend/resume ─────────────────────────────────────────────────
+
+
+def make_await_external_node(
+    ctx: FlowContext,
+    capability: dict[str, Any],
+    step: Optional[dict[str, Any]] = None,
+    *,
+    default_router: Optional[RouterFn] = None,
+    additional_targets: Optional[list[str]] = None,
+    legacy_sent_data_key: Optional[str] = None,
+    waiting_description: Optional[str] = None,
+) -> NodeDesc:
+    """Build the singular out-of-band wait primitive.
+
+    The host delivers a resume token under ``resume_on`` or a recovery signal
+    under ``_external_event``. In particular, timeout is a host event; this node
+    does not own a clock or scheduler.
+    """
+    step = step or {}
+    node_id = step.get("step") or capability.get("step") or "await_external"
+    ctx.await_external_nodes.add(node_id)
+    resume_on = capability["resume_on"]
+    prompt = step.get("prompt") or capability.get("prompt") or {}
+    description = prompt.get("text", "Conclua a ação externa para continuar.")
+    interactive = step.get("interactive") or capability.get("interactive") or {}
+    on_resume = capability.get("on_resume") or {}
+    token_bindings = on_resume.get("set") or {}
+    enrichment = on_resume.get("enrich")
+    if isinstance(enrichment, str):
+        # Legacy documents declared only a best-effort tool name. Subflows may
+        # add compatibility inputs/outputs before calling this factory.
+        enrichment = {"tool": enrichment, "optional": True, "input": {}, "set": {}}
+
+    sent_internal_key = f"_await_external_sent:{node_id}"
+    completed_internal_key = f"_await_external_completed:{node_id}"
+    route_internal_key = f"_await_external_route:{node_id}"
+
+    transitions = {
+        "timeout": capability.get("timeout"),
+        **(capability.get("recovery") or {}),
+    }
+    targets = list(additional_targets or [])
+    targets.extend(
+        transition["goto"]
+        for transition in transitions.values()
+        if transition is not None and transition["goto"] != "END"
+    )
+    targets = list(dict.fromkeys(targets))
+
+    def clear_sent(state: ServiceState) -> None:
+        state.internal.pop(sent_internal_key, None)
+        if legacy_sent_data_key:
+            state.data.pop(legacy_sent_data_key, None)
+
+    def mark_sent(state: ServiceState) -> None:
+        state.internal[sent_internal_key] = True
+        if legacy_sent_data_key:
+            state.data[legacy_sent_data_key] = True
+
+    def was_sent(state: ServiceState) -> bool:
+        return bool(
+            state.internal.get(sent_internal_key)
+            or (legacy_sent_data_key and state.data.get(legacy_sent_data_key))
+        )
+
+    async def node(state: ServiceState) -> ServiceState:
+        try:
+            state.internal.pop(route_internal_key, None)
+            if state.internal.get(completed_internal_key):
+                state.status = "progress"
+                state.agent_response = None
+                return state
+            payload = state.payload or {}
+            has_resume_token = resume_on in payload
+            has_external_event = "_external_event" in payload
+            if has_resume_token and has_external_event:
+                raise ValueError(
+                    f"await_external {node_id!r} received both {resume_on!r} and _external_event"
+                )
+
+            if has_external_event:
+                external_event = payload.get("_external_event")
+                if not isinstance(external_event, str) or external_event not in transitions:
+                    raise ValueError(
+                        f"unsupported _external_event for {node_id!r}: {external_event!r}"
+                    )
+                transition = transitions.get(external_event)
+                if transition is None:
+                    raise ValueError(
+                        f"_external_event {external_event!r} is not configured for {node_id!r}"
+                    )
+                state.payload.pop("_external_event", None)
+                clear_sent(state)
+                if external_event == "resend":
+                    state.internal.pop(completed_internal_key, None)
+                else:
+                    state.internal[completed_internal_key] = True
+                state.data.update(copy.deepcopy(transition.get("set") or {}))
+                transition_target = transition["goto"]
+                state.internal[route_internal_key] = transition_target
+                if transition_target == "END":
+                    state.data["_reset_on_next_call"] = True
+                    state.status = "completed"
+                    state.agent_response = AgentResponse(
+                        description={
+                            "abort": "A ação externa foi cancelada.",
+                            "timeout": "O prazo para concluir a ação externa terminou.",
+                        }.get(external_event, "A ação externa foi encerrada.")
+                    )
+                else:
+                    state.status = "progress"
+                    state.agent_response = None
+                return state
+
+            if has_resume_token:
+                token = payload[resume_on]
+                pending_writes = _resolve_bindings(token_bindings, "token", token)
+                if enrichment:
+                    tool_name = enrichment["tool"]
+                    try:
+                        tool_inputs = _resolve_bindings(
+                            enrichment.get("input") or {}, "token", token
+                        )
+                        enrichment_result = await ctx.tools.call(tool_name, **tool_inputs)
+                        if not isinstance(enrichment_result, dict):
+                            raise TypeError(f"tool {tool_name!r} returned a non-object result")
+                        pending_writes.update(
+                            _resolve_bindings(
+                                enrichment.get("set") or {}, "result", enrichment_result
+                            )
+                        )
+                    except Exception:
+                        if not enrichment.get("optional", False):
+                            raise
+                        log_event(
+                            logger,
+                            logging.WARNING,
+                            "Optional await_external enrichment failed",
+                            operation=node_id,
+                            log_id_generator=ctx.log_id_generator,
+                            context={"tool": tool_name},
+                            exc_info=True,
+                        )
+                state.data.update(pending_writes)
+                clear_sent(state)
+                state.internal[completed_internal_key] = True
+                state.status = "progress"
+                state.agent_response = None
+                return state
+
+            if was_sent(state):
+                state.status = "progress"
+                state.agent_response = AgentResponse(
+                    description=waiting_description or description,
+                )
+                return state
+
+            mark_sent(state)
+            state.status = "progress"
+            host_marker = copy.deepcopy(interactive)
+            host_marker.setdefault("kind", capability["kind"])
+            host_marker.setdefault("field", resume_on)
+            host_marker.setdefault("out_of_band", True)
+            host_marker.setdefault("next_step", node_id)
+            host_marker["out_of_band_sent"] = True
+            state.agent_response = AgentResponse(
+                description=description,
+                interactive=host_marker,
+            )
+            return state
+        except Exception as exc:  # noqa: BLE001
+            error_state = _handle_node_error(state, exc, ctx=ctx, operation=node_id)
+            if error_state.agent_response:
+                # A failed resume is still waiting on the same external action,
+                # but the host must not interpret the retained prior response as
+                # a fresh out-of-band send.
+                error_state.agent_response.interactive = None
+            return error_state
+
+    def router(state: ServiceState) -> str:
+        if transition_target := state.internal.pop(route_internal_key, None):
+            if not isinstance(transition_target, str):
+                raise TypeError(f"await_external {node_id!r} produced a non-string route target")
+            return END if transition_target == "END" else transition_target
+        if state.agent_response is not None:
+            return END
+        return default_router(state) if default_router else NEXT
+
+    return NodeDesc(id=node_id, fn=node, router=router, targets=targets)
+
+
 # ── init / entry node ────────────────────────────────────────────────────────
 
-def make_init_node(ctx: FlowContext, entry: Optional[dict[str, Any]], service_seed: dict[str, Any]) -> NodeDesc:
+
+def make_init_node(
+    ctx: FlowContext, entry: Optional[dict[str, Any]], service_seed: dict[str, Any]
+) -> NodeDesc:
     async def node(state: ServiceState) -> ServiceState:
         for key, value in service_seed.items():
             state.data.setdefault(key, value)
@@ -130,9 +401,18 @@ def make_init_node(ctx: FlowContext, entry: Optional[dict[str, Any]], service_se
                 result = await ctx.tools.call(entry["tool"])
                 if entry.get("writes"):
                     state.data[entry["writes"]] = result
-            except Exception:  # blocking:false swallows failure
+            except Exception:
                 if entry.get("blocking"):
                     raise
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    "Non-blocking entry tool failed",
+                    operation="__init__",
+                    log_id_generator=ctx.log_id_generator,
+                    context={"tool": entry["tool"]},
+                    exc_info=True,
+                )
             state.data["_entry_done"] = True
         state.agent_response = None
         return state
@@ -142,7 +422,10 @@ def make_init_node(ctx: FlowContext, entry: Optional[dict[str, Any]], service_se
 
 # ── collect (slot) node ──────────────────────────────────────────────────────
 
-def make_collect_node(ctx: FlowContext, step: dict[str, Any], gate: Optional[dict[str, Any]]) -> NodeDesc:
+
+def make_collect_node(
+    ctx: FlowContext, step: dict[str, Any], gate: Optional[dict[str, Any]]
+) -> NodeDesc:
     node_id = step["id"]
     slot = step["slot"]
     slot_cfg = ctx.slots[slot]
@@ -151,8 +434,11 @@ def make_collect_node(ctx: FlowContext, step: dict[str, Any], gate: Optional[dic
     extract_hint = (step.get("prompt") or {}).get("extract_hint")
     if extract_hint:  # bake the hint into the schema description
         ctx.slot_models[slot] = make_slot_model(
-            slot, slot_cfg["domain"], ctx.domains,
-            nullable=slot_cfg.get("nullable", False), extract_hint=extract_hint,
+            slot,
+            slot_cfg["domain"],
+            ctx.domains,
+            nullable=slot_cfg.get("nullable", False),
+            extract_hint=extract_hint,
         )
         model = ctx.slot_models[slot]
     interactive = step.get("interactive")
@@ -161,18 +447,45 @@ def make_collect_node(ctx: FlowContext, step: dict[str, Any], gate: Optional[dic
     on_exhaust = slot_cfg.get("on_exhaust", "reask")
 
     def ask(state: ServiceState, error: Optional[str] = None) -> AgentResponse:
-        spec = options_from_domain({**interactive, "body": interactive.get("body", prompt)}, ctx.domains, state=state, config=ctx.config) if interactive else None
-        return AgentResponse(description=prompt, payload_schema=model.model_json_schema(), error_message=error, interactive=spec)
+        spec = (
+            options_from_domain(
+                {**interactive, "body": interactive.get("body", prompt)},
+                ctx.domains,
+                state=state,
+                config=ctx.config,
+            )
+            if interactive
+            else None
+        )
+        return AgentResponse(
+            description=prompt,
+            payload_schema=model.model_json_schema(),
+            error_message=error,
+            interactive=spec,
+        )
 
     def exhaust(state: ServiceState) -> ServiceState:
         if on_exhaust in ("skip", "default"):
             state.data[slot] = slot_cfg.get("default")
             state.agent_response = None
         elif on_exhaust == "handoff":
-            state.agent_response = AgentResponse(description="Vou te encaminhar para um atendente da Central 1746.")
+            state.agent_response = AgentResponse(
+                description="Vou te encaminhar para um atendente da Central 1746."
+            )
         elif on_exhaust == "END":
             state.status = "completed"
-            state.agent_response = AgentResponse(description="Não consegui prosseguir. Tente novamente mais tarde.")
+            log_id = log_event(
+                logger,
+                logging.WARNING,
+                "Flow stopped after collection attempts were exhausted",
+                operation=node_id,
+                log_id_generator=ctx.log_id_generator,
+                context={"flow": state.service_name, "slot": slot},
+            )
+            state.agent_response = AgentResponse(
+                description="Não consegui prosseguir. Tente novamente mais tarde.",
+                log_id=log_id,
+            )
         else:  # reask
             state.agent_response = ask(state, error="máximo de tentativas — vamos tentar de novo")
             state.data.pop(_att_key(slot), None)
@@ -207,12 +520,15 @@ def make_collect_node(ctx: FlowContext, step: dict[str, Any], gate: Optional[dic
             state.agent_response = ask(state)
             return state
         except Exception as exc:  # noqa: BLE001
-            return _handle_node_error(state, exc)
+            return _handle_node_error(state, exc, ctx=ctx, operation=node_id)
 
-    return NodeDesc(id=node_id, fn=node, router=lambda s: END if s.agent_response is not None else NEXT)
+    return NodeDesc(
+        id=node_id, fn=node, router=lambda s: END if s.agent_response is not None else NEXT
+    )
 
 
 # ── derive node ──────────────────────────────────────────────────────────────
+
 
 def make_derive_node(ctx: FlowContext, derive: dict[str, Any]) -> NodeDesc:
     writes = derive["writes"]
@@ -226,11 +542,13 @@ def make_derive_node(ctx: FlowContext, derive: dict[str, Any]) -> NodeDesc:
             if writes in state.data:
                 state.agent_response = None
                 return state
-            key = "|".join("" if state.data.get(f) is None else str(state.data.get(f)) for f in from_slots)
+            key = "|".join(
+                "" if state.data.get(f) is None else str(state.data.get(f)) for f in from_slots
+            )
             value = lookup.get(key)
             if value is None and default is not None:
                 if isinstance(default, str) and default.startswith("$from["):
-                    idx = int(default[len("$from["):-1])
+                    idx = int(default[len("$from[") : -1])
                     value = state.data.get(from_slots[idx])
                 else:
                     value = default
@@ -239,7 +557,7 @@ def make_derive_node(ctx: FlowContext, derive: dict[str, Any]) -> NodeDesc:
             state.agent_response = None
             return state
         except Exception as exc:  # noqa: BLE001
-            return _handle_node_error(state, exc)
+            return _handle_node_error(state, exc, ctx=ctx, operation=node_id)
 
     return NodeDesc(id=node_id, fn=node, router=lambda s: NEXT)
 
@@ -248,7 +566,15 @@ def make_derive_node(ctx: FlowContext, derive: dict[str, Any]) -> NodeDesc:
 
 _CORR_KEYWORDS = {
     "luminaria_defeito": ["defeito", "luminaria", "luminária", "problema", "tipo"],
-    "luminaria_localizacao": ["local", "localizacao", "localização", "onde", "praca", "praça", "quadra"],
+    "luminaria_localizacao": [
+        "local",
+        "localizacao",
+        "localização",
+        "onde",
+        "praca",
+        "praça",
+        "quadra",
+    ],
     "address": ["endereco", "endereço", "rua", "avenida", "logradouro"],
     "ponto_referencia": ["ponto", "referencia", "referência"],
     "cpf": ["cpf"],
@@ -298,16 +624,29 @@ def make_summary_confirm_node(ctx: FlowContext, step: dict[str, Any]) -> NodeDes
                 state.status = "completed"
                 state.agent_response = AgentResponse(description=reject_msg)
                 return state
-            spec = options_from_domain({**interactive, "body": interactive.get("body", prompt)}, ctx.domains, state=state, config=ctx.config) if interactive else None
+            spec = (
+                options_from_domain(
+                    {**interactive, "body": interactive.get("body", prompt)},
+                    ctx.domains,
+                    state=state,
+                    config=ctx.config,
+                )
+                if interactive
+                else None
+            )
             state.agent_response = AgentResponse(description=prompt, interactive=spec)
             return state
         except Exception as exc:  # noqa: BLE001
-            return _handle_node_error(state, exc)
+            return _handle_node_error(state, exc, ctx=ctx, operation=node_id)
 
-    return NodeDesc(id=node_id, fn=node, router=lambda s: END if s.agent_response is not None else NEXT)
+    return NodeDesc(
+        id=node_id, fn=node, router=lambda s: END if s.agent_response is not None else NEXT
+    )
 
 
-def make_bool_confirm_node(ctx: FlowContext, step: dict[str, Any], gate: Optional[dict[str, Any]]) -> NodeDesc:
+def make_bool_confirm_node(
+    ctx: FlowContext, step: dict[str, Any], gate: Optional[dict[str, Any]]
+) -> NodeDesc:
     node_id = step["id"]
     slot = step["confirm"]
     model = ctx.model_for(slot)
@@ -317,8 +656,22 @@ def make_bool_confirm_node(ctx: FlowContext, step: dict[str, Any], gate: Optiona
     max_attempts = ctx.max_attempts
 
     def ask(state: ServiceState, error: Optional[str] = None) -> AgentResponse:
-        spec = options_from_domain({**interactive, "body": interactive.get("body", prompt)}, ctx.domains, state=state, config=ctx.config) if interactive else None
-        return AgentResponse(description=prompt, payload_schema=model.model_json_schema(), error_message=error, interactive=spec)
+        spec = (
+            options_from_domain(
+                {**interactive, "body": interactive.get("body", prompt)},
+                ctx.domains,
+                state=state,
+                config=ctx.config,
+            )
+            if interactive
+            else None
+        )
+        return AgentResponse(
+            description=prompt,
+            payload_schema=model.model_json_schema(),
+            error_message=error,
+            interactive=spec,
+        )
 
     async def node(state: ServiceState) -> ServiceState:
         try:
@@ -345,9 +698,11 @@ def make_bool_confirm_node(ctx: FlowContext, step: dict[str, Any], gate: Optiona
             state.agent_response = ask(state)
             return state
         except Exception as exc:  # noqa: BLE001
-            return _handle_node_error(state, exc)
+            return _handle_node_error(state, exc, ctx=ctx, operation=node_id)
 
-    return NodeDesc(id=node_id, fn=node, router=lambda s: END if s.agent_response is not None else NEXT)
+    return NodeDesc(
+        id=node_id, fn=node, router=lambda s: END if s.agent_response is not None else NEXT
+    )
 
 
 def make_hub_confirm_node(ctx: FlowContext, confirm: dict[str, Any], terminal_id: str) -> NodeDesc:
@@ -357,10 +712,19 @@ def make_hub_confirm_node(ctx: FlowContext, confirm: dict[str, Any], terminal_id
     interactive = confirm.get("interactive")
     prompt = (confirm.get("prompt") or {}).get("text", "Confirma os dados?")
     correctable = confirm["correctable"]
-    on_confirm = confirm.get("on_confirm", terminal_id)
+    on_confirm = cast(str, confirm.get("on_confirm", terminal_id))
 
     def ask(state: ServiceState, description: Optional[str] = None) -> AgentResponse:
-        spec = options_from_domain({**interactive, "body": interactive.get("body", prompt)}, ctx.domains, state=state, config=ctx.config) if interactive else None
+        spec = (
+            options_from_domain(
+                {**interactive, "body": interactive.get("body", prompt)},
+                ctx.domains,
+                state=state,
+                config=ctx.config,
+            )
+            if interactive
+            else None
+        )
         return AgentResponse(description=description or prompt, interactive=spec)
 
     async def node(state: ServiceState) -> ServiceState:
@@ -391,7 +755,7 @@ def make_hub_confirm_node(ctx: FlowContext, confirm: dict[str, Any], terminal_id
             state.agent_response = ask(state)
             return state
         except Exception as exc:  # noqa: BLE001
-            return _handle_node_error(state, exc)
+            return _handle_node_error(state, exc, ctx=ctx, operation=node_id)
 
     def router(state: ServiceState) -> str:
         if state.data.get(slot) is True:
@@ -407,6 +771,7 @@ def make_hub_confirm_node(ctx: FlowContext, confirm: dict[str, Any], terminal_id
 
 # ── terminal node ────────────────────────────────────────────────────────────
 
+
 def make_terminal_node(ctx: FlowContext, terminal: dict[str, Any]) -> NodeDesc:
     node_id = terminal["step"]
     tool = terminal["tool"]
@@ -415,7 +780,6 @@ def make_terminal_node(ctx: FlowContext, terminal: dict[str, Any]) -> NodeDesc:
     outputs = terminal.get("outputs", {})
     outcomes = terminal.get("outcomes", {})
     success = outcomes.get("success", {})
-    retryable = outcomes.get("retryable", {})
     fatal = outcomes.get("fatal", {})
 
     async def node(state: ServiceState) -> ServiceState:
@@ -450,20 +814,38 @@ def make_terminal_node(ctx: FlowContext, terminal: dict[str, Any]) -> NodeDesc:
             elif status == "retryable":
                 # preserve_state: keep everything so the next turn re-fires this node
                 state.status = "error"
+                log_id = log_event(
+                    logger,
+                    logging.WARNING,
+                    "Terminal tool returned a retryable failure",
+                    operation=node_id,
+                    log_id_generator=ctx.log_id_generator,
+                    context={"flow": state.service_name, "tool": tool},
+                )
                 state.agent_response = AgentResponse(
                     description="O sistema está temporariamente indisponível. Pode tentar de novo em instantes?",
                     error_message=result.get("error"),
+                    log_id=log_id,
                 )
             else:  # fatal
                 if fatal.get("reset_next", True):
                     state.data["_reset_on_next_call"] = True
                 state.status = "error"
+                log_id = log_event(
+                    logger,
+                    logging.ERROR,
+                    "Terminal tool returned a fatal failure",
+                    operation=node_id,
+                    log_id_generator=ctx.log_id_generator,
+                    context={"flow": state.service_name, "tool": tool},
+                )
                 state.agent_response = AgentResponse(
                     description=result.get("message", "Não foi possível concluir agora."),
                     error_message=result.get("error"),
+                    log_id=log_id,
                 )
             return state
         except Exception as exc:  # noqa: BLE001
-            return _handle_node_error(state, exc)
+            return _handle_node_error(state, exc, ctx=ctx, operation=node_id)
 
     return NodeDesc(id=node_id, fn=node, router=lambda s: END)
