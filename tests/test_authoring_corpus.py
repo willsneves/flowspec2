@@ -14,6 +14,7 @@ from flowspec2.authoring import (
     AUTHORING_CASE_FORMAT,
     AUTHORING_CORPUS_FORMAT,
     REFERENCE_AUTHORING_CORPUS_ID,
+    AuthoredSource,
     AuthoringRequest,
     load_reference_authoring_corpus,
     run_authoring_benchmark,
@@ -78,8 +79,8 @@ def test_reference_corpus_runs_as_the_fixture_integrity_baseline() -> None:
         for benchmark_case in corpus.cases
     }
 
-    def fixture_author(authoring_request: AuthoringRequest) -> str:
-        return source_by_identifier[authoring_request.benchmark_case.identifier]
+    def fixture_author(authoring_request: AuthoringRequest) -> AuthoredSource:
+        return AuthoredSource(source_by_identifier[authoring_request.task.identifier])
 
     report = run_authoring_benchmark("packaged_reference", corpus.cases, fixture_author)
 

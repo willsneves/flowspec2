@@ -3,13 +3,13 @@
 Table of Contents:
 
 - Files: 28 <!-- section:files -->
-- Authoring-to-execution pipeline: 56 <!-- section:authoring-execution-pipeline -->
-- The one idea: the boundary is the closed value-domain: 111 <!-- section:closed-value-domain -->
-- Top-level shape (the two tiers): 128 <!-- section:top-level-shape -->
-- Mapping table — every construct → its LangGraph primitive: 149 <!-- section:mapping-table -->
-- Rationale (1 page): 209 <!-- section:rationale -->
-    - Rejected alternatives: 226 <!-- section:rationale-rejected-alternatives -->
-- How this was produced: 242 <!-- section:production-method -->
+- Authoring-to-execution pipeline: 57 <!-- section:authoring-execution-pipeline -->
+- The one idea: the boundary is the closed value-domain: 114 <!-- section:closed-value-domain -->
+- Top-level shape (the two tiers): 131 <!-- section:top-level-shape -->
+- Mapping table — every construct → its LangGraph primitive: 152 <!-- section:mapping-table -->
+- Rationale (1 page): 212 <!-- section:rationale -->
+    - Rejected alternatives: 229 <!-- section:rationale-rejected-alternatives -->
+- How this was produced: 245 <!-- section:production-method -->
 
 <!-- /section:toc -->
 
@@ -43,6 +43,7 @@ that graph as a callable tool.
 | [`AUTHORING_BENCHMARK.md`](AUTHORING_BENCHMARK.md) | Evaluation protocol and real-model evidence requirements. |
 | [`FLOWSPEC3_DRAFT.md`](FLOWSPEC3_DRAFT.md) | Non-executable source preview, migration, and loss accounting. |
 | [`adr/0002-format-authoring-execution-boundary.md`](adr/0002-format-authoring-execution-boundary.md) | Decision record for the source/link/profile/IR boundary. |
+| [`adr/0003-benchmark-author-trust-boundary.md`](adr/0003-benchmark-author-trust-boundary.md) | Decision record for evaluator-private oracles and effective model identity. |
 
 The project test suite checks the schema itself, validates both example
 documents, and rejects adversarial mutations such as unknown keys, ambiguous
@@ -97,13 +98,15 @@ contracts are documented in [AUTHORING_BENCHMARK.md](AUTHORING_BENCHMARK.md) and
 [FLOWSPEC3_DRAFT.md](FLOWSPEC3_DRAFT.md).
 
 The reference authoring and CTK cases are package resources pinned by a closed
-manifest, rather than test-only fixtures. A live model receives the normative
-schema and the same complete `FlowProfile` contract whose digest binds IR and
-restored state; benchmark answer flows and required-construct oracles never
-enter its prompt. The resulting evidence envelope binds exact captured sources
-to every report attempt and records only deterministic, non-secret provenance.
-This keeps provider operation at the edge while making later comparison and
-offline review independently verifiable.
+manifest, rather than test-only fixtures. A live model receives an oracle-free
+task projection, the normative schema, and the same complete `FlowProfile`
+contract whose digest binds IR and restored state. Benchmark answer flows and
+evaluation assertions are absent from the author-facing object graph, not only
+from the rendered prompt. The resulting evidence envelope binds exact captured
+sources and provider-reported effective model versions to every report attempt
+and records only deterministic, non-secret provenance. This keeps provider
+operation at the edge while making later comparison and offline review
+independently verifiable.
 
 <!-- /section:authoring-execution-pipeline -->
 <!-- section:closed-value-domain -->

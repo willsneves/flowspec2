@@ -13,7 +13,7 @@ from jsonschema import Draft202012Validator
 from flowspec2.json_codec import StrictJsonError, strict_json_loads
 from flowspec2.schema import schema as normative_schema
 
-from .benchmark import AuthoringRequest
+from .benchmark import AuthoredSource, AuthoringRequest
 from .evidence import AuthoringProviderProvenance
 from .projection import authoring_projection
 
@@ -92,8 +92,8 @@ def _authoring_prompt(authoring_request: AuthoringRequest) -> str:
     return _canonical_json(
         {
             "format": GEMINI_AUTHOR_PROMPT_FORMAT,
-            "task": authoring_request.benchmark_case.prompt,
-            "case_identifier": authoring_request.benchmark_case.identifier,
+            "task": authoring_request.task.prompt,
+            "case_identifier": authoring_request.task.identifier,
             "format_identifier": authoring_request.format_identifier,
             "profile_identifier": authoring_request.profile_identifier,
             "profile_contract": strict_json_loads(authoring_request.profile_contract_json),
@@ -177,7 +177,7 @@ class GeminiAuthor:
             generation_configuration=self.generation_configuration,
         )
 
-    def __call__(self, authoring_request: AuthoringRequest) -> str:
+    def __call__(self, authoring_request: AuthoringRequest) -> AuthoredSource:
         if self._closed:
             raise GeminiAuthorError("Gemini author is closed")
         if authoring_request.format_identifier != "flowspec/2":
@@ -205,17 +205,20 @@ class GeminiAuthor:
             status_suffix = f", status={status_code}" if isinstance(status_code, int) else ""
             raise GeminiAuthorError(
                 "Gemini author request failed for "
-                f"{authoring_request.benchmark_case.identifier!r} correction round "
+                f"{authoring_request.task.identifier!r} correction round "
                 f"{authoring_request.correction_round} "
                 f"({type(provider_error).__name__}{status_suffix})."
             ) from provider_error
 
         try:
             response_text = getattr(provider_response, "text", None)
+            effective_model_version = getattr(provider_response, "model_version", None)
         except Exception as response_error:
             raise GeminiAuthorError("Gemini author response could not be read") from response_error
         if not isinstance(response_text, str) or not response_text:
             raise GeminiAuthorError("Gemini author returned an empty projection envelope")
+        if not isinstance(effective_model_version, str) or not effective_model_version.strip():
+            raise GeminiAuthorError("Gemini author response omitted its effective model version")
         try:
             projected_document = strict_json_loads(response_text)
         except (json.JSONDecodeError, StrictJsonError) as decoding_error:
@@ -229,7 +232,10 @@ class GeminiAuthor:
             raise GeminiAuthorError("Gemini author returned an incompatible projection envelope")
         if not isinstance(projected_document, dict):
             raise AssertionError("projection schema accepted a non-object response")
-        return cast(str, projected_document["flow_document_json"])
+        return AuthoredSource(
+            source=cast(str, projected_document["flow_document_json"]),
+            effective_model_version=effective_model_version,
+        )
 
     def close(self) -> None:
         if self._closed:

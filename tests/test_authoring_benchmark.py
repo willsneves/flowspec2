@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import json
 from collections.abc import Callable
-from dataclasses import FrozenInstanceError, dataclass, replace
+from dataclasses import FrozenInstanceError, dataclass, fields, replace
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
@@ -13,6 +13,7 @@ import pytest
 
 from flowspec2.authoring import (
     TOKEN_PROXY_BYTES_PER_UNIT,
+    AuthoredSource,
     AuthoringAttempt,
     AuthoringBenchmarkCase,
     AuthoringBenchmarkLimits,
@@ -73,11 +74,15 @@ def _pretty_source(flow_document: object) -> str:
     return json.dumps(flow_document, ensure_ascii=False, indent=2, sort_keys=True)
 
 
+def _authored(source: str) -> AuthoredSource:
+    return AuthoredSource(source=source)
+
+
 def _fixture_author(
     source_by_case: dict[str, dict[str, Any]],
-) -> Callable[[AuthoringRequest], str]:
-    def author(authoring_request: AuthoringRequest) -> str:
-        return _pretty_source(source_by_case[authoring_request.benchmark_case.identifier])
+) -> Callable[[AuthoringRequest], AuthoredSource]:
+    def author(authoring_request: AuthoringRequest) -> AuthoredSource:
+        return _authored(_pretty_source(source_by_case[authoring_request.task.identifier]))
 
     return author
 
@@ -161,6 +166,36 @@ def test_fixture_oracles_require_exact_values() -> None:
     assert all("expected" in required_construct for required_construct in required_constructs)
 
 
+def test_author_request_exposes_only_an_oracle_free_task() -> None:
+    benchmark_case = _benchmark_case(_authoring_fixtures()[0])
+    observed_requests: list[AuthoringRequest] = []
+
+    def inspecting_author(authoring_request: AuthoringRequest) -> AuthoredSource:
+        observed_requests.append(authoring_request)
+        return AuthoredSource(benchmark_case.expected_flow_json)
+
+    run_authoring_benchmark("oracle_boundary", (benchmark_case,), inspecting_author)
+
+    authoring_request = observed_requests[0]
+    assert {contract_field.name for contract_field in fields(authoring_request)} == {
+        "task",
+        "format_identifier",
+        "profile_identifier",
+        "profile_contract_json",
+        "correction_round",
+        "previous_source",
+        "previous_diagnostics",
+    }
+    assert {contract_field.name for contract_field in fields(authoring_request.task)} == {
+        "identifier",
+        "prompt",
+    }
+    assert not hasattr(authoring_request, "benchmark_case")
+    assert not hasattr(authoring_request.task, "expected_flow_json")
+    assert not hasattr(authoring_request.task, "required_constructs")
+    assert not hasattr(authoring_request.task, "forbidden_constructs")
+
+
 def test_terminal_oracle_rejects_semantically_opposite_values() -> None:
     terminal_fixture = next(
         authoring_fixture
@@ -211,7 +246,7 @@ def test_terminal_oracle_rejects_semantically_opposite_values() -> None:
         run_authoring_benchmark(
             "terminal_diagnostic",
             (_benchmark_case(terminal_fixture),),
-            lambda _authoring_request: _pretty_source(disabled_idempotency_source),
+            lambda _authoring_request: _authored(_pretty_source(disabled_idempotency_source)),
             limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
         )
         .case_results[0]
@@ -252,7 +287,7 @@ def test_terminal_oracle_rejects_an_alternate_compatible_tool() -> None:
     benchmark_report = run_authoring_benchmark(
         "terminal_tool_opposite",
         (_benchmark_case(terminal_fixture),),
-        lambda _authoring_request: _pretty_source(terminal_source),
+        lambda _authoring_request: _authored(_pretty_source(terminal_source)),
         limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
         profile=alternate_profile,
     )
@@ -326,7 +361,7 @@ def test_address_oracle_rejects_disabled_confirmation() -> None:
     benchmark_report = run_authoring_benchmark(
         "address_opposite",
         (_benchmark_case(address_fixture),),
-        lambda _authoring_request: _pretty_source(address_source),
+        lambda _authoring_request: _authored(_pretty_source(address_source)),
         limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
     )
 
@@ -346,11 +381,11 @@ def test_correction_protocol_supplies_previous_source_and_diagnostics() -> None:
     )
     observed_requests: list[AuthoringRequest] = []
 
-    def correcting_author(authoring_request: AuthoringRequest) -> str:
+    def correcting_author(authoring_request: AuthoringRequest) -> AuthoredSource:
         observed_requests.append(authoring_request)
         if authoring_request.correction_round == 0:
-            return '{"schema":'
-        return _pretty_source(authoring_fixture["source"])
+            return _authored('{"schema":')
+        return _authored(_pretty_source(authoring_fixture["source"]))
 
     benchmark_report = run_authoring_benchmark(
         "correction_protocol",
@@ -387,7 +422,7 @@ def test_valid_but_irrelevant_flow_fails_required_constructs() -> None:
     benchmark_report = run_authoring_benchmark(
         "intent_guard",
         (_benchmark_case(terminal_fixture),),
-        lambda _authoring_request: _pretty_source(linear_fixture["source"]),
+        lambda _authoring_request: _authored(_pretty_source(linear_fixture["source"])),
         limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
     )
 
@@ -429,7 +464,7 @@ def test_closed_oracle_rejects_an_unrelated_required_secret_step() -> None:
         run_authoring_benchmark(
             "closed_oracle",
             (_benchmark_case(linear_fixture),),
-            lambda _authoring_request: _pretty_source(unrelated_secret_source),
+            lambda _authoring_request: _authored(_pretty_source(unrelated_secret_source)),
             limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
         )
         .case_results[0]
@@ -475,7 +510,7 @@ def test_forbidden_construct_cannot_be_hidden_by_an_adapter() -> None:
     benchmark_report = run_authoring_benchmark(
         "forbidden_construct",
         (_benchmark_case(authoring_fixture),),
-        lambda _authoring_request: _pretty_source(mutated_source),
+        lambda _authoring_request: _authored(_pretty_source(mutated_source)),
         source_adapter=ScriptRemovingAdapter(),
         limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
     )
@@ -516,7 +551,7 @@ def test_same_case_can_run_through_an_experimental_source_adapter() -> None:
     benchmark_report = run_authoring_benchmark(
         "adapter_comparison",
         (_benchmark_case(authoring_fixture),),
-        lambda _authoring_request: _pretty_source(wrapped_source),
+        lambda _authoring_request: _authored(_pretty_source(wrapped_source)),
         source_adapter=WrappedExperimentalAdapter(),
     )
 
@@ -572,7 +607,7 @@ def test_non_json_adapter_controls_parsing_and_canonical_source_measurement() ->
         run_authoring_benchmark(
             "non_json_adapter",
             (_benchmark_case(linear_fixture),),
-            lambda _authoring_request: authored_source,
+            lambda _authoring_request: _authored(authored_source),
             source_adapter=source_adapter,
             limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
         )
@@ -602,7 +637,7 @@ def test_adapter_failure_becomes_a_repair_diagnostic() -> None:
         run_authoring_benchmark(
             "adapter_failure",
             (_benchmark_case(linear_fixture),),
-            lambda _authoring_request: "not prefixed syntax",
+            lambda _authoring_request: _authored("not prefixed syntax"),
             source_adapter=PrefixedJsonAdapter(),
             limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
         )
@@ -631,9 +666,9 @@ def test_benchmark_uses_and_records_the_selected_runtime_profile() -> None:
     )
     observed_requests: list[AuthoringRequest] = []
 
-    def fixture_author(authoring_request: AuthoringRequest) -> str:
+    def fixture_author(authoring_request: AuthoringRequest) -> AuthoredSource:
         observed_requests.append(authoring_request)
-        return _pretty_source(authoring_fixture["source"])
+        return _authored(_pretty_source(authoring_fixture["source"]))
 
     benchmark_report = run_authoring_benchmark(
         "profile_contract",
@@ -658,7 +693,7 @@ def test_case_attempt_result_and_report_contracts_are_immutable() -> None:
     benchmark_report = run_authoring_benchmark(
         "immutable_contracts",
         (_benchmark_case(authoring_fixture),),
-        lambda _authoring_request: _pretty_source(authoring_fixture["source"]),
+        lambda _authoring_request: _authored(_pretty_source(authoring_fixture["source"])),
     )
     benchmark_case = _benchmark_case(authoring_fixture)
     case_result = benchmark_report.case_results[0]

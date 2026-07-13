@@ -4,16 +4,16 @@ Table of Contents:
 
 - Install: 41 <!-- section:install -->
 - LLM-driven (the engine side): 68 <!-- section:llm-driven -->
-- Quickstart: 110 <!-- section:quickstart -->
-- Real backends: 134 <!-- section:real-backends -->
-- Error correlation: 151 <!-- section:error-correlation -->
-- CLI: 174 <!-- section:cli -->
-- What it compiles: 205 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 231 <!-- section:example -->
-    - The flowspec/2 document: 238 <!-- section:example-document -->
-    - Compiled LangGraph: 876 <!-- section:example-compiled-langgraph -->
-- Layout: 992 <!-- section:layout -->
-- Status: 1026 <!-- section:status -->
+- Quickstart: 113 <!-- section:quickstart -->
+- Real backends: 137 <!-- section:real-backends -->
+- Error correlation: 154 <!-- section:error-correlation -->
+- CLI: 177 <!-- section:cli -->
+- What it compiles: 208 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 234 <!-- section:example -->
+    - The flowspec/2 document: 241 <!-- section:example-document -->
+    - Compiled LangGraph: 879 <!-- section:example-compiled-langgraph -->
+- Layout: 995 <!-- section:layout -->
+- Status: 1029 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -93,8 +93,11 @@ packaged reference corpus, the complete runtime-profile contract, and repair
 diagnostics, then returns source through the closed authoring projection. A
 live run requires explicit network consent and writes one content-addressed
 evidence envelope containing exact emitted sources, report, corpus/profile
-digests, model configuration, prompt identity, package version, and the
-operator-supplied repository revision:
+digests, requested model configuration, provider-reported effective model
+version for every attempt, prompt identity, package version, and the
+operator-supplied repository revision. The author request is an oracle-free
+task projection; reference answers and evaluator assertions are not reachable
+from the model transport:
 
 ```bash
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output authoring-evidence.json

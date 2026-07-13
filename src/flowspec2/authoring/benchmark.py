@@ -272,8 +272,22 @@ DEFAULT_FORBIDDEN_CONSTRUCTS: Final[tuple[ForbiddenConstruct, ...]] = (
 
 
 @dataclass(frozen=True)
+class AuthoringTask:
+    """The closed oracle-free task delivered to an injected author."""
+
+    identifier: str
+    prompt: str
+
+    def __post_init__(self) -> None:
+        _require_identifier(self.identifier, "authoring task identifier")
+        if not self.prompt.strip():
+            raise ValueError(f"authoring task {self.identifier!r} prompt must be non-empty")
+        object.__setattr__(self, "prompt", self.prompt.strip())
+
+
+@dataclass(frozen=True)
 class AuthoringBenchmarkCase:
-    """One provider-neutral authoring prompt and its evaluation constraints."""
+    """One evaluator-private task, reference answer, and oracle set."""
 
     identifier: str
     prompt: str
@@ -336,6 +350,11 @@ class AuthoringBenchmarkCase:
             forbidden_constructs=forbidden_constructs,
         )
 
+    def authoring_task(self) -> AuthoringTask:
+        """Project the evaluator-private case into its author-facing contract."""
+
+        return AuthoringTask(identifier=self.identifier, prompt=self.prompt)
+
 
 @dataclass(frozen=True)
 class AuthoringBenchmarkLimits:
@@ -352,7 +371,7 @@ class AuthoringBenchmarkLimits:
 class AuthoringRequest:
     """One initial or diagnostic-guided request delivered to an injected author."""
 
-    benchmark_case: AuthoringBenchmarkCase
+    task: AuthoringTask
     format_identifier: str
     profile_identifier: str
     profile_contract_json: str
@@ -387,7 +406,24 @@ class AuthoringRequest:
         )
 
 
-AuthoringAuthor = Callable[[AuthoringRequest], str]
+@dataclass(frozen=True)
+class AuthoredSource:
+    """One exact authored source and optional effective provider model version."""
+
+    source: str
+    effective_model_version: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.source, str):
+            raise TypeError("authored source must be a string")
+        if self.effective_model_version is not None:
+            normalized_model_version = self.effective_model_version.strip()
+            if not normalized_model_version:
+                raise ValueError("effective model version must be non-empty when present")
+            object.__setattr__(self, "effective_model_version", normalized_model_version)
+
+
+AuthoringAuthor = Callable[[AuthoringRequest], AuthoredSource]
 
 
 @dataclass(frozen=True)
@@ -900,7 +936,7 @@ def _run_benchmark_case(
     previous_diagnostics: tuple[FlowDiagnostic, ...] = ()
     for correction_round in range(benchmark_limits.max_correction_rounds + 1):
         authoring_request = AuthoringRequest(
-            benchmark_case=benchmark_case,
+            task=benchmark_case.authoring_task(),
             format_identifier=source_adapter.format_identifier,
             profile_identifier=flow_profile.identifier,
             profile_contract_json=flow_profile.canonical_json(),
@@ -908,11 +944,11 @@ def _run_benchmark_case(
             previous_source=previous_source,
             previous_diagnostics=previous_diagnostics,
         )
-        authored_source = author(authoring_request)
-        if not isinstance(authored_source, str):
-            raise TypeError("the injected author must return a source string")
+        authored_response = author(authoring_request)
+        if not isinstance(authored_response, AuthoredSource):
+            raise TypeError("the injected author must return AuthoredSource")
         authoring_attempt = _evaluate_source(
-            authored_source,
+            authored_response.source,
             source_adapter,
             benchmark_case.expected_flow_json,
             benchmark_case.required_constructs,
@@ -923,7 +959,7 @@ def _run_benchmark_case(
         authoring_attempts.append(authoring_attempt)
         if authoring_attempt.succeeded:
             break
-        previous_source = authored_source
+        previous_source = authored_response.source
         previous_diagnostics = authoring_attempt.diagnostics
 
     return AuthoringBenchmarkResult(

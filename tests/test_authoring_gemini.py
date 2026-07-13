@@ -26,6 +26,7 @@ class FakeGeminiModels:
         self.response_texts = list(response_texts or [])
         self.calls: list[dict[str, object]] = []
         self.provider_error: Exception | None = None
+        self.model_version: str | None = "gemini-test-001"
 
     def generate_content(
         self,
@@ -37,7 +38,10 @@ class FakeGeminiModels:
         self.calls.append({"model": model, "contents": contents, "config": config})
         if self.provider_error is not None:
             raise self.provider_error
-        return SimpleNamespace(text=self.response_texts.pop(0))
+        return SimpleNamespace(
+            text=self.response_texts.pop(0),
+            model_version=self.model_version,
+        )
 
 
 class FakeGeminiClient:
@@ -64,7 +68,7 @@ def _request(
         ),
     )
     return AuthoringRequest(
-        benchmark_case=benchmark_case,
+        task=benchmark_case.authoring_task(),
         format_identifier=format_identifier,
         profile_identifier=profile.identifier,
         profile_contract_json=profile.canonical_json(),
@@ -99,7 +103,8 @@ def test_prompt_is_canonical_whitelisted_and_contains_exact_profile_contract() -
         "task",
     )
     assert prompt_document["profile_contract"] == json.loads(initial_request.profile_contract_json)
-    assert initial_request.benchmark_case.expected_flow_json not in first_prompt
+    expected_flow_json = load_reference_authoring_corpus().cases[0].expected_flow_json
+    assert expected_flow_json not in first_prompt
     assert "required_constructs" not in first_prompt
     assert "forbidden_constructs" not in first_prompt
 
@@ -116,10 +121,12 @@ def test_gemini_author_returns_inner_source_verbatim_with_closed_configuration()
     fake_client = FakeGeminiClient([_projection_response(expected_source)])
     author = GeminiAuthor(model="test-model", client=fake_client)
 
-    assert author(_request()) == expected_source
+    authored_response = author(_request())
+    assert authored_response.source == expected_source
+    assert authored_response.effective_model_version == "gemini-test-001"
     provider_call = fake_client.models.calls[0]
     assert provider_call["model"] == "test-model"
-    assert json.loads(str(provider_call["contents"]))["task"] == _request().benchmark_case.prompt
+    assert json.loads(str(provider_call["contents"]))["task"] == _request().task.prompt
     configuration = provider_call["config"]
     assert isinstance(configuration, dict)
     assert configuration["response_mime_type"] == "application/json"
@@ -148,6 +155,16 @@ def test_gemini_author_rejects_invalid_projection_envelopes(response_text: str) 
     author = GeminiAuthor(client=FakeGeminiClient([response_text]))
 
     with pytest.raises(GeminiAuthorError, match="projection envelope"):
+        author(_request())
+
+
+def test_gemini_author_requires_effective_model_version() -> None:
+    expected_source = load_reference_authoring_corpus().cases[0].expected_flow_json
+    fake_client = FakeGeminiClient([_projection_response(expected_source)])
+    fake_client.models.model_version = None
+    author = GeminiAuthor(client=fake_client)
+
+    with pytest.raises(GeminiAuthorError, match="effective model version"):
         author(_request())
 
 
