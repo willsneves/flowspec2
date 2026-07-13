@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import jsonschema
 
@@ -30,7 +30,7 @@ def validate_flow(doc: dict[str, Any]) -> None:
 
 def load_flow(path: str | Path, *, validate: bool = True) -> dict[str, Any]:
     """Read a flow document from disk and (by default) validate it."""
-    doc = json.loads(Path(path).read_text(encoding="utf-8"))
+    doc = cast(dict[str, Any], json.loads(Path(path).read_text(encoding="utf-8")))
     if validate:
         validate_flow(doc)
     return doc

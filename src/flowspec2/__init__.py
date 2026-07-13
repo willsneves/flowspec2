@@ -10,15 +10,21 @@ See ``docs/DESIGN.md`` for the format rationale and the construct→primitive ma
 
 from __future__ import annotations
 
+import logging
+
 from .backends import BackendConfig, make_registry
+from .clock import UtcClock
 from .compiler import CompiledFlow, compile_flow
 from .models import AgentResponse, ServiceMetadata, ServiceState
+from .observability import SnowflakeIdGenerator
 from .runtime import FlowRuntime
 from .schema import load_flow, schema, validate_flow
 from .subflows import SubflowRegistry, default_subflows
 from .tools import ToolRegistry, default_tool_registry
 
 __version__ = "0.1.0"
+
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
     "FlowRuntime",
@@ -30,7 +36,9 @@ __all__ = [
     "ServiceState",
     "AgentResponse",
     "ServiceMetadata",
+    "SnowflakeIdGenerator",
     "ToolRegistry",
+    "UtcClock",
     "default_tool_registry",
     "SubflowRegistry",
     "default_subflows",

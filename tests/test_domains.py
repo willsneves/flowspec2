@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from flowspec2.domains import make_slot_model, parse_affirmation
 
@@ -10,7 +11,11 @@ DOMAINS = {
     "LuminariaDefeito": {
         "type": "categorical",
         "values": ["Apagada", "Piscando", "Acesa de dia", "Pendurada", "Danificada", "Com ruído"],
-        "normalize": {"accent_fold": True, "number_words": True, "synonyms": {"sem luz": "Apagada", "ruido": "Com ruído"}},
+        "normalize": {
+            "accent_fold": True,
+            "number_words": True,
+            "synonyms": {"sem luz": "Apagada", "ruido": "Com ruído"},
+        },
     },
     "LuminariaLocalizacao": {
         "type": "categorical",
@@ -33,11 +38,11 @@ def _coerce(slot, domain, raw, nullable=False):
     [
         ("apagada", "Apagada"),
         ("APAGADA", "Apagada"),
-        ("sem luz", "Apagada"),       # synonym
-        ("1", "Apagada"),             # positional number
+        ("sem luz", "Apagada"),  # synonym
+        ("1", "Apagada"),  # positional number
         ("acesa de dia", "Acesa de dia"),
-        ("ruido", "Com ruído"),       # synonym + accent target
-        ("com ruído", "Com ruído"),   # accent-fold match
+        ("ruido", "Com ruído"),  # synonym + accent target
+        ("com ruído", "Com ruído"),  # accent-fold match
     ],
 )
 def test_categorical_normalizes_to_closed_token(raw, expected):
@@ -45,14 +50,14 @@ def test_categorical_normalizes_to_closed_token(raw, expected):
 
 
 def test_categorical_rejects_out_of_domain():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         _coerce("luminaria_defeito", "LuminariaDefeito", "explodiu")
 
 
 def test_nullable_member():
     model = make_slot_model("loc", "LuminariaLocalizacao", DOMAINS, nullable=True)
-    assert getattr(model.model_validate({"loc": None}), "loc") is None
-    assert getattr(model.model_validate({"loc": "praca"}), "loc") == "Praça"
+    assert model.model_validate({"loc": None}).model_dump()["loc"] is None
+    assert model.model_validate({"loc": "praca"}).model_dump()["loc"] == "Praça"
 
 
 def test_payload_schema_has_enum():
@@ -64,7 +69,15 @@ def test_payload_schema_has_enum():
 
 @pytest.mark.parametrize(
     "raw,expected",
-    [("sim", True), ("não", False), ("isso", True), ("ok", True), ("👍", True), ("👎", False), ("nao quero", False)],
+    [
+        ("sim", True),
+        ("não", False),
+        ("isso", True),
+        ("ok", True),
+        ("👍", True),
+        ("👎", False),
+        ("nao quero", False),
+    ],
 )
 def test_affirmation(raw, expected):
     assert _coerce("ok", "SimNao", raw) is expected
@@ -77,11 +90,11 @@ def test_emoji_veto_overrides_words():
 
 def test_cpf_checksum():
     assert _coerce("cpf", "CPF", "529.982.247-25") == "52998224725"  # valid
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         _coerce("cpf", "CPF", "111.111.111-11")  # repeated digits
 
 
 def test_email():
     assert _coerce("email", "Email", "Foo@Bar.com") == "foo@bar.com"
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         _coerce("email", "Email", "not-an-email")

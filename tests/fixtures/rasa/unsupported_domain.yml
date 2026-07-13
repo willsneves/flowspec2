@@ -1,0 +1,15 @@
+version: "3.1"
+slots:
+  category:
+    type: categorical
+    values:
+      - lighting
+    mappings:
+      - type: from_entity
+        entity: category
+responses:
+  utter_ask_category:
+    - text: Which category applies?
+      channel: whatsapp
+actions:
+  - action_submit_report

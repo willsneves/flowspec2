@@ -7,6 +7,8 @@ build/
 dist/
 # venv / uv
 .venv/
+# local environment files
+.env*
 # tooling caches
 .pytest_cache/
 .ruff_cache/

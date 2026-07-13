@@ -26,7 +26,13 @@ from pathlib import Path
 from flowspec2 import FlowRuntime, load_flow
 from flowspec2.llm import GeminiAgent
 
-RESET = "\033[0m"; DIM = "\033[2m"; BOLD = "\033[1m"; GREEN = "\033[32m"; YELLOW = "\033[33m"; CYAN = "\033[36m"; MAG = "\033[35m"
+RESET = "\033[0m"
+DIM = "\033[2m"
+BOLD = "\033[1m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+CYAN = "\033[36m"
+MAG = "\033[35m"
 
 BASE = load_flow(str(Path(__file__).with_name("reparo_luminaria.flow.json")))
 
@@ -48,7 +54,9 @@ def _render(state) -> None:
     elif iv.get("buttons"):
         print(f"     {DIM}↳ botões: {' · '.join(b['title'] for b in iv['buttons'])}{RESET}")
     elif iv.get("sections"):
-        print(f"     {DIM}↳ lista: {' · '.join(r['title'] for s in iv['sections'] for r in s['rows'])}{RESET}")
+        print(
+            f"     {DIM}↳ lista: {' · '.join(r['title'] for s in iv['sections'] for r in s['rows'])}{RESET}"
+        )
     if state.status == "completed" and state.data.get("protocol_id"):
         print(f"     {GREEN}✅ chamado aberto — protocolo {state.data['protocol_id']}{RESET}")
     elif state.status == "error":
@@ -68,7 +76,9 @@ async def converse(agent: GeminiAgent, title: str, opener: str, turns: list) -> 
     service = await asyncio.to_thread(agent.route, opener, [rt.doc])
     print(f"  {MAG}🧭 roteou para: {service}{RESET}")
     if service != rt.flow:
-        print(f"  {CYAN}🤖{RESET} Desculpe, ainda não consigo ajudar com isso. Posso registrar problemas de iluminação pública. 🙏\n")
+        print(
+            f"  {CYAN}🤖{RESET} Desculpe, ainda não consigo ajudar com isso. Posso registrar problemas de iluminação pública. 🙏\n"
+        )
         return
     state = await rt.execute(state, {})
     _render(state)
@@ -95,7 +105,9 @@ async def main() -> None:
         sys.exit(1)
     agent = GeminiAgent()
     print(f"{BOLD}flowspec2 · bot com inteligência de LLM (Gemini) — reparo_luminaria{RESET}")
-    print(f"{DIM}cidadão fala em texto livre; o LLM roteia e extrai o token fechado; o flowspec2 valida o trilho.{RESET}")
+    print(
+        f"{DIM}cidadão fala em texto livre; o LLM roteia e extrai o token fechado; o flowspec2 valida o trilho.{RESET}"
+    )
 
     await converse(
         agent,
@@ -126,7 +138,7 @@ async def main() -> None:
             "sim",
             "perto da farmácia",
             "anônimo pode ser",
-            "opa, espera, acho que falei o endereço errado",   # -> correcao endereço
+            "opa, espera, acho que falei o endereço errado",  # -> correcao endereço
             "é na Rua Tonelero, 150 na verdade",
             "agora sim",
             "do lado da banca de jornal",
@@ -145,7 +157,13 @@ async def main() -> None:
             "sim",
             "ao lado do quiosque",
             "quero me identificar pelo gov.br",
-            {"govbr_token": {"cpf": "52998224725", "nome": "Joana Ribeiro", "email": "joana@example.com"}},
+            {
+                "govbr_token": {
+                    "cpf": "52998224725",
+                    "nome": "Joana Ribeiro",
+                    "email": "joana@example.com",
+                }
+            },
             "pode confirmar",
         ],
     )

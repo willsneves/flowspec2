@@ -1,0 +1,128 @@
+{
+  "schema": "flowspec/2",
+  "flow": "payment_status",
+  "version": "1.2.0",
+  "service": {
+    "id": "42001"
+  },
+  "route": {
+    "description": "Collect a payment reference and confirm its external status.",
+    "trigger_phrases": ["check payment"],
+    "entry_args_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "payment_reference": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "domains": {
+    "Reference": {
+      "type": "free_text"
+    },
+    "SimNao": {
+      "type": "bool"
+    }
+  },
+  "slots": {
+    "payment_reference": {
+      "domain": "Reference",
+      "required": true
+    },
+    "payment_status": {
+      "domain": "Reference"
+    },
+    "payment_receipt": {
+      "domain": "Reference"
+    },
+    "payment_confirmed": {
+      "domain": "SimNao"
+    }
+  },
+  "path": [
+    {
+      "step": "collect_payment_reference",
+      "slot": "payment_reference",
+      "prompt": {
+        "text": "What is the payment reference?"
+      }
+    },
+    {
+      "step": "confirm_payment_reference",
+      "confirm": "payment_confirmed",
+      "prompt": {
+        "text": "Is the payment reference correct?"
+      }
+    },
+    {
+      "step": "derive_payment_status",
+      "derive": "payment_status"
+    },
+    {
+      "use": "address@1"
+    },
+    {
+      "step": "await_payment",
+      "await_external": true
+    },
+    {
+      "terminal": true
+    }
+  ],
+  "uses": [
+    {
+      "ref": "address@1",
+      "with": {
+        "required": false
+      }
+    }
+  ],
+  "derive": [
+    {
+      "writes": "payment_status",
+      "from": ["payment_reference"],
+      "lookup": {
+        "known": "pending"
+      },
+      "default": "pending"
+    }
+  ],
+  "confirm": {
+    "step": "confirm_payment_reference",
+    "slot": "payment_confirmed",
+    "correctable": ["payment_reference"]
+  },
+  "terminal": {
+    "step": "finish_payment_check",
+    "tool": "record_payment_status",
+    "idempotent": true,
+    "outcomes": {
+      "success": {
+        "reset_next": true
+      },
+      "retryable": {
+        "preserve_state": true
+      },
+      "fatal": {
+        "reset_next": true
+      }
+    }
+  },
+  "capabilities": {
+    "await_external": {
+      "kind": "cta_url",
+      "step": "await_payment",
+      "resume_on": "payment_token",
+      "on_resume": {
+        "set": {
+          "payment_receipt": "$token.receipt"
+        }
+      },
+      "timeout": {
+        "goto": "END"
+      }
+    }
+  }
+}

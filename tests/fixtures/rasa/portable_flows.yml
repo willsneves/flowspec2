@@ -1,0 +1,18 @@
+flows:
+  report_issue:
+    description: Collect a category, details, and final confirmation.
+    run_pattern_completed: false
+    persisted_slots:
+      - category
+      - details
+      - confirmed
+    steps:
+      - id: collect_category
+        collect: category
+        description: One of the declared category tokens.
+        utter: utter_ask_report_category
+      - id: collect_details
+        collect: details
+      - id: confirm_report
+        collect: confirmed
+        utter: utter_ask_report_confirmation

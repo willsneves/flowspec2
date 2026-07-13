@@ -1,0 +1,30 @@
+version: "3.1"
+slots:
+  category:
+    type: categorical
+    values:
+      - a=b
+      - lighting
+  details:
+    type: text
+    mappings:
+      - type: from_llm
+  confirmed:
+    type: bool
+responses:
+  utter_ask_report_category:
+    - text: Which category applies?
+      buttons:
+        - title: a=b
+          payload: /SetSlots(category=a=b)
+        - title: lighting
+          payload: /SetSlots(category=lighting)
+  utter_ask_details:
+    - text: Describe the issue.
+  utter_ask_report_confirmation:
+    - text: Do you confirm the report?
+      buttons:
+        - title: "true"
+          payload: /SetSlots(confirmed=true)
+        - title: "false"
+          payload: /SetSlots(confirmed=false)

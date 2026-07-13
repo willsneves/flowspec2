@@ -7,11 +7,10 @@ status to the terminal success/retryable/fatal trichotomy.
 from __future__ import annotations
 
 import httpx
+from conftest import step
 
 from flowspec2 import FlowRuntime
 from flowspec2.backends import BackendConfig, make_registry
-
-from conftest import step
 
 CONFIG = BackendConfig(
     geocode_url="https://api.test/geocode",
@@ -29,7 +28,9 @@ def _transport(handler) -> httpx.MockTransport:
 async def test_geocode_tool_parses_and_detects_praca():
     def handler(req: httpx.Request) -> httpx.Response:
         assert req.headers["authorization"] == "Bearer secret"  # api_key wired
-        return httpx.Response(200, json={"results": [{"logradouro": "Praça Mauá", "bairro": "Centro"}]})
+        return httpx.Response(
+            200, json={"results": [{"logradouro": "Praça Mauá", "bairro": "Centro"}]}
+        )
 
     reg = make_registry(CONFIG, transport=_transport(handler))
     out = await reg.call("geocode", address="Praça Mauá")
@@ -76,14 +77,19 @@ async def test_sgrc_timeout_maps_to_retryable():
 
 async def test_partial_config_falls_back_to_fakes():
     # only geocode configured -> sgrc stays the fake (still opens a ticket)
-    reg = make_registry(BackendConfig(geocode_url="https://api.test/geocode"), transport=_transport(lambda r: httpx.Response(200, json={"logradouro": "Rua X"})))
+    reg = make_registry(
+        BackendConfig(geocode_url="https://api.test/geocode"),
+        transport=_transport(lambda r: httpx.Response(200, json={"logradouro": "Rua X"})),
+    )
     out = await reg.call("sgrc_open_ticket", endereco="x")
     assert out["status"] == "success" and out["protocolo"].startswith("SGRC-")
 
 
 async def test_buraco_end_to_end_over_http_backends(buraco_doc):
     routes = {
-        "/geocode": httpx.Response(200, json={"logradouro": "Av. Brasil, 1000", "bairro": "Centro"}),
+        "/geocode": httpx.Response(
+            200, json={"logradouro": "Av. Brasil, 1000", "bairro": "Centro"}
+        ),
         "/sgrc": httpx.Response(201, json={"protocolo": "SGRC-HTTP-1"}),
         "/cpf": httpx.Response(200, json={"name": "", "email": "", "phones": []}),
     }
@@ -103,7 +109,13 @@ async def test_buraco_end_to_end_over_http_backends(buraco_doc):
 
 
 def test_config_from_env():
-    cfg = BackendConfig.from_env({"FLOWSPEC2_SGRC_URL": "https://x/sgrc", "FLOWSPEC2_API_KEY": "k", "FLOWSPEC2_HTTP_TIMEOUT": "5"})
+    cfg = BackendConfig.from_env(
+        {
+            "FLOWSPEC2_SGRC_URL": "https://x/sgrc",
+            "FLOWSPEC2_API_KEY": "k",
+            "FLOWSPEC2_HTTP_TIMEOUT": "5",
+        }
+    )
     assert cfg.sgrc_url == "https://x/sgrc"
     assert cfg.timeout == 5.0
     assert cfg.headers()["Authorization"] == "Bearer k"

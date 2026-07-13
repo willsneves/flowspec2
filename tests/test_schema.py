@@ -42,7 +42,10 @@ def test_mutation_version_not_semver(luminaria_doc):
 
 def test_mutation_predicate_two_operators(luminaria_doc):
     bad = copy.deepcopy(luminaria_doc)
-    bad["overrides"]["gates"]["collect_quadra_esportes"] = {"eq": ["slots.x", "y"], "ne": ["slots.a", "b"]}
+    bad["overrides"]["gates"]["collect_quadra_esportes"] = {
+        "eq": ["slots.x", "y"],
+        "ne": ["slots.a", "b"],
+    }
     with pytest.raises(jsonschema.ValidationError):
         validate_flow(bad)
 

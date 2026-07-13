@@ -1,3 +1,22 @@
+<!-- section:toc -->
+
+Table of Contents:
+
+- Install: 35 <!-- section:install -->
+- LLM-driven (the engine side): 57 <!-- section:llm-driven -->
+- Quickstart: 76 <!-- section:quickstart -->
+- Real backends: 100 <!-- section:real-backends -->
+- Error correlation: 117 <!-- section:error-correlation -->
+- CLI: 140 <!-- section:cli -->
+- What it compiles: 160 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 180 <!-- section:example -->
+    - The flowspec/2 document: 187 <!-- section:example-document -->
+    - Compiled LangGraph: 797 <!-- section:example-compiled-langgraph -->
+- Layout: 913 <!-- section:layout -->
+- Status: 939 <!-- section:status -->
+
+<!-- /section:toc -->
+
 # flowspec2
 
 **A JSON conversational-flow format that compiles to a [LangGraph](https://langchain-ai.github.io/langgraph/) `StateGraph` at runtime.**
@@ -6,15 +25,34 @@ You write one self-contained JSON document per service flow. A running agent loa
 
 > **One idea — the boundary is the closed value-domain.** The JSON pins the **rails** (states, value-domains, transitions, guards, tool bindings, interrupts, idempotency, guardrails); the LLM reasons and acts **freely within** them (which flow to enter, extracting the closed token from free text/voice/photo, phrasing, side actions). The LLM structurally *cannot* invent a transition, skip a required slot, or widen a value-domain.
 
+flowspec2 is deliberately specialized rather than a replacement for a general
+workflow language. See the [prior-art comparison](docs/PRIOR_ART.md), the
+[compatibility profiles](docs/COMPATIBILITY.md), and the
+[interoperability decision](docs/adr/0001-interoperability-boundaries.md).
+
+<!-- section:install -->
+
 ## Install
 
 ```bash
-uv sync --extra dev          # creates .venv with langgraph + pydantic + jsonschema + pytest
-uv run pytest                # run the suite (drives the luminária flow turn-by-turn)
+uv sync                      # install the runtime package
+make ci                      # locked lint, format check, type checks, and offline tests
 uv run python examples/simulate.py   # 6 real citizen conversations over the HTTP backends
 ```
 
+Development tooling is pinned in `pyproject.toml` and `uv.lock`. `make lint`,
+`make typecheck`, and `make test` run independently; `make format` applies the
+configured Ruff fixes and formatter. Every target uses the locked `dev` extra
+without loading environment files. Pyright uses its packaged distribution and
+a signed, minimal Distroless Node runtime pinned by digest. The checker
+container runs without a shell or package manager and has no network,
+capabilities, writable root filesystem, or writable project mount. Docker is
+therefore the only additional prerequisite for `make typecheck` and `make ci`.
+
 `examples/simulate.py` prints turn-by-turn transcripts of the reparo_luminaria flow as realistic conversations over the real HTTP backends (deterministic geocoder + SGRC via `MockTransport`): the production WhatsApp-Flow path, an address correction, gov.br auth, the praça→quadra branch, an SGRC outage (503 → retryable → recovers), and a duplicate submission that fires the side effect exactly once.
+
+<!-- /section:install -->
+<!-- section:llm-driven -->
 
 ## LLM-driven (the engine side)
 
@@ -31,6 +69,9 @@ The LLM does exactly two non-deterministic jobs, the rails hold everything else:
 - **extract** — read the messy message and the node's `payload_schema` / interactive options, and produce the **closed token** for the slot.
 
 flowspec2's validators then enforce the rail: an out-of-domain extraction is rejected and the node re-asks. The transcript shows the boundary per turn: `👤 free text → 🧠 LLM extraction → 🤖 the rail's next state`. The driver is a thin protocol (`route` + `extract`), so any provider can implement it. The gated integration tests (`FLOWSPEC2_RUN_LLM_TESTS=1`) run it against a live Gemini; the default suite stays offline.
+
+<!-- /section:llm-driven -->
+<!-- section:quickstart -->
 
 ## Quickstart
 
@@ -53,6 +94,9 @@ asyncio.run(main())
 
 `rt.as_tool()` returns a `multi_step_service`-style callable `(service_name, user_id, payload) -> dict` an outer agent dispatches to.
 
+<!-- /section:quickstart -->
+<!-- section:real-backends -->
+
 ## Real backends
 
 Tools (`geocode`, `cpf_lookup`, `get_user_info`, `sgrc_open_ticket`) default to in-memory fakes so the suite runs offline. Swap in real HTTP backends — `make_registry` overlays them onto the fakes per configured URL (partial config falls back per-tool, and the terminal's idempotency replay cache is preserved):
@@ -67,35 +111,78 @@ rt = FlowRuntime(doc, tools=make_registry(cfg))
 
 Install the HTTP extra with `uv sync --extra http`. The SGRC adapter maps HTTP semantics onto the terminal outcome trichotomy: **2xx → `success`**, **5xx / timeout / connection error → `retryable`** (the terminal node preserves state and re-fires next turn), **4xx → `fatal`** (resets). Backends are injectable (`transport=`) so they're tested offline with `httpx.MockTransport` — no network. Point each URL at a real Prefeitura endpoint (or a thin adapter conforming to the contracts in `backends/http.py`).
 
+<!-- /section:real-backends -->
+<!-- section:error-correlation -->
+
+## Error correlation
+
+Every runtime warning or error exposed to a caller carries a decimal Snowflake
+`log_id` that matches a structured Python log record. `AgentResponse` preserves
+the field, `FlowRuntime.as_tool()` returns both `error_message` and `log_id` when
+present, and CLI diagnostics render the identifier as `[log_id=…]`. Internal
+best-effort warnings use the same correlation contract.
+
+`FlowRuntime` accepts an injectable `SnowflakeIdGenerator`, including an
+injectable clock for deterministic tests. The default generator derives a
+best-effort process-local worker identity. Concurrent processes must receive
+distinct `FLOWSPEC2_SNOWFLAKE_WORKER_ID` assignments to guarantee distributed
+uniqueness. Invalid worker configuration fails before an ID is emitted. The
+generator preserves ordering through wall-clock rollback and sequence
+saturation by advancing logical time under a lock.
+
+`FlowRuntime` also accepts an injectable `clock` for `ServiceMetadata` creation
+and update timestamps. The real UTC clock is only the default boundary adapter;
+tests and hosts can supply a deterministic clock without patching global state.
+
+<!-- /section:error-correlation -->
+<!-- section:cli -->
+
 ## CLI
 
 ```bash
 flowspec2 validate examples/reparo_luminaria.flow.json   # JSON-Schema validate
 flowspec2 graph    examples/reparo_luminaria.flow.json   # list compiled node ids
 flowspec2 mermaid  examples/reparo_luminaria.flow.json   # export the compiled graph as mermaid
+flowspec2 rasa-export path/to/portable.flow.json --output-dir build/rasa --allow-lossy
+flowspec2 rasa-import build/rasa/flows.yml --domain build/rasa/domain.yml --flow collect_contact --output build/collect_contact.flow.json --allow-lossy
+flowspec2 open-workflow-export examples/reparo_luminaria.flow.json --output build/reparo_luminaria.workflow.yaml
+flowspec2 open-workflow-import build/reparo_luminaria.workflow.yaml --output build/reparo_luminaria.flow.json
 ```
+
+The Rasa adapter is a strict, versioned subset; `--allow-lossy` acknowledges its
+reported metadata and lifecycle differences. The Open Workflow adapter is a
+lossless profile envelope. See [COMPATIBILITY.md](docs/COMPATIBILITY.md) for the
+exact boundaries and Python API.
+
+<!-- /section:cli -->
+<!-- section:what-it-compiles -->
 
 ## What it compiles
 
 | flowspec2 construct | LangGraph primitive |
 |---|---|
-| document | one `StateGraph[ServiceState]` compiled per call |
+| document | one `StateGraph[ServiceState]` compiled when each `FlowRuntime` instance is created, then reused across calls |
 | `domains.<X>` | a Pydantic `@field_validator(mode="before")` + `model_json_schema()` (→ constrained-decoding `payload_schema`) + interactive option titles/rows |
-| `path` `slot`/`confirm`/`derive`/`terminal`/`use` step | `add_node` with the canonical collect/confirm/derive/terminal template; subflow splice |
+| `path` `slot`/`confirm`/`derive`/`terminal`/`use` step | `add_node` with the canonical collect/confirm/derive/terminal template; subflow splice honoring required/optional collection, attempt budgets, and exhaustion routes |
 | `path` order | synthesized `add_conditional_edges` routers (pause = `agent_response` set → `END`) |
 | `ask_when` / `overrides.gates` | guard predicate compiled into the node + path map (skip-by-vacuity) |
 | `confirm.correctable[]` | non-linear back-edges; clear-cascade derived from `requires[]` + `derive.from` |
 | `terminal.outcomes` | success / retryable / fatal trichotomy + `_reset_on_next_call` |
 | `auto_flow` | pre-graph short-circuit (send WhatsApp Flow, return `flow_sent` without entering the graph) |
-| `capabilities.await_external` | suspend/resume on an external signal (gov.br OAuth) with abort/resend/switch recovery |
+| `capabilities.await_external` | generic suspend/resume on a host-delivered external signal, with bounded atomic mappings and abort/resend/switch/timeout recovery; an `END` recovery resets on the next call |
 | `predicate` grammar | pure boolean function over `ServiceState` compiled into routers/early-returns |
 
 Full mapping + rationale + rejected alternatives: [`docs/DESIGN.md`](docs/DESIGN.md). Field-by-field reference: [`docs/SPEC.md`](docs/SPEC.md).
+
+<!-- /section:what-it-compiles -->
+<!-- section:example -->
 
 ## Example: reparo de luminária
 
 A full worked example — the flow behind the *reparo de luminária* guided
 attendance: the source flowspec/2 document and the LangGraph it compiles to.
+
+<!-- section:example-document -->
 
 ### The flowspec/2 document
 
@@ -106,7 +193,7 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
 {
   "schema": "flowspec/2",
   "flow": "reparo_luminaria",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "service": {
     "id": "18131",
     "codigo_servico_1746": "18131",
@@ -643,27 +730,58 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
     "session_reset": true,
     "await_external": {
       "kind": "cta_url",
+      "step": "authenticate_govbr",
       "resume_on": "govbr_token",
+      "prompt": {
+        "text": "Para se identificar pelo gov.br, toque no botão de login que enviei. 🔐",
+        "verbatim": true
+      },
+      "interactive": {
+        "kind": "cta_url",
+        "field": "govbr_token",
+        "out_of_band": true,
+        "next_step": "authenticate_govbr"
+      },
       "on_resume": {
         "set": {
           "cpf": "$token.cpf",
           "name": "$token.nome",
-          "email": "$token.email"
+          "email": "$token.email",
+          "govbr_authenticated": true,
+          "cadastro_verificado": true
         },
-        "enrich": "get_user_info"
+        "enrich": {
+          "tool": "get_user_info",
+          "optional": true,
+          "input": {
+            "cpf": "$token.cpf"
+          },
+          "set": {
+            "phone": "$result.phones.0"
+          }
+        }
       },
       "timeout": {
-        "goto": "collect_cpf"
+        "goto": "collect_cpf",
+        "set": {
+          "identification_method": "cpf"
+        }
       },
       "recovery": {
         "abort": {
-          "goto": "select_identification_method"
+          "goto": "select_identification_method",
+          "set": {
+            "identification_method": null
+          }
         },
         "resend": {
           "goto": "authenticate_govbr"
         },
         "switch": {
-          "goto": "collect_cpf"
+          "goto": "collect_cpf",
+          "set": {
+            "identification_method": "cpf"
+          }
         }
       }
     }
@@ -672,6 +790,9 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
 ```
 
 </details>
+
+<!-- /section:example-document -->
+<!-- section:example-compiled-langgraph -->
 
 ### Compiled LangGraph
 
@@ -785,28 +906,40 @@ back-edges (one per `confirm.correctable[]` slot); `address@1` and
 `identification@2` are the spliced subflows (collect_address/confirm_address and
 select_identification_method/collect_cpf/…).
 
+<!-- /section:example-compiled-langgraph -->
+<!-- /section:example -->
+<!-- section:layout -->
+
 ## Layout
 
 ```
 src/flowspec2/
+  clock.py         injectable UTC clock contract · real boundary adapter
   models.py        ServiceState · AgentResponse · ServiceMetadata (the contracts)
   domains.py       domain → Pydantic validator + normalize strategies
   predicates.py    the frozen predicate grammar evaluator
   nodes.py         collect / confirm / derive / terminal node templates
   compiler.py      flowspec doc → StateGraph[ServiceState]
   runtime.py       FlowRuntime: validate · compile · execute · as_tool (+ auto_flow short-circuit)
+  observability.py Snowflake log IDs · structured event helper
   schema.py        load + JSON-Schema validation
+  compat/          Rasa CALM adapter · Open Workflow profile + vendored official schema
   interactive.py   buttons / list / flow envelope builders (Meta limits)
   tools.py         ToolRegistry + injectable fake backends + idempotency replay
   backends/        BackendConfig + make_registry + httpx HTTP tools (real integrations)
   subflows/        address@1 · identification@2 (reusable, versioned)
   flowspec-2.schema.json
 examples/          reparo_luminaria.flow.json · reparo_buraco.flow.json
-tests/             schema · domains · predicates · luminária E2E · authorability
+tests/             schema · domains · predicates · compatibility · observability · runtime E2E
 ```
+
+<!-- /section:layout -->
+<!-- section:status -->
 
 ## Status
 
 Reference runtime for the flowspec/2 format. Subflows ship with in-memory fake backends (geocode, CPF lookup, gov.br token, SGRC ticket) so the suite runs offline; each backend is an injectable protocol that maps to the real production integration. Not affiliated with or deployed by the Prefeitura do Rio — this is a clean-room reimplementation of a format design.
 
 MIT licensed.
+
+<!-- /section:status -->

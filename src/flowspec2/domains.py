@@ -18,25 +18,67 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Literal, Optional, cast
 
 from pydantic import BaseModel, Field, create_model, field_validator
 
 # ── normalization primitives ────────────────────────────────────────────────
 
 _NUMBER_WORDS = {
-    "um": 1, "uma": 1, "dois": 2, "duas": 2, "tres": 3, "quatro": 4, "cinco": 5,
-    "seis": 6, "sete": 7, "oito": 8, "nove": 9, "dez": 10,
+    "um": 1,
+    "uma": 1,
+    "dois": 2,
+    "duas": 2,
+    "tres": 3,
+    "quatro": 4,
+    "cinco": 5,
+    "seis": 6,
+    "sete": 7,
+    "oito": 8,
+    "nove": 9,
+    "dez": 10,
 }
 
 _AFFIRM_POS = {
-    "sim", "s", "yes", "y", "isso", "ok", "okay", "claro", "quero", "correto",
-    "certo", "positivo", "pode", "confirmo", "aham", "uhum", "exato", "verdade",
-    "afirmativo", "true", "1", "blz", "beleza", "isso mesmo", "com certeza",
+    "sim",
+    "s",
+    "yes",
+    "y",
+    "isso",
+    "ok",
+    "okay",
+    "claro",
+    "quero",
+    "correto",
+    "certo",
+    "positivo",
+    "pode",
+    "confirmo",
+    "aham",
+    "uhum",
+    "exato",
+    "verdade",
+    "afirmativo",
+    "true",
+    "1",
+    "blz",
+    "beleza",
+    "isso mesmo",
+    "com certeza",
 }
 _AFFIRM_NEG = {
-    "nao", "n", "no", "errado", "negativo", "incorreto", "discordo", "nunca",
-    "false", "0", "nem", "jamais",
+    "nao",
+    "n",
+    "no",
+    "errado",
+    "negativo",
+    "incorreto",
+    "discordo",
+    "nunca",
+    "false",
+    "0",
+    "nem",
+    "jamais",
 }
 _POS_EMOJI = ("👍", "✅", "👌", "🙂", "😊", "🆗")
 _NEG_EMOJI = ("👎", "❌", "🚫", "🙅")
@@ -126,8 +168,9 @@ def _bool_validator(spec: dict[str, Any]) -> DomainValidator:
         if isinstance(raw, bool):
             return raw
         key = normalize_text(raw)
-        if key in synonyms and isinstance(synonyms[key], bool):
-            return synonyms[key]
+        synonym = synonyms.get(key)
+        if isinstance(synonym, bool):
+            return synonym
         if use_affirm:
             result = parse_affirmation(raw)
             if result is None:
@@ -150,7 +193,9 @@ def _cpf_valid(digits: str) -> bool:
         return False
     for length in (9, 10):
         weights = range(length + 1, 1, -1)
-        total = sum(int(d) * w for d, w in zip(digits, weights))
+        total = sum(
+            int(digit) * weight for digit, weight in zip(digits[:length], weights, strict=True)
+        )
         check = (total * 10) % 11 % 10
         if check != int(digits[length]):
             return False
@@ -220,6 +265,7 @@ def make_validator(spec: dict[str, Any]) -> DomainValidator:
 
 # ── per-slot Pydantic model (the payload_schema source) ──────────────────────
 
+
 def _field_type(spec: dict[str, Any], nullable: bool) -> Any:
     dtype = spec.get("type", "categorical")
     if dtype == "categorical":
@@ -237,10 +283,7 @@ def _field_description(slot_name: str, spec: dict[str, Any], extract_hint: Optio
     parts: list[str] = []
     if spec.get("type", "categorical") == "categorical":
         tokens = ", ".join("null" if v is None else str(v) for v in spec["values"])
-        parts.append(
-            "Interprete a fala do usuário e devolva SOMENTE um valor fechado: "
-            f"{tokens}."
-        )
+        parts.append(f"Interprete a fala do usuário e devolva SOMENTE um valor fechado: {tokens}.")
     elif spec.get("type") == "bool":
         parts.append("Interprete como booleano: true para sim/afirmativo, false para não.")
     if extract_hint:
@@ -266,17 +309,23 @@ def make_slot_model(
     field_type = _field_type(spec, nullable)
     description = _field_description(slot_name, spec, extract_hint)
 
-    def _run_validator(cls, value):  # noqa: ANN001
+    def _run_validator(_model_class: type[BaseModel], value: Any) -> Any:
         return validator(value)
 
-    validators = {
+    validators: dict[str, Any] = {
         f"_validate_{slot_name}": field_validator(slot_name, mode="before")(
             classmethod(_run_validator)
         )
     }
-    model = create_model(  # type: ignore[call-overload]
-        f"Slot_{slot_name}",
-        __validators__=validators,
-        **{slot_name: (field_type, Field(..., description=description))},
+    field_definitions: dict[str, Any] = {
+        slot_name: (field_type, Field(..., description=description))
+    }
+    model = cast(
+        type[BaseModel],
+        create_model(
+            f"Slot_{slot_name}",
+            __validators__=validators,
+            **field_definitions,
+        ),
     )
     return model

@@ -6,16 +6,22 @@ subflow boundary used to drop the re-answer or submit stale downstream data.
 
 from __future__ import annotations
 
-from conftest import step
+from conftest import require_agent_response, step
 
 
 async def _to_confirm_praca(luminaria):
     """Drive to the confirm-ticket hub with a Praça address (quadra asked)."""
     st = await step(luminaria, None, {})
-    st = await step(luminaria, st, {"_source": "whatsapp_flow", "defect_type": "Danificada", "location": "Praça"})
-    st = await step(luminaria, st, {"address": "Praça Mauá, Centro"})       # kind=praca
-    st = await step(luminaria, st, {"confirmacao": "sim"})                  # confirm address
-    st = await step(luminaria, st, {"reparo_luminaria_quadra_esportes": "sim"})  # quadra (gated open)
+    st = await step(
+        luminaria,
+        st,
+        {"_source": "whatsapp_flow", "defect_type": "Danificada", "location": "Praça"},
+    )
+    st = await step(luminaria, st, {"address": "Praça Mauá, Centro"})  # kind=praca
+    st = await step(luminaria, st, {"confirmacao": "sim"})  # confirm address
+    st = await step(
+        luminaria, st, {"reparo_luminaria_quadra_esportes": "sim"}
+    )  # quadra (gated open)
     st = await step(luminaria, st, {"ponto_referencia": "perto da quadra de tênis"})
     st = await step(luminaria, st, {"identification_method": "anonimo"})
     return st  # now at confirm_ticket_data
@@ -37,7 +43,16 @@ async def test_bug_a_address_correction_clears_dependents(luminaria):
 
 async def test_bug_b_text_reanswer_after_correction_is_not_swallowed(luminaria):
     st = await step(luminaria, None, {})
-    st = await step(luminaria, st, {"_source": "whatsapp_flow", "defect_type": "Apagada", "qty_pattern": "uma", "location": "Rua"})
+    st = await step(
+        luminaria,
+        st,
+        {
+            "_source": "whatsapp_flow",
+            "defect_type": "Apagada",
+            "qty_pattern": "uma",
+            "location": "Rua",
+        },
+    )
     st = await step(luminaria, st, {"address": "Rua A, 1"})
     st = await step(luminaria, st, {"confirmacao": "sim"})
     st = await step(luminaria, st, {"ponto_referencia": "esquina"})
@@ -47,13 +62,15 @@ async def test_bug_b_text_reanswer_after_correction_is_not_swallowed(luminaria):
 
     # the citizen TYPES the new defect — auto_flow must NOT re-fire and swallow it
     st = await step(luminaria, st, {"luminaria_defeito": "Piscando"})
-    assert (st.agent_response.interactive or {}).get("status") != "flow_sent"
+    assert (require_agent_response(st).interactive or {}).get("status") != "flow_sent"
     assert st.data["luminaria_defeito"] == "Piscando"
 
 
 async def test_bug_c_correct_cpf_after_anonimo_reenters_subflow(luminaria):
     st = await step(luminaria, None, {})
-    st = await step(luminaria, st, {"_source": "whatsapp_flow", "defect_type": "Danificada", "location": "Rua"})
+    st = await step(
+        luminaria, st, {"_source": "whatsapp_flow", "defect_type": "Danificada", "location": "Rua"}
+    )
     st = await step(luminaria, st, {"address": "Rua A, 1"})
     st = await step(luminaria, st, {"confirmacao": "sim"})
     st = await step(luminaria, st, {"ponto_referencia": "esquina"})

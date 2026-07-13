@@ -18,15 +18,17 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Callable, Final, Optional, cast
 
-from langgraph.graph import END, StateGraph
+from langgraph.graph import END as LANGGRAPH_END
+from langgraph.graph import StateGraph
 
 from .models import ServiceState
 from .nodes import (
     NEXT,
     FlowContext,
     NodeDesc,
+    make_await_external_node,
     make_bool_confirm_node,
     make_collect_node,
     make_derive_node,
@@ -35,8 +37,11 @@ from .nodes import (
     make_summary_confirm_node,
     make_terminal_node,
 )
+from .observability import SnowflakeIdGenerator, default_log_id_generator
 from .subflows import SubflowRegistry, default_subflows
 from .tools import ToolRegistry, default_tool_registry
+
+END: Final[str] = LANGGRAPH_END
 
 
 @dataclass
@@ -81,8 +86,182 @@ def _derive_readers(derives: list[dict[str, Any]]) -> dict[str, list[str]]:
 
 def _gate_for(step: dict[str, Any], gates: dict[str, Any]) -> Optional[dict[str, Any]]:
     if "ask_when" in step:
-        return step["ask_when"]
-    return gates.get(step["id"])
+        return cast(dict[str, Any], step["ask_when"])
+    return cast(Optional[dict[str, Any]], gates.get(step["id"]))
+
+
+def _uses_identification_v2(doc: dict[str, Any]) -> bool:
+    return any(use.get("ref") == "identification@2" for use in doc.get("uses", []))
+
+
+def _bind_await_external(doc: dict[str, Any]) -> Optional[dict[str, Any]]:
+    capability = cast(
+        Optional[dict[str, Any]],
+        (doc.get("capabilities") or {}).get("await_external"),
+    )
+    path_steps = [step for step in doc["path"] if step.get("await_external") is True]
+    if len(path_steps) > 1:
+        raise ValueError("flowspec/2 supports one capabilities.await_external binding")
+    if path_steps and capability is None:
+        raise ValueError("path await_external requires capabilities.await_external")
+    if capability is None:
+        return None
+
+    if path_steps:
+        path_step = path_steps[0]
+        unsupported_fields = {
+            "ask_when",
+            "skip_when",
+            "on_reject",
+            "correctable",
+        } & path_step.keys()
+        if unsupported_fields:
+            unsupported = ", ".join(sorted(unsupported_fields))
+            raise ValueError(f"path await_external does not support these fields: {unsupported}")
+        path_node_id = path_step.get("step")
+        capability_node_id = capability.get("step")
+        if path_node_id and capability_node_id and path_node_id != capability_node_id:
+            raise ValueError(
+                "path await_external step conflicts with capabilities.await_external.step"
+            )
+        bound_node_id = path_node_id or capability_node_id or "await_external"
+        path_step["step"] = bound_node_id
+        capability["step"] = bound_node_id
+        return capability
+
+    if not capability.get("step") and _uses_identification_v2(doc):
+        # Backward compatibility for documents authored before the explicit
+        # subflow binding existed.
+        capability["step"] = "authenticate_govbr"
+    if not capability.get("step"):
+        raise ValueError(
+            "capabilities.await_external must declare step or have a path await_external anchor"
+        )
+    return capability
+
+
+def _validate_binding_map(
+    bindings: dict[str, Any],
+    *,
+    namespace: str,
+    location: str,
+) -> None:
+    if not isinstance(bindings, dict):
+        raise ValueError(f"{location} must be an object")
+    prefix = f"${namespace}."
+    for target, binding in bindings.items():
+        if not isinstance(target, str) or not target:
+            raise ValueError(f"{location} contains an empty destination")
+        if binding is not None and not isinstance(binding, (str, int, float, bool)):
+            raise ValueError(f"{location}.{target} must be a JSON scalar")
+        if isinstance(binding, str) and binding.startswith("$"):
+            reference_path = binding.removeprefix(prefix)
+            if (
+                not binding.startswith(prefix)
+                or not reference_path
+                or any(not segment for segment in reference_path.split("."))
+            ):
+                raise ValueError(f"{location}.{target} must use {prefix}path")
+
+
+def _validate_await_external_definition(
+    capability: Optional[dict[str, Any]],
+    tools: ToolRegistry,
+    path_step: Optional[dict[str, Any]],
+) -> None:
+    if capability is None:
+        return
+    if not isinstance(capability.get("step"), str) or not capability["step"]:
+        raise ValueError("capabilities.await_external.step must be a non-empty string")
+    if not isinstance(capability.get("resume_on"), str) or not capability["resume_on"]:
+        raise ValueError("capabilities.await_external.resume_on must be a non-empty string")
+
+    effective_interactive = (path_step or {}).get("interactive") or capability.get("interactive")
+    if effective_interactive:
+        if effective_interactive.get("kind") != "cta_url":
+            raise ValueError("await_external interactive.kind must be 'cta_url'")
+        if effective_interactive.get("field") != capability["resume_on"]:
+            raise ValueError("await_external interactive.field must match resume_on")
+        if effective_interactive.get("out_of_band", True) is not True:
+            raise ValueError("await_external interactive.out_of_band cannot be false")
+        next_step = effective_interactive.get("next_step")
+        if next_step is not None and next_step != capability["step"]:
+            raise ValueError("await_external interactive.next_step must match step")
+    on_resume = capability.get("on_resume") or {}
+    token_bindings = on_resume.get("set") or {}
+    _validate_binding_map(
+        token_bindings,
+        namespace="token",
+        location="capabilities.await_external.on_resume.set",
+    )
+
+    enrichment = on_resume.get("enrich")
+    if enrichment is None:
+        return
+    if isinstance(enrichment, str):
+        if path_step is not None:
+            raise ValueError("path await_external requires object-form on_resume.enrich")
+        tool_name = enrichment
+    else:
+        if not isinstance(enrichment, dict):
+            raise ValueError("await_external enrichment must be a tool name or object")
+        tool_name_value = enrichment.get("tool")
+        if not isinstance(tool_name_value, str) or not tool_name_value:
+            raise ValueError("await_external enrichment.tool must be a non-empty string")
+        tool_name = tool_name_value
+        _validate_binding_map(
+            enrichment.get("input") or {},
+            namespace="token",
+            location="capabilities.await_external.on_resume.enrich.input",
+        )
+        enrichment_bindings = enrichment.get("set") or {}
+        _validate_binding_map(
+            enrichment_bindings,
+            namespace="result",
+            location="capabilities.await_external.on_resume.enrich.set",
+        )
+        duplicate_writes = set(token_bindings) & set(enrichment_bindings)
+        if duplicate_writes:
+            duplicates = ", ".join(sorted(duplicate_writes))
+            raise ValueError(f"await_external mappings write the same keys twice: {duplicates}")
+    if not tool_name or not tools.has(tool_name):
+        raise ValueError(f"await_external enrichment tool is not registered: {tool_name!r}")
+
+
+def _validate_await_external_targets(
+    capability: Optional[dict[str, Any]],
+    node_ids: set[str],
+    await_external_node_ids: set[str],
+) -> None:
+    if capability is None:
+        return
+    bound_node_id = capability["step"]
+    if bound_node_id not in node_ids:
+        raise ValueError(
+            f"capabilities.await_external.step does not resolve to a node: {bound_node_id!r}"
+        )
+    if bound_node_id not in await_external_node_ids:
+        raise ValueError(
+            "capabilities.await_external.step resolves to a node that does not implement "
+            f"await_external: {bound_node_id!r}"
+        )
+    transitions = {
+        "timeout": capability.get("timeout"),
+        **(capability.get("recovery") or {}),
+    }
+    for event, transition in transitions.items():
+        if transition is None:
+            continue
+        target = transition["goto"]
+        if event == "resend" and target != bound_node_id:
+            raise ValueError(
+                "capabilities.await_external resend target must match its bound step: "
+                f"{bound_node_id!r}"
+            )
+        if target != "END" and target not in node_ids:
+            raise ValueError(
+                f"capabilities.await_external {event} target does not resolve to a node: {target!r}"
+            )
 
 
 def compile_flow(
@@ -90,14 +269,18 @@ def compile_flow(
     *,
     tools: Optional[ToolRegistry] = None,
     subflows: Optional[SubflowRegistry] = None,
+    log_id_generator: Optional[SnowflakeIdGenerator] = None,
 ) -> CompiledFlow:
     tools = tools or default_tool_registry()
     subflows = subflows or default_subflows()
+    log_id_generator = log_id_generator or default_log_id_generator()
 
     # Work on a private copy: the compiler annotates path steps with synthesized
     # node ids, and must never mutate the caller's document (which is re-validated
     # against an additionalProperties:false schema).
     doc = copy.deepcopy(doc)
+
+    await_external = _bind_await_external(doc)
 
     slots = dict(doc.get("slots", {}))
     ctx = FlowContext(
@@ -105,6 +288,17 @@ def compile_flow(
         slots=slots,
         config=dict(doc.get("config", {})),
         tools=tools,
+        log_id_generator=log_id_generator,
+        await_external=await_external,
+    )
+    await_external_path_step = next(
+        (step for step in doc["path"] if step.get("await_external") is True),
+        None,
+    )
+    _validate_await_external_definition(
+        await_external,
+        tools,
+        await_external_path_step,
     )
 
     terminal = doc.get("terminal")
@@ -130,13 +324,22 @@ def compile_flow(
             step["id"] = terminal_id or "terminal"
         elif "derive" in step:
             step["id"] = step.get("step", f"derive_{step['derive']}")
+        elif "await_external" in step:
+            step["id"] = step["step"]
         # `use` ids come from the subflow
 
     # Main pass: build nodes in path order.
     for step in doc["path"]:
         if "use" in step:
             ref = step["use"]
-            with_cfg = next((u.get("with", {}) for u in doc.get("uses", []) if u.get("ref") == ref), {})
+            with_cfg: dict[str, Any] = next(
+                (
+                    cast(dict[str, Any], use.get("with", {}))
+                    for use in doc.get("uses", [])
+                    if use.get("ref") == ref
+                ),
+                {},
+            )
             build = subflows.get(ref).build(ctx, with_cfg)
             seq.extend(build.descriptors)
             continue
@@ -152,6 +355,10 @@ def compile_flow(
         elif "derive" in step:
             derive_def = next(d for d in doc.get("derive", []) if d["writes"] == step["derive"])
             seq.append(make_derive_node(ctx, derive_def))
+        elif "await_external" in step:
+            if await_external is None:  # defended by _bind_await_external
+                raise ValueError("path await_external requires capabilities.await_external")
+            seq.append(make_await_external_node(ctx, await_external, step))
         elif "terminal" in step:
             if terminal:
                 seq.append(make_terminal_node(ctx, terminal))
@@ -176,23 +383,43 @@ def compile_flow(
         else:
             seq.insert(idx + 1, node)
 
+    node_ids = [descriptor.id for descriptor in seq]
+    if len(node_ids) != len(set(node_ids)):
+        duplicate_node_ids = sorted(
+            node_id for node_id in set(node_ids) if node_ids.count(node_id) > 1
+        )
+        raise ValueError(
+            f"compiled flow contains duplicate node ids: {', '.join(duplicate_node_ids)}"
+        )
+    _validate_await_external_targets(
+        await_external,
+        set(node_ids),
+        ctx.await_external_nodes,
+    )
+
     # ── wire the StateGraph ──────────────────────────────────────────────
     graph = StateGraph(ServiceState)
     for desc in seq:
-        graph.add_node(desc.id, desc.fn)
+        graph.add_node(desc.id, cast(Any, desc.fn))
     graph.set_entry_point(seq[0].id)
 
     for i, desc in enumerate(seq):
         next_id = seq[i + 1].id if i + 1 < len(seq) else END
         path_map = list({*desc.targets, next_id, END})
 
-        def make_router(router, resolved_next):  # noqa: ANN001
+        def make_router(
+            router: Callable[[ServiceState], str],
+            resolved_next: str,
+        ) -> Callable[[ServiceState], str]:
             def routed(state: ServiceState) -> str:
                 target = router(state)
                 return resolved_next if target == NEXT else target
+
             return routed
 
         graph.add_conditional_edges(desc.id, make_router(desc.router, next_id), path_map)
 
     compiled = graph.compile()
-    return CompiledFlow(graph=compiled, ctx=ctx, doc=doc, terminal_id=terminal_id, entry_node_id=seq[0].id)
+    return CompiledFlow(
+        graph=compiled, ctx=ctx, doc=doc, terminal_id=terminal_id, entry_node_id=seq[0].id
+    )

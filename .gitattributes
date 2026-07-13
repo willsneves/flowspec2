@@ -1,0 +1,2 @@
+# Preserve the byte-exact upstream schema whose provenance hash includes whitespace.
+src/flowspec2/compat/schemas/vendor/open-workflow-1.0.3.workflow.yaml -whitespace

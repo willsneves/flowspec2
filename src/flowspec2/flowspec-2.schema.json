@@ -98,7 +98,7 @@
       }
     },
     "path": {
-      "description": "RAIL. The flat ordered happy path (~80% of every flow). Implicit fall-through: each step is one StateGraph node; linear order is the default edge; the PAUSE->END and back-to-agent edges are SYNTHESIZED (never authored). The step POINTER is never serialized — position = first unfilled gate-passing slot. A step is exactly one of slot | confirm | derive | terminal | use.",
+      "description": "RAIL. The flat ordered happy path (~80% of every flow). Implicit fall-through: each step is one StateGraph node; linear order is the default edge; the PAUSE->END and back-to-agent edges are SYNTHESIZED (never authored). The step POINTER is never serialized — position = first unfilled gate-passing slot. A step is exactly one of slot | confirm | derive | terminal | use | await_external.",
       "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" }
     },
     "uses": {
@@ -129,7 +129,7 @@
       "$ref": "#/$defs/autoFlowDef"
     },
     "capabilities": {
-      "description": "FENCED LLM-FREEDOM zone (boundary by LOCATION). Agent-scope non-deterministic side-actions the LLM MAY invoke at its discretion, bounded by the Mule outbound whitelist (cross-checked by the COMPILER against config.yaml, never encoded here). NOT states in the path. await_external is the one reusable out-of-band primitive (fixes A5) with recovery branches.",
+      "description": "FENCED LLM-FREEDOM zone (boundary by LOCATION). Agent-scope non-deterministic side-actions the LLM MAY invoke at its discretion, bounded by the Mule outbound whitelist (cross-checked by the COMPILER against config.yaml, never encoded here). await_external is the one reusable out-of-band primitive: it is bound either to an explicit path marker or to a subflow-provided step.",
       "type": "object", "additionalProperties": false,
       "properties": {
         "media_in": { "type": "object", "additionalProperties": false, "properties": { "analyze": { "type": "array", "items": { "enum": ["image", "audio", "video"] } }, "route_by": { "type": "string" } } },
@@ -148,12 +148,27 @@
         "handoff": { "type": "object", "additionalProperties": false, "properties": { "target": { "type": "string", "description": "e.g. '1746' or a human queue." }, "when": { "enum": ["llm_decides"], "default": "llm_decides" } } },
         "session_reset": { "type": "boolean", "default": false },
         "await_external": {
-          "description": "First-class out-of-band suspend/resume primitive (gov.br OAuth, payment redirect, alternate IdP). Emits an out-of-band send, suspends on an EXTERNAL signal (not the next text turn), resumes populating slots, with recovery branches (abort/resend/switch).",
+          "description": "First-class out-of-band suspend/resume primitive (gov.br OAuth, payment redirect, alternate IdP). Emits an out-of-band host marker, suspends on an EXTERNAL signal (not the next text turn), and resumes with atomic bounded mappings. Timeout is delivered by the host as _external_event=timeout; the runtime owns no scheduler.",
           "type": "object", "additionalProperties": false, "required": ["kind", "resume_on"],
           "properties": {
             "kind": { "enum": ["cta_url"] },
-            "resume_on": { "type": "string", "description": "External signal name, e.g. govbr_token." },
-            "on_resume": { "type": "object", "additionalProperties": false, "properties": { "set": { "type": "object", "additionalProperties": { "type": "string" }, "description": "slot -> $token.path mapping." }, "enrich": { "type": "string", "description": "tool to call for extra fields (e.g. get_user_info)." } } },
+            "step": { "type": "string", "minLength": 1, "description": "Stable id of a subflow-provided await node. An explicit path await_external step may supply the same id instead." },
+            "resume_on": { "type": "string", "minLength": 1, "description": "External signal payload key, e.g. govbr_token." },
+            "prompt": { "$ref": "#/$defs/promptDef" },
+            "interactive": { "$ref": "#/$defs/interactiveDef" },
+            "on_resume": {
+              "type": "object", "additionalProperties": false,
+              "properties": {
+                "set": { "$ref": "#/$defs/bindingMap", "description": "State key -> literal or $token.path binding. Resolved writes are committed atomically." },
+                "enrich": {
+                  "description": "Explicit enrichment call. A bare tool name remains accepted for legacy subflow documents; new documents declare the object contract.",
+                  "oneOf": [
+                    { "type": "string", "minLength": 1 },
+                    { "$ref": "#/$defs/enrichmentDef" }
+                  ]
+                }
+              }
+            },
             "timeout": { "$ref": "#/$defs/transition" },
             "recovery": { "type": "object", "additionalProperties": false, "properties": { "abort": { "$ref": "#/$defs/transition" }, "resend": { "$ref": "#/$defs/transition" }, "switch": { "$ref": "#/$defs/transition" } } }
           }
@@ -196,7 +211,7 @@
       }
     },
     "step": {
-      "description": "RAIL. A single path step. Exactly one of slot/confirm/derive/terminal/use is the step kind (mutually exclusive). step id defaults to the slot/derive/terminal target. Single-purpose: a collect step never carries action/branch side effects.",
+      "description": "RAIL. A single path step. Exactly one of slot/confirm/derive/terminal/use/await_external is the step kind (mutually exclusive). step id defaults to the construct name. Single-purpose: a collect step never carries action/branch side effects.",
       "type": "object", "additionalProperties": false,
       "properties": {
         "step": { "type": "string", "description": "Stable node id. Optional; defaults to slot name or construct name." },
@@ -205,6 +220,7 @@
         "derive": { "type": "string", "description": "derive step: references a derive[] target written here in the sequence." },
         "terminal": { "type": "boolean", "description": "terminal step marker: binds the flow's terminal{} action at this position." },
         "use": { "type": "string", "description": "subflow anchor: references a uses[] ref id (e.g. 'address@1'). Splices the subflow here." },
+        "await_external": { "const": true, "description": "Explicit anchor for the singular capabilities.await_external primitive." },
         "prompt": { "$ref": "#/$defs/promptDef" },
         "interactive": { "$ref": "#/$defs/interactiveDef" },
         "ask_when": { "$ref": "#/$defs/predicate", "description": "Inline single-predicate gate: ask this slot only if true (skip-by-vacuity otherwise)." },
@@ -212,7 +228,7 @@
         "on_reject": { "description": "For confirm/summary steps: terminal end with a message if the citizen declines.", "type": "object", "additionalProperties": false, "properties": { "end": { "type": "string" } } },
         "correctable": { "type": "boolean", "description": "Marks a confirm step as the correction hub (see confirm{})." }
       },
-      "oneOf": [ { "required": ["slot"] }, { "required": ["confirm"] }, { "required": ["derive"] }, { "required": ["terminal"] }, { "required": ["use"] } ]
+      "oneOf": [ { "required": ["slot"] }, { "required": ["confirm"] }, { "required": ["derive"] }, { "required": ["terminal"] }, { "required": ["use"] }, { "required": ["await_external"] } ]
     },
     "subflowRef": {
       "description": "RAIL. A versioned mixin reference. ref = name@major (visible, diffable version event). with{} flips the subflow's common_config rails. The subflow brings its own slots/nodes/await_external and inherits idempotency/reset defaults.",
@@ -292,6 +308,24 @@
       "description": "A routing target with optional set. Used by await_external timeout/recovery branches.",
       "type": "object", "additionalProperties": false, "required": ["goto"],
       "properties": { "goto": { "type": "string", "description": "step id or 'END'." }, "set": { "type": "object", "additionalProperties": true } }
+    },
+    "bindingLiteral": {
+      "description": "A bounded mapping value: a JSON scalar literal or a compiler-checked $token.* / $result.* reference.",
+      "type": ["string", "number", "boolean", "null"]
+    },
+    "bindingMap": {
+      "type": "object",
+      "propertyNames": { "minLength": 1 },
+      "additionalProperties": { "$ref": "#/$defs/bindingLiteral" }
+    },
+    "enrichmentDef": {
+      "type": "object", "additionalProperties": false, "required": ["tool"],
+      "properties": {
+        "tool": { "type": "string", "minLength": 1 },
+        "optional": { "type": "boolean", "default": false, "description": "When true, a logged tool failure does not discard successfully resolved token mappings." },
+        "input": { "$ref": "#/$defs/bindingMap", "description": "Tool parameter -> literal or $token.path binding." },
+        "set": { "$ref": "#/$defs/bindingMap", "description": "State key -> literal or $result.path binding." }
+      }
     }
   }
 }

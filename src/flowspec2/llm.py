@@ -116,7 +116,7 @@ class GeminiAgent:
             return {}
 
     def route(self, text: str, flows: list[dict[str, Any]]) -> Optional[str]:
-        catalog = "\n".join(f'- {f["flow"]}: {f["route"]["description"]}' for f in flows)
+        catalog = "\n".join(f"- {f['flow']}: {f['route']['description']}" for f in flows)
         prompt = (
             f"Serviços disponíveis:\n{catalog}\n\n"
             f'Mensagem do cidadão: "{text}"\n\n'

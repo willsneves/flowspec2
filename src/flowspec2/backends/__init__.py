@@ -17,9 +17,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from ..tools import ToolRegistry, default_tool_registry
+
+if TYPE_CHECKING:
+    import httpx
 
 
 @dataclass
@@ -51,7 +54,7 @@ class BackendConfig:
 def make_registry(
     config: BackendConfig,
     *,
-    transport=None,
+    transport: Optional["httpx.AsyncBaseTransport"] = None,
     base: Optional[ToolRegistry] = None,
 ) -> ToolRegistry:
     """Overlay HTTP tools onto a (fake-by-default) registry per configured URL."""

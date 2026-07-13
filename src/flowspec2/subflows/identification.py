@@ -9,15 +9,39 @@ caps re-asks at ``max_attempts`` then skips/defaults.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+import copy
+import logging
+from collections.abc import Mapping
+from typing import Any, Final, Optional, cast
+
+from langgraph.graph import END as LANGGRAPH_END
 
 from ..domains import normalize_text
 from ..models import AgentResponse, ServiceState
-from ..nodes import NEXT, FlowContext, NodeDesc, inc_attempts
-from langgraph.graph import END
+from ..nodes import (
+    NEXT,
+    FlowContext,
+    NodeDesc,
+    inc_attempts,
+    make_await_external_node,
+)
+from ..observability import log_event
 from . import SubflowBuild
 
-_REFUSAL = ("anonim", "pular", "sem ident", "nao quero", "nao me ident", "recus", "nenhum", "sem cpf", "skip")
+_REFUSAL = (
+    "anonim",
+    "pular",
+    "sem ident",
+    "nao quero",
+    "nao me ident",
+    "recus",
+    "nenhum",
+    "sem cpf",
+    "skip",
+)
+END: Final[str] = LANGGRAPH_END
+
+logger = logging.getLogger(__name__)
 
 
 def _is_refusal(text: str) -> bool:
@@ -34,6 +58,24 @@ def _is_skip(text: str) -> bool:
     return normalize_text(text) in _SKIP_TOKENS
 
 
+def _govbr_validation_failure_response(
+    ctx: FlowContext,
+    state: ServiceState,
+) -> AgentResponse:
+    log_id = log_event(
+        logger,
+        logging.WARNING,
+        "gov.br authentication response could not be validated",
+        operation="authenticate_govbr",
+        log_id_generator=ctx.log_id_generator,
+        context={"flow": state.service_name},
+    )
+    return AgentResponse(
+        description="Não consegui validar o gov.br. Vamos tentar pelo CPF?",
+        log_id=log_id,
+    )
+
+
 def _normalize_method(raw: str) -> Optional[str]:
     norm = normalize_text(raw)
     if "govbr" in norm or "gov.br" in norm or norm == "gov" or "gov br" in norm:
@@ -43,6 +85,30 @@ def _normalize_method(raw: str) -> Optional[str]:
     if _is_refusal(norm) or norm == "anonimo":
         return "anonimo"
     return None
+
+
+async def _call_optional_identification_tool(
+    ctx: FlowContext,
+    tool_name: str,
+    **tool_inputs: Any,
+) -> Optional[dict[str, Any]]:
+    """Call a subflow enrichment whose contract is explicitly best-effort."""
+    try:
+        tool_result = await ctx.tools.call(tool_name, **tool_inputs)
+        if not isinstance(tool_result, Mapping):
+            raise TypeError(f"tool {tool_name!r} returned a non-object result")
+        return dict(tool_result)
+    except Exception:
+        log_event(
+            logger,
+            logging.WARNING,
+            "Optional identification enrichment failed",
+            operation="identification",
+            log_id_generator=ctx.log_id_generator,
+            context={"tool": tool_name},
+            exc_info=True,
+        )
+        return None
 
 
 class IdentificationSubflow:
@@ -61,7 +127,9 @@ class IdentificationSubflow:
         ctx.slots.setdefault("cpf", {"domain": "CPF"})
         ctx.slots.setdefault("email", {"domain": "Email"})
         ctx.slots.setdefault("name", {"domain": "Name"})
-        ctx.node_for_slot.update({"cpf": "collect_cpf", "email": "collect_email", "name": "collect_name"})
+        ctx.node_for_slot.update(
+            {"cpf": "collect_cpf", "email": "collect_email", "name": "collect_name"}
+        )
         ctx.slot_aux["cpf"] = ["cadastro_verificado", "cpf_attempts", "identificacao_pulada"]
         ctx.slot_aux["email"] = ["email_processed", "email_attempts"]
         ctx.slot_aux["name"] = ["name_processed", "name_attempts"]
@@ -71,11 +139,17 @@ class IdentificationSubflow:
 
         # ── select method ────────────────────────────────────────────────
         async def select(state: ServiceState) -> ServiceState:
-            if state.data.get("identification_method") or state.data.get("cpf") or state.data.get("govbr_authenticated"):
+            if (
+                state.data.get("identification_method")
+                or state.data.get("cpf")
+                or state.data.get("govbr_authenticated")
+            ):
                 state.agent_response = None
                 return state
             pay = state.payload or {}
-            raw = str(pay.get("identification_method", "")) if "identification_method" in pay else ""
+            raw = (
+                str(pay.get("identification_method", "")) if "identification_method" in pay else ""
+            )
             if not required and (not pay or _is_refusal(raw)):
                 state.data["identification_method"] = "anonimo"
                 state.data["identificacao_pulada"] = True
@@ -93,10 +167,21 @@ class IdentificationSubflow:
                     state.data["identification_method"] = "cpf"
                     state.agent_response = None
                     return state
-            buttons = [{"id": m, "title": {"cpf": "CPF", "govbr": "Gov.br", "anonimo": "Sem me identificar"}[m]} for m in methods if (m != "anonimo" or not required)]
+            buttons = [
+                {
+                    "id": m,
+                    "title": {"cpf": "CPF", "govbr": "Gov.br", "anonimo": "Sem me identificar"}[m],
+                }
+                for m in methods
+                if (m != "anonimo" or not required)
+            ]
             state.agent_response = AgentResponse(
                 description="Como prefere se identificar?",
-                interactive={"body": "Como prefere se identificar?", "field": "identification_method", "buttons": buttons},
+                interactive={
+                    "body": "Como prefere se identificar?",
+                    "field": "identification_method",
+                    "buttons": buttons,
+                },
             )
             return state
 
@@ -111,8 +196,10 @@ class IdentificationSubflow:
             return "identification_done"  # anonimo / pulada
 
         # ── gov.br (await_external) ───────────────────────────────────────
-        async def authenticate(state: ServiceState) -> ServiceState:
-            if state.data.get("identification_method") != "govbr" or state.data.get("govbr_authenticated"):
+        async def authenticate_legacy(state: ServiceState) -> ServiceState:
+            if state.data.get("identification_method") != "govbr" or state.data.get(
+                "govbr_authenticated"
+            ):
                 state.agent_response = None
                 return state
             pay = state.payload or {}
@@ -122,7 +209,7 @@ class IdentificationSubflow:
                 if not cpf:
                     state.data.pop("identification_method", None)
                     state.data.pop("govbr_auth_sent", None)
-                    state.agent_response = AgentResponse(description="Não consegui validar o gov.br. Vamos tentar pelo CPF?")
+                    state.agent_response = _govbr_validation_failure_response(ctx, state)
                     return state
                 state.data["cpf"] = cpf
                 if token.get("nome"):
@@ -131,19 +218,18 @@ class IdentificationSubflow:
                 if token.get("email"):
                     state.data["email"] = token["email"]
                     state.data["email_processed"] = True
-                try:
-                    enrich = await ctx.tools.call("get_user_info", cpf=cpf)
-                    if enrich.get("phones"):
-                        state.data["phone"] = str(enrich["phones"][0])
-                except Exception:
-                    pass
+                enrich = await _call_optional_identification_tool(ctx, "get_user_info", cpf=cpf)
+                if enrich and enrich.get("phones"):
+                    state.data["phone"] = str(enrich["phones"][0])
                 state.data["govbr_authenticated"] = True
                 state.data["cadastro_verificado"] = True
                 state.data.pop("govbr_auth_sent", None)
                 state.agent_response = None
                 return state
             if state.data.get("govbr_auth_sent"):
-                text = normalize_text(f"{pay.get('message', '')} {pay.get('identification_method', '')}")
+                text = normalize_text(
+                    f"{pay.get('message', '')} {pay.get('identification_method', '')}"
+                )
                 if not required and _is_refusal(text):
                     state.data["identification_method"] = "anonimo"
                     state.data["identificacao_pulada"] = True
@@ -208,9 +294,12 @@ class IdentificationSubflow:
                     return state
                 try:
                     validated = cpf_model.model_validate({"cpf": raw})
-                    state.data["cpf"] = validated.cpf
-                    try:
-                        info = await ctx.tools.call("cpf_lookup", cpf=validated.cpf)
+                    validated_cpf = cast(str, validated.model_dump()["cpf"])
+                    state.data["cpf"] = validated_cpf
+                    info = await _call_optional_identification_tool(
+                        ctx, "cpf_lookup", cpf=validated_cpf
+                    )
+                    if info:
                         if info.get("email"):
                             state.data["email"] = info["email"]
                             state.data["email_processed"] = True
@@ -218,14 +307,14 @@ class IdentificationSubflow:
                             state.data["name"] = info["name"]
                             state.data["name_processed"] = True
                         state.data["cadastro_verificado"] = True
-                    except Exception:
-                        pass
                     state.agent_response = None
                     return state
                 except Exception as exc:
                     if inc_attempts(state, "cpf") >= max_attempts:
                         if required:
-                            state.agent_response = AgentResponse(description="Não consegui validar seu CPF.", error_message=str(exc))
+                            state.agent_response = AgentResponse(
+                                description="Não consegui validar seu CPF.", error_message=str(exc)
+                            )
                             return state
                         state.data["identificacao_pulada"] = True
                         state.agent_response = None
@@ -275,7 +364,7 @@ class IdentificationSubflow:
                     return state
                 try:
                     validated = email_model.model_validate({"email": raw})
-                    state.data["email"] = validated.email
+                    state.data["email"] = cast(str, validated.model_dump()["email"])
                     state.data["email_processed"] = True
                     state.agent_response = None
                     return state
@@ -321,7 +410,7 @@ class IdentificationSubflow:
                     return state
                 try:
                     validated = name_model.model_validate({"name": raw})
-                    state.data["name"] = validated.name
+                    state.data["name"] = cast(str, validated.model_dump()["name"])
                     state.data["name_processed"] = True
                     state.agent_response = None
                     return state
@@ -349,14 +438,178 @@ class IdentificationSubflow:
             state.agent_response = None
             return state
 
+        authenticate_descriptor = NodeDesc(
+            "authenticate_govbr",
+            authenticate_legacy,
+            authenticate_router,
+            targets=[
+                "collect_cpf",
+                "collect_email",
+                "collect_name",
+                "identification_done",
+            ],
+        )
+        await_external = ctx.await_external
+        if await_external and await_external.get("step") == "authenticate_govbr":
+            configured_capability = copy.deepcopy(await_external)
+            configured_on_resume = configured_capability.setdefault("on_resume", {})
+            if isinstance(configured_on_resume.get("enrich"), str):
+                configured_on_resume["enrich"] = {
+                    "tool": configured_on_resume["enrich"],
+                    "optional": True,
+                    "input": {"cpf": "$token.cpf"},
+                    "set": {"phone": "$result.phones.0"},
+                }
+            configured_step: dict[str, Any] = {"step": "authenticate_govbr"}
+            if not configured_capability.get("interactive"):
+                configured_step["interactive"] = {
+                    "kind": "cta_url",
+                    "field": configured_capability["resume_on"],
+                    "out_of_band": True,
+                    "next_step": "await_govbr_auth",
+                }
+            generic_descriptor = make_await_external_node(
+                ctx,
+                configured_capability,
+                configured_step,
+                default_router=authenticate_router,
+                additional_targets=[
+                    "collect_cpf",
+                    "collect_email",
+                    "collect_name",
+                    "identification_done",
+                ],
+                legacy_sent_data_key="govbr_auth_sent",
+                waiting_description=(
+                    "Estou aguardando você concluir o login gov.br. "
+                    "Quando terminar, é só me avisar. 🙂"
+                ),
+            )
+
+            async def authenticate_configured(state: ServiceState) -> ServiceState:
+                if state.data.get("identification_method") != "govbr" or state.data.get(
+                    "govbr_authenticated"
+                ):
+                    state.agent_response = None
+                    return state
+
+                payload = state.payload or {}
+                resume_on = configured_capability["resume_on"]
+                recovery = configured_capability.get("recovery") or {}
+                if (
+                    state.data.get("govbr_auth_sent")
+                    and resume_on not in payload
+                    and "_external_event" not in payload
+                ):
+                    recovery_text = normalize_text(
+                        f"{payload.get('message', '')} {payload.get('identification_method', '')}"
+                    )
+                    if not required and _is_refusal(recovery_text):
+                        if "abort" in recovery:
+                            payload["_external_event"] = "abort"
+                        else:
+                            state.data["identification_method"] = "anonimo"
+                            state.data["identificacao_pulada"] = True
+                            state.data.pop("govbr_auth_sent", None)
+                            state.internal.pop(
+                                f"_await_external_sent:{generic_descriptor.id}",
+                                None,
+                            )
+                            state.status = "progress"
+                            state.agent_response = None
+                            return state
+                    elif "cpf" in recovery_text:
+                        if "switch" in recovery:
+                            payload["_external_event"] = "switch"
+                        else:
+                            state.data["identification_method"] = "cpf"
+                            state.data.pop("govbr_auth_sent", None)
+                            state.internal.pop(
+                                f"_await_external_sent:{generic_descriptor.id}",
+                                None,
+                            )
+                            state.status = "progress"
+                            state.agent_response = None
+                            return state
+
+                resume_token = payload.get(resume_on)
+                if resume_on in payload and (
+                    not isinstance(resume_token, Mapping) or not resume_token.get("cpf")
+                ):
+                    if "switch" in recovery:
+                        payload.pop(resume_on, None)
+                        payload["_external_event"] = "switch"
+                    else:
+                        state.data["identification_method"] = "cpf"
+                        state.data.pop("govbr_auth_sent", None)
+                        state.internal.pop(
+                            f"_await_external_sent:{generic_descriptor.id}",
+                            None,
+                        )
+                        state.status = "progress"
+                        state.agent_response = _govbr_validation_failure_response(ctx, state)
+                        return state
+
+                external_event = payload.get("_external_event")
+                has_resume_token = resume_on in payload
+                updated_state = await generic_descriptor.fn(state)
+                if updated_state.agent_response is not None:
+                    return updated_state
+
+                if external_event == "abort":
+                    if required:
+                        updated_state.data.pop("identification_method", None)
+                    else:
+                        updated_state.data["identification_method"] = "anonimo"
+                        updated_state.data["identificacao_pulada"] = True
+                elif external_event in {"switch", "timeout"}:
+                    updated_state.data["identification_method"] = "cpf"
+
+                if not has_resume_token:
+                    return updated_state
+                if not updated_state.data.get("cpf"):
+                    updated_state.data["identification_method"] = "cpf"
+                    updated_state.data.pop("govbr_authenticated", None)
+                    updated_state.data.pop("cadastro_verificado", None)
+                    updated_state.agent_response = _govbr_validation_failure_response(
+                        ctx, updated_state
+                    )
+                    return updated_state
+                if updated_state.data.get("name"):
+                    updated_state.data["name_processed"] = True
+                if updated_state.data.get("email"):
+                    updated_state.data["email_processed"] = True
+                updated_state.data["govbr_authenticated"] = True
+                updated_state.data["cadastro_verificado"] = True
+                return updated_state
+
+            authenticate_descriptor = NodeDesc(
+                generic_descriptor.id,
+                authenticate_configured,
+                generic_descriptor.router,
+                generic_descriptor.targets,
+            )
+
         descriptors = [
-            NodeDesc("select_identification_method", select, select_router,
-                     targets=["authenticate_govbr", "collect_cpf", "identification_done"]),
-            NodeDesc("authenticate_govbr", authenticate, authenticate_router,
-                     targets=["collect_cpf", "collect_email", "collect_name", "identification_done"]),
-            NodeDesc("collect_cpf", collect_cpf, cpf_router,
-                     targets=["collect_email", "collect_name", "identification_done"]),
-            NodeDesc("collect_email", collect_email, email_router, targets=["collect_name", "identification_done"]),
+            NodeDesc(
+                "select_identification_method",
+                select,
+                select_router,
+                targets=["authenticate_govbr", "collect_cpf", "identification_done"],
+            ),
+            authenticate_descriptor,
+            NodeDesc(
+                "collect_cpf",
+                collect_cpf,
+                cpf_router,
+                targets=["collect_email", "collect_name", "identification_done"],
+            ),
+            NodeDesc(
+                "collect_email",
+                collect_email,
+                email_router,
+                targets=["collect_name", "identification_done"],
+            ),
             NodeDesc("collect_name", collect_name, name_router, targets=["identification_done"]),
             NodeDesc("identification_done", done, lambda s: NEXT),
         ]
