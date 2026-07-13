@@ -133,7 +133,7 @@ async def scenario_correction():
     await sim.say("sim", {"confirmacao": "sim"})
     await sim.say("perto da farmácia", {"ponto_referencia": "perto da farmácia"})
     await sim.say("anônimo", {"identification_method": "anonimo"})
-    await sim.say("não, o endereço está errado", {"correcao": "endereço"})
+    await sim.say("não, o endereço está errado", {"correcao": "address"})
     await sim.say("é na Rua Tonelero, 150", {"address": "Rua Tonelero, 150"})
     await sim.say("agora sim", {"confirmacao": "sim"})
     await sim.say(

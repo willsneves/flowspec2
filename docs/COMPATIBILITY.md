@@ -2,11 +2,12 @@
 
 Table of Contents:
 
-- Conversion policy: 25 <!-- section:conversion-policy -->
-- Python API: 48 <!-- section:python-api -->
-- CLI: 83 <!-- section:cli -->
-- Rasa CALM portable profile: 100 <!-- section:rasa-calm-profile -->
-- Open Workflow conversational profile: 166 <!-- section:open-workflow-profile -->
+- Runtime compatibility matrix: 28 <!-- section:runtime-compatibility-matrix -->
+- Conversion policy: 52 <!-- section:conversion-policy -->
+- Python API: 87 <!-- section:python-api -->
+- CLI: 122 <!-- section:cli -->
+- Rasa CALM portable profile: 139 <!-- section:rasa-calm-profile -->
+- Open Workflow conversational profile: 208 <!-- section:open-workflow-profile -->
 
 <!-- /section:toc -->
 
@@ -18,8 +19,34 @@ return a complete diagnostic report explaining why they cannot.
 
 The architectural boundary is recorded in
 [ADR 0001](adr/0001-interoperability-boundaries.md), and the systems considered
-before selecting these adapters are listed in [PRIOR_ART.md](PRIOR_ART.md).
+before selecting these adapters are listed in [PRIOR_ART.md](PRIOR_ART.md). The
+shared source-linking and runtime-profile boundary is recorded in
+[ADR 0002](adr/0002-format-authoring-execution-boundary.md).
 
+<!-- section:runtime-compatibility-matrix -->
+
+## Runtime compatibility matrix
+
+Executability is an exact resolved-contract match, not a best-effort version
+negotiation:
+
+| Layer | Accepted contract | Failure behavior |
+|---|---|---|
+| Source format | stable `flowspec/2`; experimental formats remain adapter- or report-only | structural checking stops before semantic traversal |
+| Flow revision | the document's semantic version is preserved in IR and state metadata | restored state with another revision is rejected before execution |
+| Runtime profile | a named profile resolves domain kinds, host capabilities, typed tools, and complete subflow manifests | missing, legacy-without-opt-in, or incompatible bindings fail linking |
+| Profile digest | canonical digest of the complete selected profile contract | restored state fails closed after profile drift, even when the profile name is unchanged |
+| Dependency digest | canonical digest of only the tools, subflows, schemas, and capabilities resolved by the flow | dependency drift invalidates IR and restored state |
+| IR format | explicit `flowspec2/ir@1` identity carried by every canonical IR and migration contract | an unknown IR contract is never treated as the current representation |
+| IR digest | IR format, canonical normalized source, and resolved dependency digest | a state compiled from different executable semantics cannot resume |
+| Active state | service identity and all persisted provenance fields must match the target runtime | migration must be explicit and validated; direct restore never guesses |
+
+Source adapters may preserve or lower syntax, but they cannot choose a looser
+runtime profile or erase any digest. Unknown combinations are rejected by
+default. A future stable source or IR revision requires an explicit adapter or
+migration contract rather than an implicit compatibility range.
+
+<!-- /section:runtime-compatibility-matrix -->
 <!-- section:conversion-policy -->
 
 ## Conversion policy
@@ -41,6 +68,18 @@ source path, and message.
   rejection.
 - CLI diagnostics include a Snowflake `log_id` that matches their structured log
   record.
+
+An adapter validates a projected document with an isolated per-document tool
+catalog containing tools referenced by entry, terminal, external-wait
+enrichment, or a declared subflow manifest. Known built-ins retain their exact
+`ToolDefinition`. An unknown external action receives a synthetic compile-only
+contract derived from its authored role: entry and enrichment remain read-only,
+terminal status is restricted to the lifecycle protocol, and idempotency is
+copied only from the source declaration. Terminal output bindings materialize
+their required nested result paths without inventing value types. This does not
+register the action with `FlowRuntime`, weaken ordinary profile checking, or
+assert that a backend exists. A stable executable deployment must supply its
+real typed contract in the selected runtime profile.
 
 <!-- /section:conversion-policy -->
 <!-- section:python-api -->
@@ -128,15 +167,18 @@ prevents Rasa's default completion pattern from adding behavior that flowspec2
 does not define. Each collect uses one non-empty, unconditional `utter_*`
 response. Static buttons must cover the domain in declared order and use one
 `/SetSlots(slot=value)` assignment. Curly braces are rejected because Rasa
-interprets them as response interpolation.
+interprets them as response interpolation. Categorical button titles equal the
+stored token. Boolean exports use “Sim”/“Não” titles with `true`/`false`
+payloads; imports also accept the legacy token-as-title form.
 
 flowspec2 `confirm` and Rasa `ask_before_filling: true` are hard errors, not a
 mapping: their prefill, clearing, retry, and exhaustion semantics differ.
 Control-flow gates, derived values, correction back-edges, subflow splicing,
 external waits, WhatsApp Flow behavior, and non-portable validation contracts
 also block conversion. One final custom action can be projected as a terminal
-only with an explicit adapter warning and conservative imported lifecycle
-defaults.
+only with an explicit adapter warning. Import treats that action as
+non-idempotent and clears state after every terminal outcome, so it never
+retries retained state without an executable effect contract.
 
 Rasa `from_llm` collection can fill future slots and correct an already-filled
 slot outside the active step. Its default collect processing also accepts

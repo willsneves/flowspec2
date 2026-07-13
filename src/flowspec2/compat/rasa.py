@@ -19,8 +19,14 @@ from typing import Any, Mapping, Sequence, cast
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from flowspec2.compat.tool_profiles import (
+    compatibility_tool_names,
+    synthetic_compatibility_tool_definition,
+)
 from flowspec2.compiler import compile_flow
+from flowspec2.domains import interactive_options_for_domain
 from flowspec2.schema import schema as flowspec_schema
+from flowspec2.tools import ToolRegistry, default_tool_registry
 
 from .models import (
     CompatibilityDiagnostic,
@@ -97,6 +103,34 @@ def _snapshot_mapping(document: Mapping[str, Any]) -> str:
     )
 
 
+async def _compatibility_profile_tool(**_inputs: Any) -> dict[str, Any]:
+    """Stand in for a declared action while the adapter checks compilation only."""
+
+    return {}
+
+
+def _compatibility_tool_registry(flow_document: Mapping[str, Any]) -> ToolRegistry:
+    """Register only tool names explicitly present in the document being reviewed."""
+
+    registry = ToolRegistry()
+    known_definitions = default_tool_registry().definitions
+    for tool_name in compatibility_tool_names(flow_document):
+        registry.register(
+            tool_name,
+            _compatibility_profile_tool,
+            definition=known_definitions.get(tool_name)
+            or synthetic_compatibility_tool_definition(
+                tool_name,
+                flow_document,
+                version="rasa-compatibility-profile",
+                description=(
+                    "Synthetic compile-only contract derived from the Rasa compatibility artifact."
+                ),
+            ),
+        )
+    return registry
+
+
 def _diagnostic(
     severity: DiagnosticSeverity,
     code: str,
@@ -139,7 +173,10 @@ def _flowspec_compilation_diagnostic(
     code: str,
 ) -> CompatibilityDiagnostic | None:
     try:
-        compile_flow(dict(flow_document))
+        compile_flow(
+            dict(flow_document),
+            tools=_compatibility_tool_registry(flow_document),
+        )
     except (KeyError, StopIteration, TypeError, ValueError) as compilation_error:
         return _diagnostic(
             "error",
@@ -227,14 +264,13 @@ def _set_slots_payload(slot_name: str, slot_value: str) -> str:
     return f"/SetSlots({slot_name}={slot_value})"
 
 
-def _domain_button_values(domain_specification: Mapping[str, Any]) -> tuple[str, ...]:
-    domain_type = domain_specification.get("type", "categorical")
-    if domain_type == "bool":
-        return ("true", "false")
-    if domain_type != "categorical":
-        return ()
-    raw_values = _sequence(domain_specification.get("values")) or ()
-    return tuple(value for value in raw_values if isinstance(value, str))
+def _domain_button_options(
+    domain_specification: Mapping[str, Any],
+) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (str(domain_option.value).lower(), domain_option.title)
+        for domain_option in interactive_options_for_domain(domain_specification)
+    )
 
 
 def _export_domain_specification(
@@ -429,8 +465,8 @@ def _export_buttons(
     source_path: str,
     diagnostics: list[CompatibilityDiagnostic],
 ) -> list[dict[str, str]] | None:
-    button_values = _domain_button_values(domain_specification)
-    if not button_values:
+    button_options = _domain_button_options(domain_specification)
+    if not button_options:
         diagnostics.append(
             _diagnostic(
                 "warning",
@@ -463,7 +499,7 @@ def _export_buttons(
 
     interpolated_values = [
         button_value
-        for button_value in button_values
+        for button_value, _button_title in button_options
         if not _rasa_response_text_supported(button_value)
     ]
     for button_value in interpolated_values:
@@ -478,7 +514,7 @@ def _export_buttons(
         )
     unsupported_values = [
         button_value
-        for button_value in button_values
+        for button_value, _button_title in button_options
         if _rasa_response_text_supported(button_value)
         and not _rasa_set_slots_value_supported(button_value)
     ]
@@ -496,10 +532,10 @@ def _export_buttons(
         return None
     return [
         {
-            "title": button_value,
+            "title": button_title,
             "payload": _set_slots_payload(slot_name, button_value),
         }
-        for button_value in button_values
+        for button_value, button_title in button_options
     ]
 
 
@@ -529,15 +565,6 @@ def _export_interactive(
                     f"interactive control {property_name!r} has no portable Rasa equivalent",
                 )
             )
-    if interactive.get("gate"):
-        diagnostics.append(
-            _diagnostic(
-                "warning",
-                "RASA_INTERACTIVE_GATE_UNSUPPORTED",
-                f"{source_path}.gate",
-                "Rasa will always render the exported buttons when the response is selected",
-            )
-        )
     if interactive_kind != "buttons":
         diagnostics.append(
             _diagnostic(
@@ -1229,6 +1256,9 @@ def _import_buttons(
         )
         return None
 
+    expected_options = _domain_button_options(domain_specification)
+    expected_titles = dict(expected_options)
+    accepts_legacy_boolean_titles = domain_specification.get("type") == "bool"
     parsed_values: list[str] = []
     portable = True
     for button_index, button_value in enumerate(buttons):
@@ -1284,19 +1314,22 @@ def _import_buttons(
                 )
             )
             portable = False
-        if button.get("title") != assigned_value:
+        accepted_titles = {expected_titles.get(assigned_value)}
+        if accepts_legacy_boolean_titles:
+            accepted_titles.add(assigned_value)
+        if button.get("title") not in accepted_titles:
             diagnostics.append(
                 _diagnostic(
                     "warning",
                     "RASA_BUTTON_TITLE_UNSUPPORTED",
                     f"{button_path}.title",
-                    "flowspec2 domain buttons use the stored token as their title",
+                    "the button title must match the domain's canonical presentation",
                 )
             )
             portable = False
         parsed_values.append(assigned_value)
 
-    expected_values = list(_domain_button_values(domain_specification))
+    expected_values = [button_value for button_value, _button_title in expected_options]
     if parsed_values != expected_values:
         diagnostics.append(
             _diagnostic(
@@ -1556,7 +1589,7 @@ def _import_terminal_action(
             "RASA_ACTION_ADAPTER_REQUIRED",
             source_path,
             "the imported terminal uses conservative lifecycle defaults: "
-            "non-idempotent, reset after success/fatal, preserve after retryable",
+            "non-idempotent and reset after every outcome",
         )
     )
     terminal = {
@@ -1565,7 +1598,7 @@ def _import_terminal_action(
         "idempotent": False,
         "outcomes": {
             "success": {"reset_next": True},
-            "retryable": {"preserve_state": True},
+            "retryable": {"preserve_state": False},
             "fatal": {"reset_next": True},
         },
     }

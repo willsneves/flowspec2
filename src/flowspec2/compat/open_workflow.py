@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping, Never
@@ -16,9 +15,15 @@ from flowspec2.compat.models import (
     CompatibilityReport,
     ConversionOutcome,
 )
+from flowspec2.compat.tool_profiles import (
+    compatibility_tool_names,
+    synthetic_compatibility_tool_definition,
+)
 from flowspec2.compat.yaml import load_yaml_mapping
 from flowspec2.compiler import compile_flow
+from flowspec2.json_codec import strict_json_loads
 from flowspec2.schema import schema as flowspec_schema
+from flowspec2.tools import ToolRegistry, default_tool_registry
 
 OPEN_WORKFLOW_PROFILE_ID = "https://wllsena.github.io/flowspec2/profiles/open-workflow-conversation-1"
 OPEN_WORKFLOW_SCHEMA_VERSION = "1.0.3"
@@ -48,8 +53,37 @@ _profile_schema_cache: dict[str, Any] | None = None
 _official_schema_cache: dict[str, Any] | None = None
 
 
+async def _compatibility_profile_tool(**_inputs: Any) -> dict[str, Any]:
+    """Stand in for a preserved tool while the adapter checks compilation only."""
+
+    return {}
+
+
+def _compatibility_tool_registry(flow_document: Mapping[str, Any]) -> ToolRegistry:
+    """Register only tools named by the preserved artifact under review."""
+
+    registry = ToolRegistry()
+    known_definitions = default_tool_registry().definitions
+    for tool_name in compatibility_tool_names(flow_document):
+        registry.register(
+            tool_name,
+            _compatibility_profile_tool,
+            definition=known_definitions.get(tool_name)
+            or synthetic_compatibility_tool_definition(
+                tool_name,
+                flow_document,
+                version="open-workflow-profile",
+                description=(
+                    "Synthetic compile-only contract derived from the preserved "
+                    "Open Workflow profile."
+                ),
+            ),
+        )
+    return registry
+
+
 def _load_json_mapping(document_path: Path) -> dict[str, Any]:
-    loaded_document = json.loads(document_path.read_text(encoding="utf-8"))
+    loaded_document = strict_json_loads(document_path.read_text(encoding="utf-8"))
     if not isinstance(loaded_document, dict):
         raise RuntimeError(f"expected a JSON object in {document_path}")
     return dict(loaded_document)
@@ -102,7 +136,7 @@ def _profile_schema() -> dict[str, Any]:
     global _profile_schema_cache
     cached_schema = _profile_schema_cache
     if cached_schema is None:
-        cached_schema = json.loads(_PROFILE_SCHEMA_PATH.read_text(encoding="utf-8"))
+        cached_schema = strict_json_loads(_PROFILE_SCHEMA_PATH.read_text(encoding="utf-8"))
         jsonschema.Draft202012Validator.check_schema(cached_schema)
         _profile_schema_cache = cached_schema
     return cached_schema
@@ -231,7 +265,10 @@ def _flowspec_validation_errors(
 
 def _compilation_error(flow_document: Mapping[str, Any]) -> str | None:
     try:
-        compile_flow(deepcopy(dict(flow_document)))
+        compile_flow(
+            deepcopy(dict(flow_document)),
+            tools=_compatibility_tool_registry(flow_document),
+        )
     except (KeyError, StopIteration, TypeError, ValueError) as error:
         return str(error) or error.__class__.__name__
     return None

@@ -45,6 +45,7 @@ packages = ["src/flowspec2"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/flowspec2/flowspec-2.schema.json" = "flowspec2/flowspec-2.schema.json"
+"src/flowspec2/experimental/flowspec-3-draft.schema.json" = "flowspec2/experimental/flowspec-3-draft.schema.json"
 "src/flowspec2/compat/schemas/open-workflow-conversation-1.schema.json" = "flowspec2/compat/schemas/open-workflow-conversation-1.schema.json"
 "src/flowspec2/compat/schemas/vendor/open-workflow-1.0.3.workflow.yaml" = "flowspec2/compat/schemas/vendor/open-workflow-1.0.3.workflow.yaml"
 "src/flowspec2/compat/schemas/vendor/open-workflow-1.0.3.LICENSE" = "flowspec2/compat/schemas/vendor/open-workflow-1.0.3.LICENSE"

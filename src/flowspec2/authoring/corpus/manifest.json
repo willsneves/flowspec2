@@ -1,0 +1,31 @@
+{
+  "format": "flowspec2/authoring-corpus@1",
+  "identifier": "flowspec2_reference",
+  "cases": [
+    {
+      "identifier": "address_subflow",
+      "path": "subflow.case.json",
+      "sha256": "12dfa665cf3f0d196bd7fdb479f62462d3c2856c630cbcd85e5f2f53c634ad3b"
+    },
+    {
+      "identifier": "await_and_correction",
+      "path": "await_correction.case.json",
+      "sha256": "ef13e2600dae77cbf2ce13891e785995362d445c341290dbf90b1f93fc6791f1"
+    },
+    {
+      "identifier": "gated_derivation",
+      "path": "gated_derive.case.json",
+      "sha256": "f941ed78d00139932405b0bc864b1ea1344f293d630051f65f881bd1d0028040"
+    },
+    {
+      "identifier": "linear_collection",
+      "path": "linear.case.json",
+      "sha256": "896b6f111480bf680d07355373172b9bfb67a1d350f0a4a76498bd386b7b44c3"
+    },
+    {
+      "identifier": "terminal_fulfillment",
+      "path": "terminal.case.json",
+      "sha256": "d13cb3074b35a0fffecbae568a4719bb4c094c81173bb786de89ce127928c652"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "format": "flowspec2/authoring-case@1",
+  "identifier": "gated_derivation",
+  "prompt": "Author a flow that collects issue_category from Pothole or Obstruction, asks for issue_detail only when issue_category is Pothole, and derives backend_classification from issue_category followed by issue_detail.",
+  "feature_tags": ["gate", "derive", "closed_domain"],
+  "required_constructs": [
+    {
+      "identifier": "conditional-gate",
+      "pointer_pattern": "/path/*/ask_when",
+      "expected": {
+        "eq": [
+          "slots.issue_category",
+          "Pothole"
+        ]
+      }
+    },
+    {
+      "identifier": "derive-step",
+      "pointer_pattern": "/path/*/derive",
+      "expected": "backend_classification"
+    },
+    {
+      "identifier": "derive-definition",
+      "pointer_pattern": "/derive/*/writes",
+      "expected": "backend_classification"
+    },
+    {
+      "identifier": "derive-sources",
+      "pointer_pattern": "/derive/*/from",
+      "expected": [
+        "issue_category",
+        "issue_detail"
+      ]
+    }
+  ],
+  "source": {
+    "schema": "flowspec/2",
+    "flow": "gated_issue_classification",
+    "version": "1.0.0",
+    "route": {
+      "description": "Classify a street issue with a conditional detail."
+    },
+    "domains": {
+      "IssueCategory": {
+        "type": "categorical",
+        "values": ["Pothole", "Obstruction"]
+      },
+      "IssueDetail": {
+        "type": "categorical",
+        "values": ["Small", "Large"]
+      }
+    },
+    "slots": {
+      "issue_category": {
+        "domain": "IssueCategory",
+        "required": true
+      },
+      "issue_detail": {
+        "domain": "IssueDetail",
+        "required": true,
+        "requires": ["issue_category"]
+      }
+    },
+    "path": [
+      {
+        "step": "collect_issue_category",
+        "slot": "issue_category",
+        "prompt": {
+          "text": "Which type of issue are you reporting?"
+        }
+      },
+      {
+        "step": "collect_issue_detail",
+        "slot": "issue_detail",
+        "ask_when": {
+          "eq": ["slots.issue_category", "Pothole"]
+        },
+        "prompt": {
+          "text": "How large is the pothole?"
+        }
+      },
+      {
+        "step": "derive_backend_classification",
+        "derive": "backend_classification"
+      }
+    ],
+    "derive": [
+      {
+        "writes": "backend_classification",
+        "from": ["issue_category", "issue_detail"],
+        "lookup": {
+          "Pothole|Small": "POTHOLE_SMALL",
+          "Pothole|Large": "POTHOLE_LARGE",
+          "Obstruction|null": "STREET_OBSTRUCTION"
+        },
+        "default": "$from[0]"
+      }
+    ]
+  }
+}

@@ -2,18 +2,18 @@
 
 Table of Contents:
 
-- Install: 35 <!-- section:install -->
-- LLM-driven (the engine side): 57 <!-- section:llm-driven -->
-- Quickstart: 76 <!-- section:quickstart -->
-- Real backends: 100 <!-- section:real-backends -->
-- Error correlation: 117 <!-- section:error-correlation -->
-- CLI: 140 <!-- section:cli -->
-- What it compiles: 160 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 180 <!-- section:example -->
-    - The flowspec/2 document: 187 <!-- section:example-document -->
-    - Compiled LangGraph: 797 <!-- section:example-compiled-langgraph -->
-- Layout: 913 <!-- section:layout -->
-- Status: 939 <!-- section:status -->
+- Install: 41 <!-- section:install -->
+- LLM-driven (the engine side): 63 <!-- section:llm-driven -->
+- Quickstart: 105 <!-- section:quickstart -->
+- Real backends: 129 <!-- section:real-backends -->
+- Error correlation: 146 <!-- section:error-correlation -->
+- CLI: 169 <!-- section:cli -->
+- What it compiles: 200 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 226 <!-- section:example -->
+    - The flowspec/2 document: 233 <!-- section:example-document -->
+    - Compiled LangGraph: 871 <!-- section:example-compiled-langgraph -->
+- Layout: 987 <!-- section:layout -->
+- Status: 1021 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -23,12 +23,18 @@ Table of Contents:
 
 You write one self-contained JSON document per service flow. A running agent loads it and `flowspec2` compiles it into an executable `StateGraph[ServiceState]` — the flow becomes immediately callable as a tool/subgraph. The design comes from the Prefeitura do Rio WhatsApp bot's `multi_step_service` framework; this repo is a clean, self-contained, dependency-light reimplementation of the *format* and its *runtime compiler*.
 
-> **One idea — the boundary is the closed value-domain.** The JSON pins the **rails** (states, value-domains, transitions, guards, tool bindings, interrupts, idempotency, guardrails); the LLM reasons and acts **freely within** them (which flow to enter, extracting the closed token from free text/voice/photo, phrasing, side actions). The LLM structurally *cannot* invent a transition, skip a required slot, or widen a value-domain.
+> **One idea — the boundary is the closed value-domain.** The JSON pins the **rails** (states, value-domains, transitions, guards, tool bindings, interrupts, idempotency, guardrails); the LLM reasons and acts **freely within** them (which flow to enter, extracting the closed token from free text/voice/photo, phrasing, side actions). The LLM structurally *cannot* invent a transition, skip a required slot without an author-declared exhaustion route, or widen a value-domain.
 
 flowspec2 is deliberately specialized rather than a replacement for a general
 workflow language. See the [prior-art comparison](docs/PRIOR_ART.md), the
 [compatibility profiles](docs/COMPATIBILITY.md), and the
-[interoperability decision](docs/adr/0001-interoperability-boundaries.md).
+[interoperability decision](docs/adr/0001-interoperability-boundaries.md). The
+[authoring/execution boundary](docs/adr/0002-format-authoring-execution-boundary.md)
+records why concise source is linked through a runtime profile and canonical IR
+before graph construction. The [AI authoring benchmark](docs/AUTHORING_BENCHMARK.md)
+defines the evidence protocol and executable conformance kit. The
+[FlowSpec3 preview](docs/FLOWSPEC3_DRAFT.md) documents the isolated source
+experiment and its loss accounting.
 
 <!-- section:install -->
 
@@ -49,7 +55,7 @@ container runs without a shell or package manager and has no network,
 capabilities, writable root filesystem, or writable project mount. Docker is
 therefore the only additional prerequisite for `make typecheck` and `make ci`.
 
-`examples/simulate.py` prints turn-by-turn transcripts of the reparo_luminaria flow as realistic conversations over the real HTTP backends (deterministic geocoder + SGRC via `MockTransport`): the production WhatsApp-Flow path, an address correction, gov.br auth, the praça→quadra branch, an SGRC outage (503 → retryable → recovers), and a duplicate submission that fires the side effect exactly once.
+`examples/simulate.py` prints turn-by-turn transcripts of the reparo_luminaria flow as realistic conversations over the real HTTP backends (deterministic geocoder + SGRC via `MockTransport`): the production WhatsApp-Flow path, an address correction, gov.br auth, the praça→quadra branch, an SGRC outage (503 → retryable → recovers), and a duplicate submission replayed without a second backend call in the same registry. Durable cross-process exactly-once behavior remains a host-storage responsibility.
 
 <!-- /section:install -->
 <!-- section:llm-driven -->
@@ -68,7 +74,30 @@ The LLM does exactly two non-deterministic jobs, the rails hold everything else:
 - **route** — decide whether the citizen's free-text opener enters the flow (from `route.description`);
 - **extract** — read the messy message and the node's `payload_schema` / interactive options, and produce the **closed token** for the slot.
 
-flowspec2's validators then enforce the rail: an out-of-domain extraction is rejected and the node re-asks. The transcript shows the boundary per turn: `👤 free text → 🧠 LLM extraction → 🤖 the rail's next state`. The driver is a thin protocol (`route` + `extract`), so any provider can implement it. The gated integration tests (`FLOWSPEC2_RUN_LLM_TESTS=1`) run it against a live Gemini; the default suite stays offline.
+flowspec2's validators then enforce the rail: an out-of-domain extraction is
+rejected and the node re-asks. The Gemini request also carries a closed response
+JSON Schema built from the route catalog or active slot contract; parsed output
+is checked again locally before it reaches the runtime. The transcript shows the
+boundary per turn: `👤 free text → 🧠 LLM extraction → 🤖 the rail's next state`.
+The driver is a thin protocol (`route` + `extract`), so any provider can
+implement it. Live-model tests are explicitly opted into; the default suite
+stays offline.
+
+Authoring evaluation is a separate boundary. `GeminiAuthor` receives the
+packaged reference corpus, the complete runtime-profile contract, and repair
+diagnostics, then returns source through the closed authoring projection. A
+live run requires explicit network consent and writes one content-addressed
+evidence envelope containing exact emitted sources, report, corpus/profile
+digests, model configuration, prompt identity, package version, and the
+operator-supplied repository revision:
+
+```bash
+flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output authoring-evidence.json
+```
+
+The command never records or prints the API key, refuses to overwrite an
+existing artifact, and writes nothing when the provider fails. The presence of
+`GEMINI_API_KEY` alone never enables network access.
 
 <!-- /section:llm-driven -->
 <!-- section:quickstart -->
@@ -140,19 +169,30 @@ tests and hosts can supply a deterministic clock without patching global state.
 ## CLI
 
 ```bash
-flowspec2 validate examples/reparo_luminaria.flow.json   # JSON-Schema validate
+flowspec2 validate examples/reparo_luminaria.flow.json   # structural + semantic + profile checks
+flowspec2 check examples/reparo_luminaria.flow.json --json  # checks + compile, aggregate JSON diagnostics
+flowspec2 normalize examples/reparo_luminaria.flow.json  # canonical defaults and stable node ids
+flowspec2 ir examples/reparo_luminaria.flow.json         # canonical compiler contracts and digests
 flowspec2 graph    examples/reparo_luminaria.flow.json   # list compiled node ids
 flowspec2 mermaid  examples/reparo_luminaria.flow.json   # export the compiled graph as mermaid
 flowspec2 rasa-export path/to/portable.flow.json --output-dir build/rasa --allow-lossy
 flowspec2 rasa-import build/rasa/flows.yml --domain build/rasa/domain.yml --flow collect_contact --output build/collect_contact.flow.json --allow-lossy
 flowspec2 open-workflow-export examples/reparo_luminaria.flow.json --output build/reparo_luminaria.workflow.yaml
 flowspec2 open-workflow-import build/reparo_luminaria.workflow.yaml --output build/reparo_luminaria.flow.json
+flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output build/authoring-evidence.json
 ```
 
 The Rasa adapter is a strict, versioned subset; `--allow-lossy` acknowledges its
 reported metadata and lifecycle differences. The Open Workflow adapter is a
 lossless profile envelope. See [COMPATIBILITY.md](docs/COMPATIBILITY.md) for the
 exact boundaries and Python API.
+
+`check --json` is the repair-loop interface for AI authors. Every finding has a
+stable code, severity, JSON Pointer, message, and optional related location or
+fix. Structural errors are aggregated first; semantic and runtime-profile
+linking run only when the source shape is safe to traverse; compilation is the
+final check. `normalize` and `ir` write only to standard output and never mutate
+the source document.
 
 <!-- /section:cli -->
 <!-- section:what-it-compiles -->
@@ -161,15 +201,21 @@ exact boundaries and Python API.
 
 | flowspec2 construct | LangGraph primitive |
 |---|---|
+| source document | closed JSON Schema → aggregate semantic linker → named runtime profile → canonical `FlowIR`; source remains the only authored artifact and the IR carries the explicit `flowspec2/ir@1` identity |
+| runtime profile | exact domain-kind, typed tool, complete subflow manifest, and host-capability catalog checked before graph construction; the reference profile rejects legacy open contracts |
+| `ToolDefinition` / `SubflowDefinition` | immutable versioned JSON Schema contracts for calls, results, effects, configuration, exposed slot schemas, state ownership, node IDs, transitive tools, and capabilities |
 | document | one `StateGraph[ServiceState]` compiled when each `FlowRuntime` instance is created, then reused across calls |
-| `domains.<X>` | a Pydantic `@field_validator(mode="before")` + `model_json_schema()` (→ constrained-decoding `payload_schema`) + interactive option titles/rows |
-| `path` `slot`/`confirm`/`derive`/`terminal`/`use` step | `add_node` with the canonical collect/confirm/derive/terminal template; subflow splice honoring required/optional collection, attempt budgets, and exhaustion routes |
+| `domains.<X>` | a Pydantic `@field_validator(mode="before")` + `model_json_schema()` (→ constrained-decoding `payload_schema`) + interactive option titles/rows; boolean domains render canonical `true`/`false` IDs as “Sim”/“Não” |
+| `path.slot` + `slots.<s>` | a partition-aware collection node where `required:false` advertises `null` as a persistent no-value skip, `required:true` requires a domain-valid value unless `nullable:true` stores `null`, `fill_only_when_asked` binds sensitive input to its prompt or an allowed prefill source, and `on_exhaust:default` is compiled through the domain validator |
+| `path` `confirm`/`derive`/`terminal`/`use` step | `add_node` with the canonical confirm/derive/terminal template; address and identification subflows expose their collectable slots to a post-expansion referential-integrity pass |
+| `interactive.field` / `options_when` | the enclosing slot or confirmation is the compiled state target for the UI payload key; conflicting field bindings fail compilation and conditional options are evaluated against runtime predicates |
 | `path` order | synthesized `add_conditional_edges` routers (pause = `agent_response` set → `END`) |
 | `ask_when` / `overrides.gates` | guard predicate compiled into the node + path map (skip-by-vacuity) |
-| `confirm.correctable[]` | non-linear back-edges; clear-cascade derived from `requires[]` + `derive.from` |
-| `terminal.outcomes` | success / retryable / fatal trichotomy + `_reset_on_next_call` |
-| `auto_flow` | pre-graph short-circuit (send WhatsApp Flow, return `flow_sent` without entering the graph) |
-| `capabilities.await_external` | generic suspend/resume on a host-delivered external signal, with bounded atomic mappings and abort/resend/switch/timeout recovery; an `END` recovery resets on the next call |
+| `confirm.correctable[]` | exact canonical-ID enum and private non-linear back-edge routing; clear-cascade derived from `requires[]` + `derive.from` |
+| `terminal.outcomes` | typed success / retryable / fatal protocol + `_reset_on_next_call`; replay is registry-local unless the host supplies durable storage |
+| `auto_flow` | pre-graph send with a closed pending-event contract, absolute deadline, bounded resend, and compiler-validated cancel/timeout/fallback recovery |
+| `capabilities.await_external` | typed suspend/resume with token schema, correlation, duplicate/late policy, atomic mappings, and abort/resend/switch/timeout recovery; timeout materializes a persisted absolute deadline and an `END` recovery resets on the next call |
+| active state migration | exact source/target IR contracts + declarative partition copies/defaults/drops → target-schema validation and a canonical verifiable loss report; ordinary restore never guesses |
 | `predicate` grammar | pure boolean function over `ServiceState` compiled into routers/early-returns |
 
 Full mapping + rationale + rejected alternatives: [`docs/DESIGN.md`](docs/DESIGN.md). Field-by-field reference: [`docs/SPEC.md`](docs/SPEC.md).
@@ -193,7 +239,7 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
 {
   "schema": "flowspec/2",
   "flow": "reparo_luminaria",
-  "version": "1.5.0",
+  "version": "1.8.0",
   "service": {
     "id": "18131",
     "codigo_servico_1746": "18131",
@@ -227,7 +273,6 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
   },
   "config": {
     "address_required": true,
-    "reference_point_required": true,
     "identification_required": false,
     "max_attempts": 3
   },
@@ -358,6 +403,7 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
       "domain": "LuminariaDefeito",
       "persist": "data",
       "required": true,
+      "fill_only_when_asked": true,
       "prefill_sources": [
         "whatsapp_flow"
       ],
@@ -384,7 +430,7 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
       "domain": "LuminariaLocalizacao",
       "persist": "data",
       "required": false,
-      "nullable": true,
+      "fill_only_when_asked": true,
       "prefill_sources": [
         "whatsapp_flow"
       ]
@@ -420,8 +466,7 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
       "interactive": {
         "kind": "buttons",
         "field": "confirmacao_servico",
-        "from_domain": "SimNao",
-        "gate": "ENABLE_INTERACTIVE_CONFIRM"
+        "from_domain": "SimNao"
       },
       "skip_when": {
         "eq": [
@@ -495,8 +540,7 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
       "interactive": {
         "kind": "buttons",
         "field": "reparo_luminaria_quadra_esportes",
-        "from_domain": "SimNao",
-        "gate": "ENABLE_INTERACTIVE_CONFIRM"
+        "from_domain": "SimNao"
       }
     },
     {
@@ -519,8 +563,7 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
       "interactive": {
         "kind": "buttons",
         "field": "confirmacao",
-        "from_domain": "SimNao",
-        "gate": "ENABLE_INTERACTIVE_CONFIRM"
+        "from_domain": "SimNao"
       }
     },
     {
@@ -533,7 +576,6 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
       "with": {
         "required": true,
         "needs_confirmation": true,
-        "reference_point_required": true,
         "max_attempts": 3
       }
     },
@@ -561,18 +603,18 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
       ],
       "after": "collect_localizacao",
       "lookup": {
-        "Apagada|uma|": "Apagada",
+        "Apagada|uma|null": "Apagada",
         "Apagada|grupo|bloco": "Bloco ou grupo de luminárias apagadas",
         "Apagada|grupo|intercaladas": "Várias luminárias intercaladas apagadas",
-        "Piscando|uma|": "Piscando",
+        "Piscando|uma|null": "Piscando",
         "Piscando|grupo|bloco": "Bloco ou grupo de luminárias piscando",
         "Piscando|grupo|intercaladas": "Bloco ou grupo de luminárias piscando",
-        "Acesa de dia|uma|": "Acesa durante o dia",
+        "Acesa de dia|uma|null": "Acesa durante o dia",
         "Acesa de dia|grupo|bloco": "Bloco ou grupo de luminárias acesas de dia",
         "Acesa de dia|grupo|intercaladas": "Várias luminárias intercaladas acesas de dia",
-        "Pendurada||": "Pendurada",
-        "Danificada||": "Danificada",
-        "Com ruído||": "Com ruído"
+        "Pendurada|null|null": "Pendurada",
+        "Danificada|null|null": "Danificada",
+        "Com ruído|null|null": "Com ruído"
       },
       "default": "$from[0]"
     }
@@ -587,8 +629,7 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
     "interactive": {
       "kind": "buttons",
       "field": "confirmacao",
-      "from_domain": "SimNao",
-      "gate": "ENABLE_INTERACTIVE_CONFIRM"
+      "from_domain": "SimNao"
     },
     "correctable": [
       "luminaria_defeito",
@@ -681,6 +722,13 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
     ],
     "resume_at": "collect_defeito",
     "on_submit_source": "whatsapp_flow",
+    "recovery": {
+      "fallback_at": "show_service_summary",
+      "cancel": "END",
+      "timeout": "fallback",
+      "max_resends": 2,
+      "timeout_seconds": 900
+    },
     "alias_map": {
       "defect_type": {
         "luminaria_defeito": "$value"
@@ -732,6 +780,34 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
       "kind": "cta_url",
       "step": "authenticate_govbr",
       "resume_on": "govbr_token",
+      "resume": {
+        "version": "1",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpf": {
+              "type": "string",
+              "pattern": "^[0-9]{11}$"
+            },
+            "nome": {
+              "type": "string",
+              "minLength": 2
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          "required": [
+            "cpf"
+          ]
+        },
+        "correlation": "$token.cpf",
+        "duplicate": "ignore",
+        "late": "reject"
+      },
       "prompt": {
         "text": "Para se identificar pelo gov.br, toque no botão de login que enviei. 🔐",
         "verbatim": true
@@ -767,12 +843,10 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
           "identification_method": "cpf"
         }
       },
+      "timeout_seconds": 900,
       "recovery": {
         "abort": {
-          "goto": "select_identification_method",
-          "set": {
-            "identification_method": null
-          }
+          "goto": "select_identification_method"
         },
         "resend": {
           "goto": "authenticate_govbr"
@@ -920,17 +994,25 @@ src/flowspec2/
   predicates.py    the frozen predicate grammar evaluator
   nodes.py         collect / confirm / derive / terminal node templates
   compiler.py      flowspec doc → StateGraph[ServiceState]
+  checker.py       aggregate structural · semantic · profile · compilation diagnostics
+  diagnostics.py   immutable machine-readable findings and reports
+  semantics.py     reference linking · dependency · profile checks
+  profiles.py      named runtime capability catalogs
+  ir.py            canonical normalization · contracts · state schema · digests
+  state_migration.py declarative active-state migration · loss report · schema proofs
   runtime.py       FlowRuntime: validate · compile · execute · as_tool (+ auto_flow short-circuit)
   observability.py Snowflake log IDs · structured event helper
   schema.py        load + JSON-Schema validation
   compat/          Rasa CALM adapter · Open Workflow profile + vendored official schema
+  authoring/       packaged corpus · benchmark · Gemini transport · evidence · projection · CTK
+  experimental/    non-runtime flowspec/3-draft source preview
   interactive.py   buttons / list / flow envelope builders (Meta limits)
   tools.py         ToolRegistry + injectable fake backends + idempotency replay
   backends/        BackendConfig + make_registry + httpx HTTP tools (real integrations)
   subflows/        address@1 · identification@2 (reusable, versioned)
   flowspec-2.schema.json
 examples/          reparo_luminaria.flow.json · reparo_buraco.flow.json
-tests/             schema · domains · predicates · compatibility · observability · runtime E2E
+tests/             schema · linker · IR · authoring · compatibility · observability · runtime E2E
 ```
 
 <!-- /section:layout -->
@@ -938,7 +1020,15 @@ tests/             schema · domains · predicates · compatibility · observabi
 
 ## Status
 
-Reference runtime for the flowspec/2 format. Subflows ship with in-memory fake backends (geocode, CPF lookup, gov.br token, SGRC ticket) so the suite runs offline; each backend is an injectable protocol that maps to the real production integration. Not affiliated with or deployed by the Prefeitura do Rio — this is a clean-room reimplementation of a format design.
+Reference runtime for the stable flowspec/2 format. The isolated
+`flowspec/3-draft` package is an authoring experiment, not an executable or
+stable format; promotion depends on comparative real-model benchmark evidence.
+The live runner emits the reproducible evidence artifact needed for that
+decision, but does not reinterpret fixture success as model-quality evidence.
+Subflows ship with in-memory fake backends so the suite runs offline; each
+backend is an injectable protocol that maps to the real production integration.
+Not affiliated with or deployed by the Prefeitura do Rio — this is a clean-room
+reimplementation of a format design.
 
 MIT licensed.
 

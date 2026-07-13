@@ -45,6 +45,16 @@ def test_config_and_address_namespaces():
     assert evaluate({"eq": ["config.flag", True]}, st, {"flag": True})
 
 
+def test_namespaced_string_can_be_an_explicit_literal() -> None:
+    state = _state(answer="config.flag")
+
+    assert evaluate(
+        {"eq": ["slots.answer", {"literal": "config.flag"}]},
+        state,
+        {"flag": "different"},
+    )
+
+
 def test_payload_namespace():
     st = ServiceState(user_id="u", service_name="s")
     st.payload = {"_source": "whatsapp_flow"}

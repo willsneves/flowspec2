@@ -44,7 +44,7 @@ async def test_sgrc_success_maps_to_success():
         return httpx.Response(201, json={"protocolo": "SGRC-REAL-9"})
 
     reg = make_registry(CONFIG, transport=_transport(handler))
-    out = await reg.call("sgrc_open_ticket", endereco="x")
+    out = await reg.call("sgrc_open_ticket", endereco={"logradouro": "x"})
     assert out["status"] == "success" and out["protocolo"] == "SGRC-REAL-9"
 
 
@@ -53,7 +53,7 @@ async def test_sgrc_5xx_maps_to_retryable():
         return httpx.Response(503, text="upstream down")
 
     reg = make_registry(CONFIG, transport=_transport(handler))
-    out = await reg.call("sgrc_open_ticket", endereco="x")
+    out = await reg.call("sgrc_open_ticket", endereco={"logradouro": "x"})
     assert out["status"] == "retryable"
 
 
@@ -62,7 +62,7 @@ async def test_sgrc_4xx_maps_to_fatal():
         return httpx.Response(422, text="bad payload")
 
     reg = make_registry(CONFIG, transport=_transport(handler))
-    out = await reg.call("sgrc_open_ticket", endereco="x")
+    out = await reg.call("sgrc_open_ticket", endereco={"logradouro": "x"})
     assert out["status"] == "fatal"
 
 
@@ -71,7 +71,7 @@ async def test_sgrc_timeout_maps_to_retryable():
         raise httpx.ConnectTimeout("timed out")
 
     reg = make_registry(CONFIG, transport=_transport(handler))
-    out = await reg.call("sgrc_open_ticket", endereco="x")
+    out = await reg.call("sgrc_open_ticket", endereco={"logradouro": "x"})
     assert out["status"] == "retryable"
 
 
@@ -81,7 +81,7 @@ async def test_partial_config_falls_back_to_fakes():
         BackendConfig(geocode_url="https://api.test/geocode"),
         transport=_transport(lambda r: httpx.Response(200, json={"logradouro": "Rua X"})),
     )
-    out = await reg.call("sgrc_open_ticket", endereco="x")
+    out = await reg.call("sgrc_open_ticket", endereco={"logradouro": "x"})
     assert out["status"] == "success" and out["protocolo"].startswith("SGRC-")
 
 

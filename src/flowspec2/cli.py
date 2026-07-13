@@ -9,11 +9,23 @@ import os
 import shutil
 import sys
 import tempfile
+from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any, Callable, Mapping, Never, cast
 
 import jsonschema
 
+from .authoring import (
+    DEFAULT_GEMINI_AUTHOR_MODEL,
+    AuthoringBenchmarkEvidence,
+    AuthoringBenchmarkLimits,
+    GeminiAuthor,
+    GeminiAuthorError,
+    RecordingAuthor,
+    load_reference_authoring_corpus,
+    run_authoring_benchmark,
+)
+from .checker import check_flow, check_json
 from .compat.models import CompatibilityError, CompatibilityReport
 from .compat.open_workflow import export_open_workflow, import_open_workflow
 from .compat.rasa import RasaBundle, export_rasa, import_rasa
@@ -22,7 +34,11 @@ from .compat.yaml import (
     load_yaml_mapping,
 )
 from .compiler import compile_flow
+from .diagnostics import FlowCheckReport
+from .ir import build_flow_ir, normalize_flow
+from .json_codec import strict_json_loads
 from .observability import log_event
+from .profiles import reference_profile
 from .schema import load_flow
 
 CommandHandler = Callable[[argparse.Namespace], int]
@@ -44,7 +60,7 @@ class _CorrelatedArgumentParser(argparse.ArgumentParser):
 
 def _load_json_mapping(document_path: str | Path) -> dict[str, Any]:
     path = Path(document_path)
-    document = json.loads(path.read_text(encoding="utf-8"))
+    document = strict_json_loads(path.read_text(encoding="utf-8"))
     if not isinstance(document, dict) or not document:
         raise ValueError(f"JSON document {path} must be a non-empty object")
     return document
@@ -151,9 +167,94 @@ def _print_report(report: CompatibilityReport) -> None:
         )
 
 
+def _print_flow_diagnostics(flow_report: FlowCheckReport, *, operation: str) -> None:
+    for diagnostic in flow_report.diagnostics:
+        log_id = log_event(
+            logger,
+            logging.ERROR if diagnostic.severity == "error" else logging.WARNING,
+            "Flow diagnostic",
+            operation=operation,
+            context={
+                "diagnostic_code": diagnostic.code,
+                "source_path": diagnostic.path,
+            },
+        )
+        source_path = diagnostic.path or "<root>"
+        suggested_fix = (
+            f" Suggested fix: {diagnostic.suggested_fix}"
+            if diagnostic.suggested_fix is not None
+            else ""
+        )
+        print(
+            f"{diagnostic.severity.upper()} {diagnostic.code} [log_id={log_id}] "
+            f"{source_path}: {diagnostic.message}{suggested_fix}",
+            file=sys.stderr,
+        )
+
+
+def _check(arguments: argparse.Namespace) -> int:
+    serialized_flow = Path(arguments.path).read_text(encoding="utf-8")
+    flow_report = check_json(serialized_flow)
+    if arguments.json_output:
+        print(
+            json.dumps(
+                flow_report.to_dict(),
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+    else:
+        _print_flow_diagnostics(flow_report, operation="check")
+        if flow_report.is_valid:
+            print(f"OK: {arguments.path} is valid flowspec/2 and compiles")
+    return 0 if flow_report.is_valid else 1
+
+
 def _validate(arguments: argparse.Namespace) -> int:
-    load_flow(arguments.path)
+    serialized_flow = Path(arguments.path).read_text(encoding="utf-8")
+    flow_report = check_json(serialized_flow, compile_document=False)
+    _print_flow_diagnostics(flow_report, operation="validate")
+    if flow_report.has_errors:
+        return 1
     print(f"OK: {arguments.path} is valid flowspec/2")
+    return 0
+
+
+def _normalize(arguments: argparse.Namespace) -> int:
+    flow_document = _load_json_mapping(arguments.path)
+    flow_report = check_flow(flow_document, compile_document=False)
+    if flow_report.has_errors:
+        _print_flow_diagnostics(flow_report, operation="normalize")
+        return 1
+    print(
+        json.dumps(
+            normalize_flow(flow_document),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+    return 0
+
+
+def _ir(arguments: argparse.Namespace) -> int:
+    flow_document = _load_json_mapping(arguments.path)
+    flow_report = check_flow(flow_document, compile_document=False)
+    if flow_report.has_errors:
+        _print_flow_diagnostics(flow_report, operation="ir")
+        return 1
+    print(
+        json.dumps(
+            build_flow_ir(flow_document).to_dict(),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
     return 0
 
 
@@ -237,6 +338,50 @@ def _open_workflow_import(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _create_gemini_author(model: str) -> GeminiAuthor:
+    return GeminiAuthor(model=model)
+
+
+def _authoring_benchmark_gemini(arguments: argparse.Namespace) -> int:
+    output_path = Path(arguments.output)
+    if output_path.exists():
+        raise FileExistsError(f"output already exists: {output_path}")
+    if not arguments.repository_revision.strip():
+        raise ValueError("repository revision must be non-empty")
+    benchmark_limits = AuthoringBenchmarkLimits(
+        max_correction_rounds=arguments.max_correction_rounds,
+    )
+    corpus = load_reference_authoring_corpus()
+    flow_profile = reference_profile()
+    with _create_gemini_author(arguments.model) as gemini_author:
+        recording_author = RecordingAuthor(gemini_author)
+        benchmark_report = run_authoring_benchmark(
+            arguments.benchmark_identifier,
+            corpus.cases,
+            recording_author,
+            limits=benchmark_limits,
+            profile=flow_profile,
+        )
+        evidence = AuthoringBenchmarkEvidence(
+            package_version=package_version("flowspec2"),
+            repository_revision=arguments.repository_revision,
+            corpus=corpus,
+            profile_identifier=flow_profile.identifier,
+            profile_digest=flow_profile.digest,
+            provider=gemini_author.provenance(),
+            report=benchmark_report,
+            captures=recording_author.captures,
+        )
+    _write_text_exclusive(arguments.output, f"{evidence.to_json()}\n")
+    print(
+        f"Wrote authoring evidence to {arguments.output} "
+        f"[digest={evidence.digest}, "
+        f"successful_cases={benchmark_report.successful_cases}, "
+        f"total_cases={benchmark_report.total_cases}]"
+    )
+    return 0 if benchmark_report.successful_cases == benchmark_report.total_cases else 1
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = _CorrelatedArgumentParser(
         prog="flowspec2",
@@ -250,6 +395,33 @@ def _parser() -> argparse.ArgumentParser:
     )
     validate_parser.add_argument("path")
     validate_parser.set_defaults(handler=_validate)
+
+    check_parser = subparsers.add_parser(
+        "check",
+        help="validate and compile-check a flowspec2 document",
+    )
+    check_parser.add_argument("path")
+    check_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="emit a deterministic machine-readable report",
+    )
+    check_parser.set_defaults(handler=_check)
+
+    normalize_parser = subparsers.add_parser(
+        "normalize",
+        help="emit the canonical normalized flowspec2 document",
+    )
+    normalize_parser.add_argument("path")
+    normalize_parser.set_defaults(handler=_normalize)
+
+    ir_parser = subparsers.add_parser(
+        "ir",
+        help="emit the canonical intermediate representation",
+    )
+    ir_parser.add_argument("path")
+    ir_parser.set_defaults(handler=_ir)
 
     graph_parser = subparsers.add_parser("graph", help="list compiled graph nodes")
     graph_parser.add_argument("path")
@@ -300,6 +472,26 @@ def _parser() -> argparse.ArgumentParser:
     open_import_parser.add_argument("--output", required=True)
     open_import_parser.set_defaults(handler=_open_workflow_import)
 
+    authoring_benchmark_parser = subparsers.add_parser(
+        "authoring-benchmark-gemini",
+        help="run the packaged AI-authoring corpus through Gemini",
+    )
+    authoring_benchmark_parser.add_argument(
+        "--allow-network",
+        action="store_true",
+        required=True,
+        help="explicitly permit Gemini API requests for this invocation",
+    )
+    authoring_benchmark_parser.add_argument(
+        "--benchmark-identifier",
+        default="gemini_reference",
+    )
+    authoring_benchmark_parser.add_argument("--model", default=DEFAULT_GEMINI_AUTHOR_MODEL)
+    authoring_benchmark_parser.add_argument("--repository-revision", required=True)
+    authoring_benchmark_parser.add_argument("--max-correction-rounds", type=int, default=2)
+    authoring_benchmark_parser.add_argument("--output", required=True)
+    authoring_benchmark_parser.set_defaults(handler=_authoring_benchmark_gemini)
+
     return parser
 
 
@@ -317,6 +509,19 @@ def main(argv: list[str] | None = None) -> int:
         return handler(arguments)
     except CompatibilityError as compatibility_error:
         _print_report(compatibility_error.report)
+        return 1
+    except GeminiAuthorError as provider_error:
+        log_id = log_event(
+            logger,
+            logging.ERROR,
+            "Authoring provider failed",
+            operation=str(getattr(arguments, "command", "unknown")),
+            context={
+                "provider": "google_gemini",
+                "model": str(getattr(arguments, "model", "unknown")),
+            },
+        )
+        print(f"ERROR [log_id={log_id}]: {provider_error}", file=sys.stderr)
         return 1
     except (
         json.JSONDecodeError,

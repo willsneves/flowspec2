@@ -4,14 +4,22 @@ from __future__ import annotations
 
 import copy
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 
 import pytest
 from conftest import require_agent_response
 from jsonschema import ValidationError as JsonSchemaValidationError
 
-from flowspec2 import FlowRuntime, ToolRegistry, default_tool_registry, validate_flow
-from flowspec2.tools import Tool
+from flowspec2 import (
+    FlowLinkError,
+    FlowRuntime,
+    ToolRegistry,
+    default_tool_registry,
+    validate_flow,
+)
+from flowspec2.nodes import DEFAULT_AWAIT_EXTERNAL_TIMEOUT_SECONDS
+from flowspec2.tools import Tool, ToolDefinition, ToolEffects
 
 
 def _await_flow() -> dict[str, Any]:
@@ -44,6 +52,19 @@ def _await_flow() -> dict[str, Any]:
                 "kind": "cta_url",
                 "step": "await_payment",
                 "resume_on": "payment_token",
+                "resume": {
+                    "version": "1",
+                    "schema": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {"id": {"type": "string", "minLength": 1}},
+                        "required": ["id"],
+                    },
+                    "correlation": "$token.id",
+                    "duplicate": "ignore",
+                    "late": "reject",
+                },
                 "on_resume": {
                     "set": {
                         "payment_id": "$token.id",
@@ -76,6 +97,40 @@ def _await_flow() -> dict[str, Any]:
     }
 
 
+def _payment_lookup_definition() -> ToolDefinition:
+    return ToolDefinition(
+        name="payment_lookup",
+        version="1",
+        description="Load a receipt for one external payment.",
+        input_schema={
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "payment_id": {"type": "string"},
+                "attempt": {"type": "integer"},
+            },
+            "required": ["payment_id", "attempt"],
+        },
+        output_schema={
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "receipts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {"code": {"type": "string"}},
+                        "required": ["code"],
+                    },
+                }
+            },
+            "required": ["receipts"],
+        },
+        effects=ToolEffects(read_only=True, idempotent=True),
+    )
+
+
 def _payment_registry(*, fails: bool = False) -> tuple[ToolRegistry, list[dict[str, Any]]]:
     registry = default_tool_registry()
     calls: list[dict[str, Any]] = []
@@ -86,7 +141,11 @@ def _payment_registry(*, fails: bool = False) -> tuple[ToolRegistry, list[dict[s
             raise RuntimeError("payment backend unavailable")
         return {"receipts": [{"code": "REC-42"}]}
 
-    registry.register("payment_lookup", payment_lookup)
+    registry.register(
+        "payment_lookup",
+        payment_lookup,
+        definition=_payment_lookup_definition(),
+    )
     return registry, calls
 
 
@@ -117,6 +176,178 @@ async def test_explicit_path_wait_maps_token_and_enrichment_result_atomically():
     assert calls == [{"payment_id": "PAY-7", "attempt": 1}]
 
 
+async def test_wait_marker_and_state_provenance_pin_the_resume_contract():
+    registry, _ = _payment_registry()
+    runtime = FlowRuntime(_await_flow(), tools=registry)
+
+    state = await runtime.execute(runtime.new_state("resume-provenance"), {"start": True})
+
+    marker_contract = (require_agent_response(state).interactive or {})["resume_contract"]
+    provenance = state.metadata.await_resume
+    assert provenance is not None
+    assert provenance.deadline is not None
+    assert marker_contract == {
+        "version": "1",
+        "digest": provenance.digest,
+        "correlation": "$token.id",
+        "duplicate": "ignore",
+        "late": "reject",
+        "deadline": provenance.deadline.isoformat(),
+    }
+    assert provenance.step == "await_payment"
+    assert provenance.version == "1"
+    assert provenance.correlation_path == "$token.id"
+    assert provenance.correlation_value is None
+
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+
+    assert state.metadata.await_resume is not None
+    assert state.metadata.await_resume.correlation_value == "PAY-7"
+
+
+async def test_resume_token_schema_and_formats_are_enforced_before_mapping_or_tools():
+    flow_document = _await_flow()
+    token_schema = flow_document["capabilities"]["await_external"]["resume"]["schema"]
+    token_schema["properties"]["email"] = {"type": "string", "format": "email"}
+    token_schema["required"].append("email")
+    registry, calls = _payment_registry()
+    runtime = FlowRuntime(flow_document, tools=registry)
+    state = await runtime.execute(runtime.new_state("typed-token"), {"start": True})
+
+    state = await runtime.execute(
+        state,
+        {"payment_token": {"id": "PAY-7", "email": "not-an-email"}},
+    )
+
+    assert state.status == "error"
+    assert calls == []
+    assert "does not satisfy contract" in (require_agent_response(state).error_message or "")
+    assert "payment_id" not in state.data
+
+
+@pytest.mark.parametrize(
+    ("schema_mutation", "message"),
+    [
+        (
+            lambda schema: schema["properties"].update(
+                {"id": {"$ref": "https://example.invalid/payment-id"}}
+            ),
+            "only supports local \\$ref",
+        ),
+        (
+            lambda schema: schema["properties"].update({"id": {"$dynamicRef": "#payment-id"}}),
+            "does not support dynamic schema references",
+        ),
+        (
+            lambda schema: schema["properties"].update({"id": {"$id": "nested", "type": "string"}}),
+            "does not support nested \\$id",
+        ),
+        (
+            lambda schema: schema.update(
+                {
+                    "$defs": {"id": {"$ref": "#/$defs/id"}},
+                    "properties": {"id": {"$ref": "#/$defs/id"}},
+                }
+            ),
+            "does not support cyclic local references",
+        ),
+        (
+            lambda schema: schema["properties"].update(
+                {
+                    "id": {
+                        "type": "object",
+                        "properties": {"value": {"type": "string"}},
+                    }
+                }
+            ),
+            "must close every declared object",
+        ),
+    ],
+)
+def test_compiler_rejects_unsafe_or_open_resume_schemas(schema_mutation, message):
+    flow_document = _await_flow()
+    token_schema = flow_document["capabilities"]["await_external"]["resume"]["schema"]
+    schema_mutation(token_schema)
+    registry, _ = _payment_registry()
+
+    with pytest.raises(ValueError, match=message):
+        FlowRuntime(flow_document, tools=registry)
+
+
+def test_compiler_accepts_closed_acyclic_local_resume_schema_references():
+    flow_document = _await_flow()
+    token_schema = flow_document["capabilities"]["await_external"]["resume"]["schema"]
+    token_schema["$defs"] = {"payment_id": {"type": "string", "minLength": 1}}
+    token_schema["properties"]["id"] = {"$ref": "#/$defs/payment_id"}
+    registry, _ = _payment_registry()
+
+    FlowRuntime(flow_document, tools=registry)
+
+
+def test_compiler_requires_correlation_path_in_every_token():
+    flow_document = _await_flow()
+    flow_document["capabilities"]["await_external"]["resume"]["schema"]["required"] = []
+    registry, _ = _payment_registry()
+
+    with pytest.raises(ValueError, match="must be required by every resume.schema alternative"):
+        FlowRuntime(flow_document, tools=registry)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda flow: flow["capabilities"]["await_external"]["on_resume"]["set"].update(
+                {"payment_id": "$token.missing"}
+            ),
+            "does not resolve exactly in resume.schema",
+        ),
+        (
+            lambda flow: flow["capabilities"]["await_external"]["on_resume"]["enrich"][
+                "input"
+            ].update({"attempt": "$token.id"}),
+            "not proven to satisfy tool parameter 'attempt'",
+        ),
+        (
+            lambda flow: flow["capabilities"]["await_external"]["on_resume"]["enrich"][
+                "input"
+            ].update({"attempt": "one"}),
+            "literal does not satisfy tool parameter 'attempt'",
+        ),
+    ],
+)
+def test_compiler_checks_resume_paths_and_tool_input_types(mutate, message):
+    flow_document = _await_flow()
+    mutate(flow_document)
+    registry, _ = _payment_registry()
+
+    with pytest.raises(ValueError, match=message):
+        FlowRuntime(flow_document, tools=registry)
+
+
+def test_compiler_checks_resume_literal_against_declared_state_schema():
+    flow_document = _await_flow()
+    flow_document["domains"]["Confirmation"] = {"type": "bool"}
+    flow_document["slots"]["payment_confirmed"] = {"domain": "Confirmation"}
+    flow_document["capabilities"]["await_external"]["on_resume"]["set"]["payment_confirmed"] = (
+        "confirmed"
+    )
+    registry, _ = _payment_registry()
+
+    with pytest.raises(ValueError, match="literal does not satisfy slot 'payment_confirmed'"):
+        FlowRuntime(flow_document, tools=registry)
+
+
+def test_compiler_checks_enrichment_result_against_declared_state_schema():
+    flow_document = _await_flow()
+    flow_document["domains"]["ReceiptNumber"] = {"type": "integer"}
+    flow_document["slots"]["receipt_code"] = {"domain": "ReceiptNumber"}
+    registry, _ = _payment_registry()
+
+    with pytest.raises(ValueError, match="tool result path.*not proven to satisfy"):
+        FlowRuntime(flow_document, tools=registry)
+
+
 async def test_required_enrichment_failure_commits_none_of_the_pending_writes():
     registry, calls = _payment_registry(fails=True)
     runtime = FlowRuntime(_await_flow(), tools=registry)
@@ -144,7 +375,11 @@ async def test_required_enrichment_can_recover_on_the_next_token_turn():
             raise RuntimeError("temporary payment failure")
         return {"receipts": [{"code": "REC-RECOVERED"}]}
 
-    registry.register("payment_lookup", flaky_payment_lookup)
+    registry.register(
+        "payment_lookup",
+        flaky_payment_lookup,
+        definition=_payment_lookup_definition(),
+    )
     runtime = FlowRuntime(_await_flow(), tools=registry)
     state = await runtime.execute(runtime.new_state("payment-user"), {"start": True})
     payment_token = {"payment_token": {"id": "PAY-7"}}
@@ -183,10 +418,111 @@ async def test_optional_enrichment_failure_is_logged_and_keeps_token_writes(capl
     )
 
 
-async def test_timeout_requires_a_host_event_and_resend_reemits_the_marker():
+async def test_duplicate_resume_with_ignore_policy_does_not_repeat_enrichment():
+    registry, calls = _payment_registry()
+    runtime = FlowRuntime(_await_flow(), tools=registry)
+    state = await runtime.execute(runtime.new_state("duplicate-ignore"), {"start": True})
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+
+    assert state.status == "progress"
+    assert calls == [{"payment_id": "PAY-7", "attempt": 1}]
+    assert state.data["payment_id"] == "PAY-7"
+    assert "referência alternativa" in require_agent_response(state).description
+
+
+async def test_duplicate_resume_with_reject_policy_is_atomic():
+    flow_document = _await_flow()
+    flow_document["capabilities"]["await_external"]["resume"]["duplicate"] = "reject"
+    registry, calls = _payment_registry()
+    runtime = FlowRuntime(flow_document, tools=registry)
+    state = await runtime.execute(runtime.new_state("duplicate-reject"), {"start": True})
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+    accepted_data = copy.deepcopy(state.data)
+
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+
+    assert state.status == "error"
+    assert calls == [{"payment_id": "PAY-7", "attempt": 1}]
+    assert state.data == accepted_data
+    assert "rejected duplicate resume delivery" in (
+        require_agent_response(state).error_message or ""
+    )
+
+
+@pytest.mark.parametrize(
+    ("late_policy", "expected_status"),
+    [("ignore", "progress"), ("reject", "error")],
+)
+async def test_different_correlation_uses_declared_late_policy_atomically(
+    late_policy: str,
+    expected_status: str,
+):
+    flow_document = _await_flow()
+    flow_document["capabilities"]["await_external"]["resume"]["late"] = late_policy
+    registry, calls = _payment_registry()
+    runtime = FlowRuntime(flow_document, tools=registry)
+    state = await runtime.execute(runtime.new_state(f"late-{late_policy}"), {"start": True})
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+    accepted_data = copy.deepcopy(state.data)
+
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-8"}})
+
+    assert state.status == expected_status
+    assert calls == [{"payment_id": "PAY-7", "attempt": 1}]
+    assert state.data == accepted_data
+    if late_policy == "reject":
+        assert "rejected late resume delivery" in (
+            require_agent_response(state).error_message or ""
+        )
+    else:
+        assert "referência alternativa" in require_agent_response(state).description
+
+
+async def test_completed_lifecycle_classifies_duplicate_before_reset():
+    registry, calls = _payment_registry()
+    runtime = FlowRuntime(_await_flow(), tools=registry)
+    state = await runtime.execute(runtime.new_state("completed-duplicate"), {"start": True})
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+    state.data["_reset_on_next_call"] = True
+    state.status = "completed"
+    previous_description = require_agent_response(state).description
+
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+
+    assert state.status == "completed"
+    assert calls == [{"payment_id": "PAY-7", "attempt": 1}]
+    assert state.data["payment_id"] == "PAY-7"
+    assert require_agent_response(state).description == previous_description
+
+    state = await runtime.execute(state, {"start": True})
+
+    assert state.metadata.await_resume is not None
+    assert state.metadata.await_resume.correlation_value is None
+
+
+async def test_restored_resume_provenance_must_match_runtime_contract():
     registry, _ = _payment_registry()
     runtime = FlowRuntime(_await_flow(), tools=registry)
+    state = await runtime.execute(runtime.new_state("tampered-resume"), {"start": True})
+    assert state.metadata.await_resume is not None
+    state.metadata.await_resume.digest = "0" * 64
+
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+
+    assert state.status == "error"
+    assert "await_resume.digest" in (require_agent_response(state).error_message or "")
+
+
+async def test_timeout_requires_a_host_event_and_resend_reemits_the_marker():
+    registry, _ = _payment_registry()
+    current_time = [datetime(2026, 7, 13, 12, tzinfo=timezone.utc)]
+    runtime = FlowRuntime(_await_flow(), tools=registry, clock=lambda: current_time[0])
     state = await runtime.execute(runtime.new_state("payment-user"), {"start": True})
+    initial_deadline = current_time[0] + timedelta(seconds=DEFAULT_AWAIT_EXTERNAL_TIMEOUT_SECONDS)
+    assert state.metadata.await_resume is not None
+    assert state.metadata.await_resume.deadline == initial_deadline
 
     state = await runtime.execute(state, {"message": "ainda estou pagando"})
     assert "payment_timed_out" not in state.data
@@ -196,9 +532,38 @@ async def test_timeout_requires_a_host_event_and_resend_reemits_the_marker():
     state = await runtime.execute(state, {"_external_event": "resend"})
     assert (require_agent_response(state).interactive or {})["out_of_band_sent"] is True
 
+    current_time[0] = initial_deadline
     state = await runtime.execute(state, {"_external_event": "timeout"})
     assert state.data["payment_timed_out"] is True
     assert "referência alternativa" in require_agent_response(state).description
+
+
+async def test_timeout_before_persisted_deadline_is_rejected_atomically():
+    registry, _ = _payment_registry()
+    current_time = datetime(2026, 7, 13, 12, tzinfo=timezone.utc)
+    runtime = FlowRuntime(_await_flow(), tools=registry, clock=lambda: current_time)
+    state = await runtime.execute(runtime.new_state("early-timeout"), {"start": True})
+
+    state = await runtime.execute(state, {"_external_event": "timeout"})
+
+    assert state.status == "error"
+    assert "payment_timed_out" not in state.data
+    assert "before its deadline" in (require_agent_response(state).error_message or "")
+
+
+def test_timeout_duration_is_materialized_and_cannot_exist_without_transition():
+    runtime = FlowRuntime(_await_flow(), tools=_payment_registry()[0])
+
+    assert (
+        runtime.doc["capabilities"]["await_external"]["timeout_seconds"]
+        == DEFAULT_AWAIT_EXTERNAL_TIMEOUT_SECONDS
+    )
+
+    invalid_flow = _await_flow()
+    invalid_flow["capabilities"]["await_external"].pop("timeout")
+    invalid_flow["capabilities"]["await_external"]["timeout_seconds"] = 1
+    with pytest.raises(JsonSchemaValidationError):
+        validate_flow(invalid_flow)
 
 
 @pytest.mark.parametrize(
@@ -268,10 +633,6 @@ async def test_end_recovery_resets_the_flow_on_the_next_call():
             "not registered",
         ),
         (
-            lambda flow: flow["path"][0].update({"ask_when": {"is_present": "slots.payment_id"}}),
-            "does not support these fields: ask_when",
-        ),
-        (
             lambda flow: flow["path"][0]["interactive"].update({"field": "different_token"}),
             "interactive.field must match resume_on",
         ),
@@ -283,7 +644,7 @@ async def test_end_recovery_resets_the_flow_on_the_next_call():
             lambda flow: flow["capabilities"]["await_external"]["on_resume"].update(
                 {"enrich": "payment_lookup"}
             ),
-            "requires object-form on_resume.enrich",
+            "requires a versioned typed resume contract and object-form enrichment",
         ),
         (
             lambda flow: flow["capabilities"]["await_external"]["recovery"]["resend"].update(
@@ -300,6 +661,14 @@ def test_compile_time_validation_rejects_invalid_wait_contracts(mutate, message)
 
     with pytest.raises(ValueError, match=message):
         FlowRuntime(flow_document, tools=registry)
+
+
+def test_schema_rejects_unused_wait_step_fields() -> None:
+    flow_document = _await_flow()
+    flow_document["path"][0]["ask_when"] = {"is_present": "slots.payment_id"}
+
+    with pytest.raises(JsonSchemaValidationError):
+        validate_flow(flow_document)
 
 
 def test_compile_time_validation_rejects_unbound_capability():
@@ -344,6 +713,25 @@ def _identification_flow() -> dict[str, Any]:
         "domains": {"Placeholder": {"type": "free_text"}},
         "path": [{"use": "identification@2"}],
         "uses": [{"ref": "identification@2", "with": {"required": False}}],
+    }
+
+
+def _govbr_resume_contract() -> dict[str, Any]:
+    return {
+        "version": "1",
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "cpf": {"type": "string", "pattern": "^[0-9]{11}$"},
+                "nome": {"type": "string", "minLength": 2},
+                "email": {"type": "string", "format": "email"},
+            },
+            "required": ["cpf"],
+        },
+        "correlation": "$token.cpf",
+        "duplicate": "ignore",
+        "late": "reject",
     }
 
 
@@ -445,7 +833,7 @@ async def test_malformed_optional_tool_results_are_logged_and_ignored(caplog):
     )
 
 
-async def test_legacy_minimal_capability_keeps_text_fallback_and_marker():
+def test_reference_profile_rejects_legacy_untyped_wait_capability():
     flow_document = _identification_flow()
     flow_document["capabilities"] = {
         "await_external": {
@@ -453,19 +841,8 @@ async def test_legacy_minimal_capability_keeps_text_fallback_and_marker():
             "resume_on": "govbr_token",
         }
     }
-    runtime = FlowRuntime(flow_document)
-    state = await runtime.execute(
-        runtime.new_state("citizen"),
-        {"identification_method": "govbr"},
-    )
-
-    assert (require_agent_response(state).interactive or {})["next_step"] == ("await_govbr_auth")
-
-    state = await runtime.execute(state, {"message": "prefiro cpf"})
-
-    assert state.status == "progress"
-    assert state.data["identification_method"] == "cpf"
-    assert "cpf" in require_agent_response(state).description.lower()
+    with pytest.raises(FlowLinkError, match="LEGACY_AWAIT_CONTRACT_FORBIDDEN"):
+        FlowRuntime(flow_document)
 
 
 async def test_legacy_invalid_govbr_response_has_correlated_log_id():
@@ -474,6 +851,7 @@ async def test_legacy_invalid_govbr_response_has_correlated_log_id():
         "await_external": {
             "kind": "cta_url",
             "resume_on": "govbr_token",
+            "resume": _govbr_resume_contract(),
         }
     }
     runtime = FlowRuntime(flow_document)
@@ -496,6 +874,7 @@ async def test_govbr_token_without_cpf_has_no_writes_or_enrichment():
         "await_external": {
             "kind": "cta_url",
             "resume_on": "govbr_token",
+            "resume": _govbr_resume_contract(),
             "on_resume": {
                 "set": {
                     "cpf": "$token.cpf",
@@ -542,19 +921,25 @@ async def test_govbr_token_without_cpf_has_no_writes_or_enrichment():
     assert "cpf" in require_agent_response(state).description.lower()
 
 
-async def test_legacy_subflow_binding_and_bare_enrichment_tool_remain_supported():
+async def test_typed_subflow_wait_binding_and_enrichment_execute():
     flow_document = _identification_flow()
     flow_document["capabilities"] = {
         "await_external": {
             "kind": "cta_url",
             "resume_on": "govbr_token",
+            "resume": _govbr_resume_contract(),
             "on_resume": {
                 "set": {
                     "cpf": "$token.cpf",
                     "name": "$token.nome",
                     "email": "$token.email",
                 },
-                "enrich": "get_user_info",
+                "enrich": {
+                    "tool": "get_user_info",
+                    "optional": True,
+                    "input": {"cpf": "$token.cpf"},
+                    "set": {"phone": "$result.phones.0"},
+                },
             },
             "recovery": {
                 "abort": {"goto": "select_identification_method"},

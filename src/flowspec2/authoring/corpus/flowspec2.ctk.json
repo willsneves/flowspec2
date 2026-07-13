@@ -1,0 +1,468 @@
+{
+  "format": "flowspec2/ctk-corpus",
+  "version": "1",
+  "cases": [
+    {
+      "identifier": "linear_valid_runtime",
+      "source": {
+        "path": "linear.case.json",
+        "pointer": "/source"
+      },
+      "expected": {
+        "compilation": "succeeded",
+        "diagnostics": [],
+        "ir": {
+          "ir_format": "flowspec2/ir@1",
+          "flow": "linear_maintenance_request",
+          "version": "1.0.0",
+          "source_digest": "f2245343ad392625ecd114f6273cc87c0f37eddea59ef65e523b8713873f0e34",
+          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "dependency_digest": "fedc868783841382d0969ddb2c3d84a886bba6406e2d978cf64185bb16e013ec",
+          "digest": "6d179ef50a1cbc7523e04e040c1bd5302bc6541e6eb1c552548293e3847e801c",
+          "canonical_document_digest": "7ebe5686db48ae1bc246a395fe32573d2643346816ea7b760eb2487e38f1c490",
+          "canonical_execution_ir_digest": "49dea87756411b4ec35986e0341b375f443b5e065f4928539fcf064b50eb5ef7",
+          "canonical_ir_digest": "cbfee79b5b1eb0328c437ce3b27628d81f4465aa7a759ca7c270f146dd236d64"
+        }
+      },
+      "turns": [
+        {
+          "payload": {},
+          "expected_trace": {
+            "status": "progress",
+            "data": {},
+            "agent_response": {
+              "description": "Describe the maintenance request.",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_request_description",
+                "properties": {
+                  "request_description": {
+                    "type": "string",
+                    "title": "Request Description",
+                    "description": "Valor para request_description.",
+                    "minLength": 1
+                  }
+                },
+                "required": ["request_description"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "request_description": "Broken streetlight cover"
+          },
+          "expected_trace": {
+            "status": "completed",
+            "data": {
+              "request_description": "Broken streetlight cover"
+            },
+            "agent_response": {
+              "description": "Serviço concluído com sucesso."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "structural_diagnostic_order",
+      "source": {
+        "path": "linear.case.json",
+        "pointer": "/source",
+        "mutations": [
+          {
+            "path": "/flow",
+            "replacement": "Invalid Flow"
+          },
+          {
+            "path": "/version",
+            "replacement": "2"
+          },
+          {
+            "path": "/unexpected",
+            "replacement": true
+          }
+        ]
+      },
+      "expected": {
+        "compilation": "skipped",
+        "diagnostics": [
+          {
+            "code": "FLOWSPEC_SCHEMA_ADDITIONALPROPERTIES",
+            "severity": "error",
+            "path": ""
+          },
+          {
+            "code": "FLOWSPEC_SCHEMA_PATTERN",
+            "severity": "error",
+            "path": "/flow"
+          },
+          {
+            "code": "FLOWSPEC_SCHEMA_PATTERN",
+            "severity": "error",
+            "path": "/version"
+          }
+        ]
+      }
+    },
+    {
+      "identifier": "terminal_success_runtime",
+      "source": {
+        "path": "terminal.case.json",
+        "pointer": "/source"
+      },
+      "expected": {
+        "compilation": "succeeded",
+        "diagnostics": [],
+        "ir": {
+          "ir_format": "flowspec2/ir@1",
+          "flow": "terminal_ticket_fulfillment",
+          "version": "1.0.0",
+          "source_digest": "38ffd29ef03a100bfb60dd02a468069c34c3b0f3341cc3263f2984a100f91c25",
+          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "dependency_digest": "543ff96d165fe3f6236418afe8c1d476459f9ef78579a483390f768e74956001",
+          "digest": "f99b8fb616bcba2977255484f0fed2c839042aefd56d8264a0d69cc3d8f96880",
+          "canonical_document_digest": "fbd7378b3da7eb120809d48486558ae2e5845e47bd37426ee188a3d26a7eb062",
+          "canonical_execution_ir_digest": "3be69b8ce2f492becb522ffd43381d0fa7010f870779278fcdbfb696ccea5e2f",
+          "canonical_ir_digest": "e4df419e19211cd4bd65dff3fb904b49bdcef765e927ec98cb953d08eae4fb33"
+        }
+      },
+      "turns": [
+        {
+          "payload": {},
+          "expected_trace": {
+            "status": "progress",
+            "data": {},
+            "agent_response": {
+              "description": "Describe the service problem.",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_problem_description",
+                "properties": {
+                  "problem_description": {
+                    "type": "string",
+                    "title": "Problem Description",
+                    "description": "Valor para problem_description.",
+                    "minLength": 1
+                  }
+                },
+                "required": ["problem_description"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "problem_description": "Broken signal cabinet"
+          },
+          "expected_trace": {
+            "status": "completed",
+            "data": {
+              "_reset_on_next_call": true,
+              "problem_description": "Broken signal cabinet",
+              "protocol_id": "SGRC-72E4E60B8E"
+            },
+            "agent_response": {
+              "description": "Chamado aberto com sucesso."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "address_subflow_runtime",
+      "source": {
+        "path": "subflow.case.json",
+        "pointer": "/source"
+      },
+      "expected": {
+        "compilation": "succeeded",
+        "diagnostics": [],
+        "ir": {
+          "ir_format": "flowspec2/ir@1",
+          "flow": "address_collection",
+          "version": "1.0.0",
+          "source_digest": "01822a8b6076ebf5ff3700bf514e7ffeaf23145d622b433ab3a9ddfc3d785476",
+          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "dependency_digest": "2a5e13ddc386838768d287db3b116ae9ab80dcbee648214cdad92e8f59df226e",
+          "digest": "20096ab6965694baf91f6c687a01fac3f00544228a223ce2e7cc1eba37cd87ce",
+          "canonical_document_digest": "e27e8450d91c841314af83b3b2a3e27bfa8a868ec476b3e6f62beaaa5d449c65",
+          "canonical_execution_ir_digest": "ae34386b654dc20f19609e27b21273576e30631f9b4dbe9819aac89d48fc33fd",
+          "canonical_ir_digest": "68c9c5966193ff9f35c3e46e37e3ce50d47a3055f807d8ccaf79a404a96efc01"
+        }
+      },
+      "turns": [
+        {
+          "payload": {},
+          "expected_trace": {
+            "status": "progress",
+            "data": {},
+            "agent_response": {
+              "description": "Add an optional nearby reference point.",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_reference_note",
+                "properties": {
+                  "reference_note": {
+                    "type": ["string", "null"],
+                    "title": "Reference Note",
+                    "description": "Valor para reference_note. Use null when the citizen chooses not to provide this optional value."
+                  }
+                },
+                "required": ["reference_note"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "reference_note": "Near the public school"
+          },
+          "expected_trace": {
+            "status": "progress",
+            "data": {
+              "reference_note": "Near the public school"
+            },
+            "agent_response": {
+              "description": "Qual o endereço completo (rua, número, bairro)?",
+              "payload_schema": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "description": "Endereço completo: rua/avenida, número e bairro."
+                  }
+                },
+                "required": ["address"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "address": "Rua das Flores, 100"
+          },
+          "expected_trace": {
+            "status": "progress",
+            "data": {
+              "reference_note": "Near the public school",
+              "address": {
+                "logradouro": "Rua das Flores, 100",
+                "kind": "rua",
+                "bairro": "Centro",
+                "municipio": "Rio de Janeiro"
+              },
+              "address_needs_confirmation": true
+            },
+            "agent_response": {
+              "description": "Confirma o endereço: Rua das Flores, 100, Centro?"
+            }
+          }
+        },
+        {
+          "payload": {
+            "confirmacao": "sim"
+          },
+          "expected_trace": {
+            "status": "completed",
+            "data": {
+              "reference_note": "Near the public school",
+              "address": {
+                "logradouro": "Rua das Flores, 100",
+                "kind": "rua",
+                "bairro": "Centro",
+                "municipio": "Rio de Janeiro"
+              },
+              "address_needs_confirmation": true,
+              "address_completed": true,
+              "address_confirmed": true
+            },
+            "agent_response": {
+              "description": "Serviço concluído com sucesso."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "typed_external_resume_policies",
+      "source": {
+        "path": "await_correction.case.json",
+        "pointer": "/source"
+      },
+      "expected": {
+        "compilation": "succeeded",
+        "diagnostics": [],
+        "ir": {
+          "ir_format": "flowspec2/ir@1",
+          "flow": "authenticated_correctable_request",
+          "version": "1.0.0",
+          "source_digest": "13d9347648706cc0d74420654f71bf67a48095d726a327a2c8aeeb9613e6e7e0",
+          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "dependency_digest": "64ad91b8566f667e847b7619efe803faafe5af2d5cb12818446659950b680cee",
+          "digest": "5777b9242482efae9c33a5fc516da97e719a763fd9e5a32d3d1706570ac61e14",
+          "canonical_document_digest": "824ae8c33b774fa6761f5ffd3fe68d03eb57244d009c16d8cddf7dd702a76a81",
+          "canonical_execution_ir_digest": "07fe38929e2d923009b2e8a3cbf77c0c8aedb66b6d52f816cb3dc02058bcf4f0",
+          "canonical_ir_digest": "3583ece9c14ea8029b37cc49ca14ac81c9e14baedc7072079f9dbe1463455ff8"
+        }
+      },
+      "turns": [
+        {
+          "payload": {},
+          "expected_trace": {
+            "status": "progress",
+            "data": {},
+            "agent_response": {
+              "description": "Describe your request.",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_request_description",
+                "properties": {
+                  "request_description": {
+                    "type": "string",
+                    "title": "Request Description",
+                    "description": "Valor para request_description.",
+                    "minLength": 1
+                  }
+                },
+                "required": ["request_description"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "request_description": "Broken accessibility ramp"
+          },
+          "expected_trace": {
+            "status": "progress",
+            "data": {
+              "request_description": "Broken accessibility ramp"
+            },
+            "agent_response": {
+              "description": "Authenticate to continue.",
+              "interactive": {
+                "kind": "cta_url",
+                "field": "authentication_token",
+                "out_of_band": true,
+                "next_step": "authenticate_requester",
+                "out_of_band_sent": true,
+                "resume_contract": {
+                  "version": "1",
+                  "digest": "9efba3c00a7e48626356abcf9b871620ae284dec067f437f33b5c4b67294ce0a",
+                  "correlation": "$token.cpf",
+                  "deadline": "2025-01-01T00:15:00+00:00",
+                  "duplicate": "ignore",
+                  "late": "reject"
+                }
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "authentication_token": {
+              "cpf": "12345678909"
+            }
+          },
+          "expected_trace": {
+            "status": "progress",
+            "data": {
+              "request_description": "Broken accessibility ramp"
+            },
+            "agent_response": {
+              "description": "Do you confirm the request details?",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_ticket_data_confirmed",
+                "properties": {
+                  "ticket_data_confirmed": {
+                    "type": "boolean",
+                    "title": "Ticket Data Confirmed",
+                    "description": "Interprete como booleano: true para sim/afirmativo, false para não."
+                  }
+                },
+                "required": ["ticket_data_confirmed"],
+                "x-flowspec2-correction-targets": ["request_description"]
+              },
+              "interactive": {
+                "body": "Do you confirm the request details?",
+                "field": "ticket_data_confirmed",
+                "buttons": [
+                  {
+                    "id": "true",
+                    "title": "Sim"
+                  },
+                  {
+                    "id": "false",
+                    "title": "Não"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "authentication_token": {
+              "cpf": "12345678909"
+            }
+          },
+          "expected_trace": {
+            "status": "progress",
+            "data": {
+              "request_description": "Broken accessibility ramp"
+            },
+            "agent_response": {
+              "description": "Do you confirm the request details?",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_ticket_data_confirmed",
+                "properties": {
+                  "ticket_data_confirmed": {
+                    "type": "boolean",
+                    "title": "Ticket Data Confirmed",
+                    "description": "Interprete como booleano: true para sim/afirmativo, false para não."
+                  }
+                },
+                "required": ["ticket_data_confirmed"],
+                "x-flowspec2-correction-targets": ["request_description"]
+              },
+              "interactive": {
+                "body": "Do you confirm the request details?",
+                "field": "ticket_data_confirmed",
+                "buttons": [
+                  {
+                    "id": "true",
+                    "title": "Sim"
+                  },
+                  {
+                    "id": "false",
+                    "title": "Não"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "authentication_token": {
+              "cpf": "98765432100"
+            }
+          },
+          "expected_trace": {
+            "status": "error",
+            "data": {
+              "request_description": "Broken accessibility ramp"
+            },
+            "agent_response": {
+              "description": "",
+              "error_message": "await_external 'authenticate_requester' rejected late resume delivery"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

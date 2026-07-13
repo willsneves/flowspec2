@@ -1,0 +1,220 @@
+{
+  "format": "flowspec2/authoring-case@1",
+  "identifier": "await_and_correction",
+  "prompt": "Author a flow that collects request_description, suspends at authenticate_requester for an authentication_token, stores $token.cpf as cpf, lets the citizen correct request_description at confirmation, and opens an idempotent sgrc_open_ticket whose protocol_id comes from result.protocolo.",
+  "feature_tags": ["await_external", "correction", "terminal"],
+  "required_constructs": [
+    {
+      "identifier": "external-wait-marker",
+      "pointer_pattern": "/path/*/await_external",
+      "expected": true
+    },
+    {
+      "identifier": "external-wait-kind",
+      "pointer_pattern": "/capabilities/await_external/kind",
+      "expected": "cta_url"
+    },
+    {
+      "identifier": "external-wait-step",
+      "pointer_pattern": "/capabilities/await_external/step",
+      "expected": "authenticate_requester"
+    },
+    {
+      "identifier": "external-wait-resume-token",
+      "pointer_pattern": "/capabilities/await_external/resume_on",
+      "expected": "authentication_token"
+    },
+    {
+      "identifier": "external-resume-cpf",
+      "pointer_pattern": "/capabilities/await_external/on_resume/set/cpf",
+      "expected": "$token.cpf"
+    },
+    {
+      "identifier": "correctable-confirmation",
+      "pointer_pattern": "/path/*/correctable",
+      "expected": true
+    },
+    {
+      "identifier": "correction-contract",
+      "pointer_pattern": "/confirm/correctable",
+      "expected": [
+        "request_description"
+      ]
+    },
+    {
+      "identifier": "terminal-marker",
+      "pointer_pattern": "/path/*/terminal",
+      "expected": true
+    },
+    {
+      "identifier": "terminal-tool",
+      "pointer_pattern": "/terminal/tool",
+      "expected": "sgrc_open_ticket"
+    },
+    {
+      "identifier": "terminal-idempotency",
+      "pointer_pattern": "/terminal/idempotent",
+      "expected": true
+    },
+    {
+      "identifier": "terminal-output",
+      "pointer_pattern": "/terminal/outputs/protocol_id",
+      "expected": "result.protocolo"
+    }
+  ],
+  "source": {
+    "schema": "flowspec/2",
+    "flow": "authenticated_correctable_request",
+    "version": "1.0.0",
+    "route": {
+      "description": "Authenticate, confirm, and open a correctable municipal request."
+    },
+    "domains": {
+      "RequestDescription": {
+        "type": "free_text"
+      },
+      "Cpf": {
+        "type": "cpf"
+      },
+      "SimNao": {
+        "type": "bool",
+        "normalize": {
+          "affirmation": true,
+          "emoji_veto": true
+        }
+      }
+    },
+    "slots": {
+      "request_description": {
+        "domain": "RequestDescription",
+        "required": true
+      },
+      "cpf": {
+        "domain": "Cpf",
+        "persist": "internal"
+      },
+      "ticket_data_confirmed": {
+        "domain": "SimNao"
+      }
+    },
+    "path": [
+      {
+        "step": "collect_request_description",
+        "slot": "request_description",
+        "prompt": {
+          "text": "Describe your request."
+        }
+      },
+      {
+        "step": "authenticate_requester",
+        "await_external": true
+      },
+      {
+        "step": "confirm_ticket_data",
+        "confirm": "ticket_data_confirmed",
+        "correctable": true,
+        "prompt": {
+          "text": "Do you confirm the request details?"
+        },
+        "interactive": {
+          "kind": "buttons",
+          "field": "ticket_data_confirmed",
+          "from_domain": "SimNao"
+        }
+      },
+      {
+        "terminal": true
+      }
+    ],
+    "confirm": {
+      "step": "confirm_ticket_data",
+      "slot": "ticket_data_confirmed",
+      "on_confirm": "open_ticket",
+      "correctable": ["request_description"]
+    },
+    "terminal": {
+      "step": "open_ticket",
+      "tool": "sgrc_open_ticket",
+      "idempotent": true,
+      "input": [
+        {
+          "param": "problema",
+          "slot": "request_description"
+        },
+        {
+          "param": "solicitante",
+          "slot": "cpf"
+        }
+      ],
+      "outputs": {
+        "protocol_id": "result.protocolo"
+      },
+      "outcomes": {
+        "success": {
+          "reset_next": true
+        },
+        "retryable": {
+          "preserve_state": true
+        },
+        "fatal": {
+          "reset_next": true
+        }
+      }
+    },
+    "capabilities": {
+      "await_external": {
+        "kind": "cta_url",
+        "step": "authenticate_requester",
+        "resume_on": "authentication_token",
+        "resume": {
+          "version": "1",
+          "schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "cpf": {
+                "type": "string",
+                "pattern": "^[0-9]{11}$"
+              }
+            },
+            "required": [
+              "cpf"
+            ]
+          },
+          "correlation": "$token.cpf",
+          "duplicate": "ignore",
+          "late": "reject"
+        },
+        "prompt": {
+          "text": "Authenticate to continue.",
+          "verbatim": true
+        },
+        "interactive": {
+          "kind": "cta_url",
+          "field": "authentication_token",
+          "out_of_band": true,
+          "next_step": "authenticate_requester"
+        },
+        "on_resume": {
+          "set": {
+            "cpf": "$token.cpf"
+          }
+        },
+        "timeout": {
+          "goto": "collect_request_description"
+        },
+        "recovery": {
+          "abort": {
+            "goto": "collect_request_description"
+          },
+          "resend": {
+            "goto": "authenticate_requester"
+          },
+          "switch": {
+            "goto": "collect_request_description"
+          }
+        }
+      }
+    }
+  }
+}

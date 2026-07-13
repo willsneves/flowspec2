@@ -1,7 +1,7 @@
 {
   "schema": "flowspec/2",
   "flow": "reparo_luminaria",
-  "version": "1.5.0",
+  "version": "1.8.0",
   "service": {
     "id": "18131",
     "codigo_servico_1746": "18131",
@@ -35,7 +35,6 @@
   },
   "config": {
     "address_required": true,
-    "reference_point_required": true,
     "identification_required": false,
     "max_attempts": 3
   },
@@ -166,6 +165,7 @@
       "domain": "LuminariaDefeito",
       "persist": "data",
       "required": true,
+      "fill_only_when_asked": true,
       "prefill_sources": [
         "whatsapp_flow"
       ],
@@ -192,7 +192,7 @@
       "domain": "LuminariaLocalizacao",
       "persist": "data",
       "required": false,
-      "nullable": true,
+      "fill_only_when_asked": true,
       "prefill_sources": [
         "whatsapp_flow"
       ]
@@ -228,8 +228,7 @@
       "interactive": {
         "kind": "buttons",
         "field": "confirmacao_servico",
-        "from_domain": "SimNao",
-        "gate": "ENABLE_INTERACTIVE_CONFIRM"
+        "from_domain": "SimNao"
       },
       "skip_when": {
         "eq": [
@@ -303,8 +302,7 @@
       "interactive": {
         "kind": "buttons",
         "field": "reparo_luminaria_quadra_esportes",
-        "from_domain": "SimNao",
-        "gate": "ENABLE_INTERACTIVE_CONFIRM"
+        "from_domain": "SimNao"
       }
     },
     {
@@ -327,8 +325,7 @@
       "interactive": {
         "kind": "buttons",
         "field": "confirmacao",
-        "from_domain": "SimNao",
-        "gate": "ENABLE_INTERACTIVE_CONFIRM"
+        "from_domain": "SimNao"
       }
     },
     {
@@ -341,7 +338,6 @@
       "with": {
         "required": true,
         "needs_confirmation": true,
-        "reference_point_required": true,
         "max_attempts": 3
       }
     },
@@ -369,18 +365,18 @@
       ],
       "after": "collect_localizacao",
       "lookup": {
-        "Apagada|uma|": "Apagada",
+        "Apagada|uma|null": "Apagada",
         "Apagada|grupo|bloco": "Bloco ou grupo de luminárias apagadas",
         "Apagada|grupo|intercaladas": "Várias luminárias intercaladas apagadas",
-        "Piscando|uma|": "Piscando",
+        "Piscando|uma|null": "Piscando",
         "Piscando|grupo|bloco": "Bloco ou grupo de luminárias piscando",
         "Piscando|grupo|intercaladas": "Bloco ou grupo de luminárias piscando",
-        "Acesa de dia|uma|": "Acesa durante o dia",
+        "Acesa de dia|uma|null": "Acesa durante o dia",
         "Acesa de dia|grupo|bloco": "Bloco ou grupo de luminárias acesas de dia",
         "Acesa de dia|grupo|intercaladas": "Várias luminárias intercaladas acesas de dia",
-        "Pendurada||": "Pendurada",
-        "Danificada||": "Danificada",
-        "Com ruído||": "Com ruído"
+        "Pendurada|null|null": "Pendurada",
+        "Danificada|null|null": "Danificada",
+        "Com ruído|null|null": "Com ruído"
       },
       "default": "$from[0]"
     }
@@ -395,8 +391,7 @@
     "interactive": {
       "kind": "buttons",
       "field": "confirmacao",
-      "from_domain": "SimNao",
-      "gate": "ENABLE_INTERACTIVE_CONFIRM"
+      "from_domain": "SimNao"
     },
     "correctable": [
       "luminaria_defeito",
@@ -489,6 +484,13 @@
     ],
     "resume_at": "collect_defeito",
     "on_submit_source": "whatsapp_flow",
+    "recovery": {
+      "fallback_at": "show_service_summary",
+      "cancel": "END",
+      "timeout": "fallback",
+      "max_resends": 2,
+      "timeout_seconds": 900
+    },
     "alias_map": {
       "defect_type": {
         "luminaria_defeito": "$value"
@@ -540,6 +542,34 @@
       "kind": "cta_url",
       "step": "authenticate_govbr",
       "resume_on": "govbr_token",
+      "resume": {
+        "version": "1",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpf": {
+              "type": "string",
+              "pattern": "^[0-9]{11}$"
+            },
+            "nome": {
+              "type": "string",
+              "minLength": 2
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          "required": [
+            "cpf"
+          ]
+        },
+        "correlation": "$token.cpf",
+        "duplicate": "ignore",
+        "late": "reject"
+      },
       "prompt": {
         "text": "Para se identificar pelo gov.br, toque no botão de login que enviei. 🔐",
         "verbatim": true
@@ -575,12 +605,10 @@
           "identification_method": "cpf"
         }
       },
+      "timeout_seconds": 900,
       "recovery": {
         "abort": {
-          "goto": "select_identification_method",
-          "set": {
-            "identification_method": null
-          }
+          "goto": "select_identification_method"
         },
         "resend": {
           "goto": "authenticate_govbr"

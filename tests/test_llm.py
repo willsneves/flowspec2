@@ -9,19 +9,27 @@ from __future__ import annotations
 
 import copy
 import os
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
 from flowspec2 import FlowRuntime
-from flowspec2.llm import _enum_of, _fields_spec
-from flowspec2.models import AgentResponse
+from flowspec2.llm import (
+    GeminiAgent,
+    _enum_of,
+    _extraction_response_schema,
+    _fields_spec,
+    _route_response_schema,
+)
+from flowspec2.models import CORRECTION_TARGETS_SCHEMA_KEY, AgentResponse
 
 # ── offline unit tests for the schema→field-spec mapping ─────────────────────
 
 
 def test_enum_of_plain_and_anyof_nullable():
     assert _enum_of({"enum": ["a", "b"]}) == ["a", "b"]
-    assert _enum_of({"anyOf": [{"enum": ["x"]}, {"type": "null"}]}) == ["x", "null"]
+    assert _enum_of({"anyOf": [{"enum": ["x"]}, {"type": "null"}]}) == ["x", None]
     assert _enum_of({"type": "string"}) is None
 
 
@@ -34,7 +42,39 @@ def test_fields_spec_from_payload_schema():
             "required": ["luminaria_defeito"],
         },
     )
-    assert _fields_spec(ar) == [("luminaria_defeito", "closed", ["Apagada", "Piscando"])]
+    assert _fields_spec(ar) == [("luminaria_defeito", "closed", ["Apagada", "Piscando"], False)]
+
+
+def test_fields_spec_preserves_boolean_kind_for_nullable_schema():
+    response = AgentResponse(
+        description="?",
+        payload_schema={
+            "type": "object",
+            "properties": {"optional_confirmation": {"type": ["boolean", "null"]}},
+            "required": ["optional_confirmation"],
+        },
+    )
+
+    assert _fields_spec(response) == [("optional_confirmation", "bool", None, True)]
+
+
+def test_fields_spec_preserves_numeric_kinds_for_nullable_schemas() -> None:
+    response = AgentResponse(
+        description="?",
+        payload_schema={
+            "type": "object",
+            "properties": {
+                "quantity": {"type": "integer"},
+                "distance": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+            },
+            "required": ["quantity", "distance"],
+        },
+    )
+
+    assert _fields_spec(response) == [
+        ("quantity", "integer", None, False),
+        ("distance", "number", None, True),
+    ]
 
 
 def test_fields_spec_falls_back_to_interactive_buttons():
@@ -45,7 +85,7 @@ def test_fields_spec_falls_back_to_interactive_buttons():
             "buttons": [{"id": "sim", "title": "Sim"}, {"id": "nao", "title": "Não"}],
         },
     )
-    assert _fields_spec(ar) == [("confirmacao", "bool", None)]
+    assert _fields_spec(ar) == [("confirmacao", "bool", None, False)]
     ar2 = AgentResponse(
         description="?",
         interactive={
@@ -53,7 +93,144 @@ def test_fields_spec_falls_back_to_interactive_buttons():
             "buttons": [{"id": "cpf", "title": "CPF"}, {"id": "govbr", "title": "Gov.br"}],
         },
     )
-    assert _fields_spec(ar2) == [("identification_method", "closed", ["cpf", "govbr"])]
+    assert _fields_spec(ar2) == [("identification_method", "closed", ["cpf", "govbr"], False)]
+
+
+def _capture_extraction_prompt(agent_response: AgentResponse) -> str:
+    captured_prompts: list[str] = []
+    agent = object.__new__(GeminiAgent)
+
+    def capture_json(
+        system: str,
+        prompt: str,
+        response_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        del system, response_schema
+        captured_prompts.append(prompt)
+        return {}
+
+    cast(Any, agent)._json = capture_json
+    agent.extract("resposta", agent_response)
+    return captured_prompts[0]
+
+
+def test_extraction_prompt_uses_exact_json_scalar_types_and_null() -> None:
+    prompt = _capture_extraction_prompt(
+        AgentResponse(
+            description="Informe os valores.",
+            payload_schema={
+                "type": "object",
+                "properties": {
+                    "quantity": {"type": "integer"},
+                    "distance": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+                    "label": {"type": ["string", "null"]},
+                    "enabled": {"type": ["boolean", "null"]},
+                    "choice": {"enum": ["alpha", None]},
+                },
+                "required": ["quantity", "distance", "label", "enabled", "choice"],
+            },
+        )
+    )
+
+    assert '"quantity": número inteiro em JSON, sem aspas' in prompt
+    assert '"distance": número finito em JSON, sem aspas ou null' in prompt
+    assert '"label": string JSON com o texto informado ou null' in prompt
+    assert '"enabled": true (sim/afirmativo), false (não/negativo) ou null' in prompt
+    assert '"choice": um destes valores EXATOS: ["alpha", null]' in prompt
+
+
+def test_extraction_prompt_only_mentions_correction_for_correction_hub() -> None:
+    ordinary_response = AgentResponse(
+        description="Informe.",
+        payload_schema={
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+        },
+    )
+    correction_response = ordinary_response.model_copy(
+        update={
+            "payload_schema": {
+                **(ordinary_response.payload_schema or {}),
+                CORRECTION_TARGETS_SCHEMA_KEY: ["address", "cpf"],
+            }
+        }
+    )
+
+    assert "CORRIGIR" not in _capture_extraction_prompt(ordinary_response)
+    assert "CORRIGIR" in _capture_extraction_prompt(correction_response)
+
+
+def test_route_response_schema_closes_service_to_catalog() -> None:
+    response_schema = _route_response_schema(
+        [
+            {"flow": "repair_light"},
+            {"flow": "repair_road"},
+            {"flow": "repair_light"},
+        ]
+    )
+
+    assert response_schema["additionalProperties"] is False
+    assert response_schema["properties"]["service"]["enum"] == [
+        "repair_light",
+        "repair_road",
+        None,
+    ]
+
+
+def test_extraction_response_schema_supports_payload_or_correction() -> None:
+    response_schema = _extraction_response_schema(
+        AgentResponse(
+            description="?",
+            payload_schema={
+                "type": "object",
+                "properties": {"defect": {"enum": ["off", "flashing"]}},
+                "required": ["defect"],
+                CORRECTION_TARGETS_SCHEMA_KEY: ["defect", "address"],
+            },
+        )
+    )
+
+    assert response_schema["additionalProperties"] is False
+    assert response_schema["properties"]["defect"] == {"enum": ["off", "flashing"]}
+    assert response_schema["properties"]["correcao"] == {"enum": ["defect", "address"]}
+    assert {tuple(branch["required"]) for branch in response_schema["oneOf"]} == {
+        ("defect",),
+        ("correcao",),
+    }
+
+
+def test_extraction_response_schema_does_not_offer_correction_outside_hub() -> None:
+    response_schema = _extraction_response_schema(
+        AgentResponse(
+            description="?",
+            payload_schema={
+                "type": "object",
+                "properties": {"defect": {"enum": ["off", "flashing"]}},
+                "required": ["defect"],
+            },
+        )
+    )
+
+    assert response_schema["required"] == ["defect"]
+    assert "correcao" not in response_schema["properties"]
+
+
+def test_gemini_request_uses_json_schema_and_rejects_invalid_provider_output() -> None:
+    captured_config: list[Any] = []
+
+    class FakeModels:
+        def generate_content(self, **kwargs: Any) -> SimpleNamespace:
+            captured_config.append(kwargs["config"])
+            return SimpleNamespace(text='{"service":"unknown"}')
+
+    agent = object.__new__(GeminiAgent)
+    agent.model = "test-model"
+    cast(Any, agent).client = SimpleNamespace(models=FakeModels())
+    response_schema = _route_response_schema([{"flow": "repair_light"}])
+
+    assert agent._json("system", "prompt", response_schema) == {}
+    assert captured_config[0].response_json_schema == response_schema
 
 
 # ── gated integration tests (real Gemini) ───────────────────────────────────

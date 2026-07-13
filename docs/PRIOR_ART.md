@@ -2,9 +2,10 @@
 
 Table of Contents:
 
-- Closest projects and formats: 23 <!-- section:closest-projects-and-formats -->
-- Positioning decision: 39 <!-- section:positioning-decision -->
-- Compatibility strategy: 60 <!-- section:compatibility-strategy -->
+- Closest projects and formats: 24 <!-- section:closest-projects-and-formats -->
+- Positioning decision: 44 <!-- section:positioning-decision -->
+- Borrowed constraints: 65 <!-- section:borrowed-constraints -->
+- Compatibility strategy: 90 <!-- section:compatibility-strategy -->
 
 <!-- /section:toc -->
 
@@ -29,6 +30,10 @@ the executable graph and lifecycle behavior.
 | [Dialogflow CX](https://cloud.google.com/dialogflow/cx/docs/concept/page) | Page-based conversational state machines with forms, parameters, routes, and fulfillment | Managed platform resources, APIs, and console configuration replace a portable, self-contained source document | A product-level analogue; no compatibility adapter is currently promised |
 | [Microsoft Agent Framework declarative workflows](https://learn.microsoft.com/en-us/agent-framework/workflows/declarative) | YAML workflow definitions compiled into executable workflow graphs | General agent orchestration with action kinds and an expression language, rather than a closed conversational-domain spine | Evidence that declarative graph compilation is a useful model, but not a replacement for the conversational contract |
 | [Open Workflow Specification](https://serverlessworkflow.io/) | Vendor-neutral JSON/YAML workflow DSL with calls, events, branching, reuse, and fault handling | General workflow semantics do not define conversational prompting, LLM extraction, corrections, or closed token domains | Standards envelope for the flowspec2 conversational profile; not the native authoring model |
+| [OpenAPI Arazzo](https://spec.openapis.org/arazzo/latest.html) | Declarative API-call sequences, typed inputs/outputs, success criteria, and asynchronous operations | Runtime expressions and external references are broader than the closed flowspec2 linker | Reference for parse-before-resolve linking, operation identity, correlation, and precise asynchronous boundaries |
+| [BPMN](https://www.omg.org/spec/BPMN/2.0.2/PDF) | Durable processes, messages, correlation, subprocesses, cancellation, and compensation | The complete process metamodel and diagram/XML surface are far broader than conversational collection | Reference for separating cancellation from compensation; compensation stays out until flows can commit multiple effects |
+| [DMN](https://www.omg.org/spec/DMN/1.5) | Typed decision tables and explicit rule hit policies | FEEL and the full decision metamodel would widen the expression surface substantially | Decision tables remain deferred unless real flows demonstrate that the closed predicate grammar is insufficient |
+| [CMMN](https://www.omg.org/spec/CMMN/) | Human-led cases with milestones and partially ordered work | Discretionary planning conflicts with compiler-proven rails and liveness | Not a core model; reconsider only if operator-directed adaptive case work enters scope |
 | [VoiceXML](https://www.w3.org/TR/voicexml21/) | Declarative forms, prompts, field collection, validation, and event handling for voice dialogs | Telephony-oriented XML and grammar execution predate tool-using LLM agents | Formal ancestor for declarative conversational collection |
 | [SCXML](https://www.w3.org/TR/scxml/) | Executable state-machine notation with events and transitions | Explicit general statecharts require authors to model graph mechanics that flowspec2 synthesizes | Formal ancestor for graph semantics, not the preferred authoring surface |
 | [LangGraph](https://docs.langchain.com/oss/python/langgraph/overview) | Stateful graph runtime for long-running agents and workflows | Runtime primitives and deployment configuration do not define this project's conversational source format | Execution target of the reference compiler |
@@ -55,6 +60,31 @@ This positioning is recorded in
 [ADR 0001](adr/0001-interoperability-boundaries.md).
 
 <!-- /section:positioning-decision -->
+<!-- section:borrowed-constraints -->
+
+## Borrowed constraints
+
+The comparison changes contracts, not the format's specialization:
+
+- Rasa CALM validates a compact conversational command boundary: language models
+  may identify a flow, value, correction, or recovery intent, while the runtime
+  owns transitions. FlowSpec2 therefore exposes exact closed correction and
+  interaction schemas instead of accepting fuzzy control text.
+- SCXML and Open Workflow make deterministic traces and conformance corpora more
+  useful than prose-only lifecycle claims. FlowSpec2 conformance covers source
+  validation, ordered diagnostics, canonical IR/digests, and executable traces.
+- Arazzo makes asynchronous correlation part of the operation contract rather
+  than host convention. External waits therefore pin a versioned token schema,
+  correlation path, and duplicate/late-delivery policy.
+- BPMN distinguishes ending a pending interaction from undoing committed work.
+  FlowSpec2 models cancel/recovery now and defers compensation until multiple
+  committed effects make a reverse-order contract necessary.
+- General expression languages, remote references, discretionary planning,
+  loops, parallel task orchestration, and open extension fields remain outside
+  the stable core. They would make generation easier to improvise but harder to
+  link, prove, migrate, and execute reproducibly.
+
+<!-- /section:borrowed-constraints -->
 <!-- section:compatibility-strategy -->
 
 ## Compatibility strategy

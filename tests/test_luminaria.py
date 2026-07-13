@@ -25,8 +25,9 @@ async def test_auto_flow_then_submission_fills_via_alias_map(luminaria):
     assert st.data["luminaria_intercaladas_bloco"] == "bloco"
     # derived lookup table (matches _classifica_defeito)
     assert st.data["luminaria_defeito_classificado"] == "Bloco ou grupo de luminárias apagadas"
-    # summary was skipped on the Flow submission
-    assert st.data["service_confirmed"] is True
+    # summary was satisfied by its explicit skip_when without inventing consent
+    assert "service_confirmed" not in st.data
+    assert st.internal["_slot_skipped:service_confirmed"] is True
     # now collecting the address
     assert "endereço" in require_agent_response(st).description.lower()
 
@@ -103,7 +104,7 @@ async def test_correction_clears_slot_and_dependents(luminaria):
     st = await step(luminaria, st, {"ponto_referencia": "padaria"})
     st = await step(luminaria, st, {"identification_method": "anonimo"})
     # at confirm_ticket_data -> request a correction of the defect
-    st = await step(luminaria, st, {"correcao": "defeito"})
+    st = await step(luminaria, st, {"correcao": "luminaria_defeito"})
     # defect + its requires-dependents + the derived classification are cleared
     assert "luminaria_defeito" not in st.data
     assert "luminaria_quantidade" not in st.data

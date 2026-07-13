@@ -60,6 +60,26 @@ def test_nullable_member():
     assert model.model_validate({"loc": "praca"}).model_dump()["loc"] == "Praça"
 
 
+def test_categorical_null_requires_slot_nullable_contract() -> None:
+    model = make_slot_model("loc", "LuminariaLocalizacao", DOMAINS, nullable=False)
+
+    with pytest.raises(ValidationError):
+        model.model_validate({"loc": None})
+    assert None not in model.model_json_schema()["properties"]["loc"]["enum"]
+
+
+def test_nullable_flag_applies_to_non_categorical_domains():
+    model = make_slot_model("email", "Email", DOMAINS, nullable=True)
+
+    assert model.model_validate({"email": None}).model_dump()["email"] is None
+    assert {
+        branch.get("type") for branch in model.model_json_schema()["properties"]["email"]["anyOf"]
+    } == {
+        "string",
+        "null",
+    }
+
+
 def test_payload_schema_has_enum():
     model = make_slot_model("luminaria_defeito", "LuminariaDefeito", DOMAINS)
     js = model.model_json_schema()
@@ -86,6 +106,23 @@ def test_affirmation(raw, expected):
 def test_emoji_veto_overrides_words():
     # negative emoji vetoes even alongside an affirmative word
     assert parse_affirmation("sim 👎") is False
+
+
+def test_boolean_aliases_honor_accent_fold() -> None:
+    accent_sensitive_domains = {
+        "Boolean": {
+            "type": "bool",
+            "normalize": {
+                "accent_fold": False,
+                "synonyms": {"não mesmo": False},
+            },
+        }
+    }
+    model = make_slot_model("accepted", "Boolean", accent_sensitive_domains)
+
+    assert model.model_validate({"accepted": "não mesmo"}).model_dump()["accepted"] is False
+    with pytest.raises(ValidationError):
+        model.model_validate({"accepted": "nao mesmo"})
 
 
 def test_cpf_checksum():
