@@ -121,6 +121,22 @@ def test_cli_writes_canonical_evidence_with_exact_captures(
     assert "digest=" in standard_output
     assert "authored_source" not in standard_output
 
+    assert (
+        main(
+            [
+                "authoring-evidence-verify",
+                str(output_path),
+                "--repository-revision",
+                "revision-under-test",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    verification_output = json.loads(capsys.readouterr().out)
+    assert verification_output["digest"] == evidence_document["digest"]
+    assert "authored_source" not in verification_output
+
 
 def test_cli_writes_completed_semantic_failure_and_returns_failure(
     tmp_path: Path,

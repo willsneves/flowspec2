@@ -440,8 +440,12 @@ exact source captures, corpus/profile identities, provider configuration,
 prompt identity, package version, and repository revision in one canonical
 content-addressed evidence envelope. Every Gemini capture also records the
 provider-reported effective model version rather than treating the requested
-model alias as the executed identity. Network use requires an explicit CLI
-opt-in; a configured credential alone is never consent.
+model alias as the executed identity. The envelope binds the configured
+correction limit. Offline verification validates its closed schema and digest,
+matches installed contracts, checks every capture hash, and deterministically
+replays the complete report. The digest provides integrity rather than signer
+authenticity. Network use requires an explicit CLI opt-in; a configured
+credential alone is never consent.
 
 The included corpus is a deterministic infrastructure baseline, not evidence
 about model quality. A format revision may become stable only after controlled

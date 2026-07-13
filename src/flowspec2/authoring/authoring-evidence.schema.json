@@ -1,0 +1,455 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prefeitura.rio/flowspec2/authoring-benchmark-evidence-2.json",
+  "title": "FlowSpec2 authoring benchmark evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "package_version",
+    "repository_revision",
+    "benchmark",
+    "corpus",
+    "profile",
+    "source_adapter",
+    "provider",
+    "captures",
+    "report",
+    "digest"
+  ],
+  "properties": {
+    "format": {
+      "const": "flowspec2/authoring-benchmark-evidence@2"
+    },
+    "package_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark": {
+      "$ref": "#/$defs/benchmark"
+    },
+    "corpus": {
+      "$ref": "#/$defs/corpus"
+    },
+    "profile": {
+      "$ref": "#/$defs/profile"
+    },
+    "source_adapter": {
+      "$ref": "#/$defs/sourceAdapter"
+    },
+    "provider": {
+      "$ref": "#/$defs/provider"
+    },
+    "captures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/capture"
+      }
+    },
+    "report": {
+      "$ref": "#/$defs/report"
+    },
+    "digest": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_correction_rounds"
+      ],
+      "properties": {
+        "max_correction_rounds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "corpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "case_format",
+        "identifier",
+        "digest",
+        "case_identifiers"
+      ],
+      "properties": {
+        "format": {
+          "const": "flowspec2/authoring-corpus@1"
+        },
+        "case_format": {
+          "const": "flowspec2/authoring-case@1"
+        },
+        "identifier": {
+          "$ref": "#/$defs/identifier"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "case_identifiers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identifier",
+        "digest"
+      ],
+      "properties": {
+        "identifier": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "sourceAdapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "implementation",
+        "version"
+      ],
+      "properties": {
+        "format": {
+          "const": "flowspec/2"
+        },
+        "implementation": {
+          "const": "FlowSpec2JsonAdapter"
+        },
+        "version": {
+          "const": "1"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identifier",
+        "model",
+        "sdk",
+        "sdk_version",
+        "prompt_format",
+        "prompt_digest",
+        "generation_configuration"
+      ],
+      "properties": {
+        "identifier": {
+          "$ref": "#/$defs/identifier"
+        },
+        "model": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "sdk": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "sdk_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "prompt_format": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "prompt_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "generation_configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_identifier",
+        "correction_round",
+        "authored_source",
+        "source_sha256",
+        "effective_model_version"
+      ],
+      "properties": {
+        "case_identifier": {
+          "$ref": "#/$defs/identifier"
+        },
+        "correction_round": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "authored_source": {
+          "type": "string"
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "effective_model_version": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "benchmark_identifier",
+        "format_identifier",
+        "profile_identifier",
+        "successful_cases",
+        "total_cases",
+        "total_attempts",
+        "total_correction_rounds",
+        "token_proxy",
+        "case_results"
+      ],
+      "properties": {
+        "benchmark_identifier": {
+          "$ref": "#/$defs/identifier"
+        },
+        "format_identifier": {
+          "const": "flowspec/2"
+        },
+        "profile_identifier": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "successful_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_cases": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "total_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "total_correction_rounds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "token_proxy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "bytes_per_unit"
+          ],
+          "properties": {
+            "method": {
+              "const": "utf8_byte_quartets"
+            },
+            "bytes_per_unit": {
+              "const": 4
+            }
+          }
+        },
+        "case_results": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/caseResult"
+          }
+        }
+      }
+    },
+    "caseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_identifier",
+        "feature_tags",
+        "format_identifier",
+        "succeeded",
+        "correction_rounds",
+        "attempts"
+      ],
+      "properties": {
+        "case_identifier": {
+          "$ref": "#/$defs/identifier"
+        },
+        "feature_tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "format_identifier": {
+          "const": "flowspec/2"
+        },
+        "succeeded": {
+          "type": "boolean"
+        },
+        "correction_rounds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attempts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/attempt"
+          }
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "correction_round",
+        "source_sha256",
+        "raw_source_bytes",
+        "canonical_source_bytes",
+        "token_proxy_units",
+        "compilation",
+        "succeeded",
+        "diagnostics"
+      ],
+      "properties": {
+        "correction_round": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_source_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "canonical_source_bytes": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "token_proxy_units": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compilation": {
+          "enum": [
+            "not_requested",
+            "skipped",
+            "succeeded",
+            "failed"
+          ]
+        },
+        "succeeded": {
+          "type": "boolean"
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "severity",
+        "path",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "severity": {
+          "enum": [
+            "warning",
+            "error"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^$|^/"
+        },
+        "message": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "related_locations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnosticLocation"
+          }
+        },
+        "suggested_fix": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "diagnosticLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^$|^/"
+        },
+        "message": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    }
+  }
+}

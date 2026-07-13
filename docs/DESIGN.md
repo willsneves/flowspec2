@@ -3,13 +3,13 @@
 Table of Contents:
 
 - Files: 28 <!-- section:files -->
-- Authoring-to-execution pipeline: 57 <!-- section:authoring-execution-pipeline -->
-- The one idea: the boundary is the closed value-domain: 114 <!-- section:closed-value-domain -->
-- Top-level shape (the two tiers): 131 <!-- section:top-level-shape -->
-- Mapping table — every construct → its LangGraph primitive: 152 <!-- section:mapping-table -->
-- Rationale (1 page): 212 <!-- section:rationale -->
-    - Rejected alternatives: 229 <!-- section:rationale-rejected-alternatives -->
-- How this was produced: 245 <!-- section:production-method -->
+- Authoring-to-execution pipeline: 59 <!-- section:authoring-execution-pipeline -->
+- The one idea: the boundary is the closed value-domain: 119 <!-- section:closed-value-domain -->
+- Top-level shape (the two tiers): 136 <!-- section:top-level-shape -->
+- Mapping table — every construct → its LangGraph primitive: 157 <!-- section:mapping-table -->
+- Rationale (1 page): 217 <!-- section:rationale -->
+    - Rejected alternatives: 234 <!-- section:rationale-rejected-alternatives -->
+- How this was produced: 250 <!-- section:production-method -->
 
 <!-- /section:toc -->
 
@@ -40,6 +40,8 @@ that graph as a callable tool.
 | [`../src/flowspec2/authoring/corpus.py`](../src/flowspec2/authoring/corpus.py) | Packaged reference-corpus manifest, integrity checks, and content identity. |
 | [`../src/flowspec2/authoring/gemini.py`](../src/flowspec2/authoring/gemini.py) | Explicit-network Gemini source transport over the closed projection. |
 | [`../src/flowspec2/authoring/evidence.py`](../src/flowspec2/authoring/evidence.py) | Exact captures and content-addressed real-model evidence. |
+| [`../src/flowspec2/authoring/evidence_verification.py`](../src/flowspec2/authoring/evidence_verification.py) | Closed-schema verification and deterministic offline replay. |
+| [`../src/flowspec2/authoring/authoring-evidence.schema.json`](../src/flowspec2/authoring/authoring-evidence.schema.json) | Authoritative evidence-envelope schema. |
 | [`AUTHORING_BENCHMARK.md`](AUTHORING_BENCHMARK.md) | Evaluation protocol and real-model evidence requirements. |
 | [`FLOWSPEC3_DRAFT.md`](FLOWSPEC3_DRAFT.md) | Non-executable source preview, migration, and loss accounting. |
 | [`adr/0002-format-authoring-execution-boundary.md`](adr/0002-format-authoring-execution-boundary.md) | Decision record for the source/link/profile/IR boundary. |
@@ -106,7 +108,10 @@ from the rendered prompt. The resulting evidence envelope binds exact captured
 sources and provider-reported effective model versions to every report attempt
 and records only deterministic, non-secret provenance. This keeps provider
 operation at the edge while making later comparison and offline review
-independently verifiable.
+independently verifiable. Offline verification matches the installed package,
+corpus, profile, adapter, and correction protocol before replaying every exact
+capture and requiring complete report equality. Its content digest proves
+integrity rather than author identity; signatures remain an external concern.
 
 <!-- /section:authoring-execution-pipeline -->
 <!-- section:closed-value-domain -->
