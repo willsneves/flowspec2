@@ -14,11 +14,12 @@ def _address_flow_document(
     *,
     required: bool | None = True,
     address_required: bool = True,
+    needs_confirmation: bool = False,
     max_attempts: int = 1,
     on_exhaust: str = "reask",
 ) -> dict[str, Any]:
     subflow_configuration: dict[str, Any] = {
-        "needs_confirmation": False,
+        "needs_confirmation": needs_confirmation,
         "max_attempts": max_attempts,
         "on_exhaust": on_exhaust,
     }
@@ -159,3 +160,141 @@ async def test_address_end_completes_with_a_correlated_warning(
         getattr(log_record, "log_id", None) == state.agent_response.log_id
         for log_record in caplog.records
     )
+
+
+async def test_geocode_call_failure_is_correlated_and_retryable(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    tool_registry = default_tool_registry()
+    geocode_calls = 0
+
+    async def flaky_geocode(address: str) -> dict[str, Any]:
+        nonlocal geocode_calls
+        geocode_calls += 1
+        if geocode_calls == 1:
+            raise RuntimeError("geocoder unavailable")
+        return {
+            "status": "ok",
+            "needs_confirmation": False,
+            "address": {
+                "logradouro": address,
+                "kind": "rua",
+                "bairro": "Centro",
+                "municipio": "Rio de Janeiro",
+            },
+        }
+
+    tool_registry.register("geocode", flaky_geocode)
+    runtime = FlowRuntime(_address_flow_document(), tools=tool_registry)
+
+    with caplog.at_level(logging.ERROR, logger="flowspec2.nodes"):
+        state = await runtime.execute(
+            runtime.new_state("address-tool-retry"),
+            {"address": "Rua das Flores, 100"},
+        )
+
+    assert state.status == "error"
+    assert state.agent_response is not None
+    assert state.agent_response.log_id is not None
+    assert "address" not in state.data
+    assert any(
+        getattr(log_record, "log_id", None) == state.agent_response.log_id
+        for log_record in caplog.records
+    )
+
+    state = await runtime.execute(state, {"address": "Rua das Flores, 100"})
+
+    assert state.status == "completed"
+    assert state.data["address"]["logradouro"] == "Rua das Flores, 100"
+
+
+@pytest.mark.parametrize(
+    "malformed_geocode_result",
+    [
+        {"status": "ok", "needs_confirmation": False, "address": {}},
+        {"status": "ok", "needs_confirmation": False, "address": "not-an-object"},
+    ],
+)
+async def test_geocode_success_requires_a_meaningful_address(
+    malformed_geocode_result: dict[str, Any],
+) -> None:
+    tool_registry = default_tool_registry()
+
+    async def malformed_geocode(address: str) -> dict[str, Any]:
+        del address
+        return malformed_geocode_result
+
+    tool_registry.register("geocode", malformed_geocode)
+    runtime = FlowRuntime(_address_flow_document(), tools=tool_registry)
+
+    state = await runtime.execute(
+        runtime.new_state("address-contract-failure"),
+        {"address": "Rua das Flores, 100"},
+    )
+
+    assert state.status == "error"
+    assert state.agent_response is not None
+    assert state.agent_response.log_id is not None
+    assert "address" not in state.data
+
+
+async def test_ambiguous_address_confirmation_reasks_without_clearing_address() -> None:
+    runtime = FlowRuntime(_address_flow_document(needs_confirmation=True, max_attempts=2))
+    state = await runtime.execute(
+        runtime.new_state("ambiguous-address-confirmation"),
+        {"address": "Rua das Flores, 100"},
+    )
+
+    state = await runtime.execute(state, {"confirmacao": "talvez"})
+
+    assert state.status == "progress"
+    assert state.data["address"]["logradouro"] == "Rua das Flores, 100"
+    assert state.data["address_attempts"] == 1
+    assert state.agent_response is not None
+    assert state.agent_response.error_message == (
+        "não consegui identificar se a resposta foi sim ou não"
+    )
+
+    state = await runtime.execute(state, {"confirmacao": "sim"})
+
+    assert state.status == "completed"
+    assert state.data["address_confirmed"] is True
+    assert "address_attempts" not in state.data
+
+
+async def test_ambiguous_address_confirmation_uses_exhaustion_policy() -> None:
+    runtime = FlowRuntime(
+        _address_flow_document(
+            needs_confirmation=True,
+            max_attempts=1,
+            on_exhaust="skip",
+        )
+    )
+    state = await runtime.execute(
+        runtime.new_state("ambiguous-address-exhaustion"),
+        {"address": "Rua das Flores, 100"},
+    )
+
+    state = await runtime.execute(state, {"confirmacao": None})
+
+    assert state.status == "completed"
+    assert state.data["address_skipped"] is True
+    assert "address" not in state.data
+
+
+async def test_negative_address_confirmation_alone_clears_and_recollects() -> None:
+    runtime = FlowRuntime(_address_flow_document(needs_confirmation=True, max_attempts=2))
+    state = await runtime.execute(
+        runtime.new_state("negative-address-confirmation"),
+        {"address": "Rua das Flores, 100"},
+    )
+
+    state = await runtime.execute(state, {"confirmacao": "não"})
+
+    assert state.status == "progress"
+    assert "address" not in state.data
+    assert "address_completed" not in state.data
+    assert "address_attempts" not in state.data
+    assert state.agent_response is not None
+    assert state.agent_response.payload_schema is not None
+    assert "endereço completo" in state.agent_response.description.lower()

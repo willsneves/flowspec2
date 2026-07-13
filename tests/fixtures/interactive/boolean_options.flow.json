@@ -1,0 +1,126 @@
+{
+  "schema": "flowspec/2",
+  "flow": "boolean_options_contract",
+  "version": "1.0.0",
+  "route": {
+    "description": "Exercise canonical boolean options across collection and confirmation nodes."
+  },
+  "config": {
+    "identification_required": false
+  },
+  "domains": {
+    "SimNao": {
+      "type": "bool",
+      "normalize": {
+        "affirmation": true
+      }
+    }
+  },
+  "slots": {
+    "boolean_choice": {
+      "domain": "SimNao",
+      "required": true
+    },
+    "summary_confirmed": {
+      "domain": "SimNao"
+    },
+    "simple_confirmed": {
+      "domain": "SimNao"
+    },
+    "hub_confirmed": {
+      "domain": "SimNao"
+    }
+  },
+  "path": [
+    {
+      "step": "collect_boolean_choice",
+      "slot": "boolean_choice",
+      "prompt": {
+        "text": "Choose a boolean value."
+      },
+      "interactive": {
+        "kind": "buttons",
+        "field": "boolean_choice_button",
+        "from_domain": "SimNao",
+        "options_when": [
+          {
+            "value": false,
+            "gate": {
+              "eq": [
+                "config.identification_required",
+                false
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step": "confirm_summary",
+      "confirm": "summary_confirmed",
+      "prompt": {
+        "text": "Confirm the summary?"
+      },
+      "interactive": {
+        "kind": "buttons",
+        "field": "summary_confirmation_button",
+        "from_domain": "SimNao"
+      },
+      "on_reject": {
+        "end": "Summary rejected."
+      }
+    },
+    {
+      "step": "confirm_simple",
+      "confirm": "simple_confirmed",
+      "prompt": {
+        "text": "Confirm this choice?"
+      },
+      "interactive": {
+        "kind": "buttons",
+        "field": "simple_confirmation_button",
+        "from_domain": "SimNao"
+      }
+    },
+    {
+      "step": "confirm_hub",
+      "confirm": "hub_confirmed",
+      "correctable": true,
+      "prompt": {
+        "text": "Confirm all values?"
+      },
+      "interactive": {
+        "kind": "buttons",
+        "field": "hub_confirmation_button",
+        "from_domain": "SimNao"
+      }
+    },
+    {
+      "terminal": true
+    }
+  ],
+  "confirm": {
+    "step": "confirm_hub",
+    "slot": "hub_confirmed",
+    "on_confirm": "finish_boolean_options",
+    "correctable": [
+      "boolean_choice"
+    ]
+  },
+  "terminal": {
+    "step": "finish_boolean_options",
+    "tool": "sgrc_open_ticket",
+    "idempotent": true,
+    "outcomes": {
+      "success": {
+        "reset_next": true
+      },
+      "retryable": {
+        "preserve_state": true
+      },
+      "fatal": {
+        "reset_next": true
+      }
+    }
+  }
+}

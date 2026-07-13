@@ -137,6 +137,10 @@ def test_export_projects_linear_collection_profile() -> None:
         "title": "a=b",
         "payload": "/SetSlots(category=a=b)",
     }
+    assert exported_domain["responses"]["utter_ask_portable_report_confirmed_3"][0]["buttons"] == [
+        {"title": "Sim", "payload": "/SetSlots(confirmed=true)"},
+        {"title": "Não", "payload": "/SetSlots(confirmed=false)"},
+    ]
 
 
 def test_runtime_semantics_warning_covers_interruptions_and_repairs() -> None:
@@ -172,6 +176,16 @@ def test_export_aggregates_all_flowspec_schema_failures() -> None:
     ]
     assert len(schema_diagnostics) >= 6
     assert len({diagnostic.source_path for diagnostic in schema_diagnostics}) >= 5
+
+
+def test_export_treats_removed_interactive_gate_as_invalid_source() -> None:
+    flow_document = portable_flow()
+    flow_document["path"][0]["interactive"]["gate"] = {"literal": True}
+
+    with pytest.raises(CompatibilityError) as raised_error:
+        export_rasa(flow_document, allow_lossy=True)
+
+    assert diagnostic_codes(raised_error.value) == {"FLOWSPEC_INVALID_DOCUMENT"}
 
 
 def test_rasa_bundle_is_deeply_immutable_by_defensive_copy() -> None:
@@ -216,9 +230,11 @@ def test_export_allow_lossy_never_permits_executable_contract_loss() -> None:
     flow_document["domains"]["Details"]["optional"] = True
     flow_document["domains"]["Category"]["normalize"] = {"synonyms": {"lamp": "lighting"}}
     flow_document["slots"]["category"]["prefill_sources"] = ["trusted_source"]
+    flow_document["slots"]["category"]["fill_only_when_asked"] = True
     flow_document["route"]["entry_args_schema"] = {
         "type": "object",
-        "properties": {"category": {"type": "string"}},
+        "additionalProperties": False,
+        "properties": {"category": {"enum": ["a=b", "lighting"]}},
     }
     flow_document["capabilities"] = {"media_out": ["location"]}
 
@@ -227,6 +243,7 @@ def test_export_allow_lossy_never_permits_executable_contract_loss() -> None:
 
     assert diagnostic_codes(raised_error.value) == {
         "RASA_FLOW_VERSION_UNSUPPORTED",
+        "RASA_FILL_ONLY_WHEN_ASKED_UNSUPPORTED",
         "RASA_ENTRY_ARGUMENTS_UNSUPPORTED",
         "RASA_CAPABILITY_UNSUPPORTED",
         "RASA_NORMALIZATION_UNSUPPORTED",
@@ -239,6 +256,7 @@ def test_export_allow_lossy_never_permits_executable_contract_loss() -> None:
         for diagnostic in raised_error.value.report.blocking_diagnostics(allow_lossy=True)
     } == {
         "RASA_ENTRY_ARGUMENTS_UNSUPPORTED",
+        "RASA_FILL_ONLY_WHEN_ASKED_UNSUPPORTED",
         "RASA_CAPABILITY_UNSUPPORTED",
         "RASA_NORMALIZATION_UNSUPPORTED",
         "RASA_OPTIONAL_EMPTY_TEXT_UNSUPPORTED",
@@ -279,6 +297,18 @@ def test_export_control_flow_errors_block_even_when_lossy_is_allowed() -> None:
         "RASA_EXTERNAL_WAIT_UNSUPPORTED",
     }.issubset(diagnostic_codes(raised_error.value))
     assert len(raised_error.value.report.blocking_diagnostics(allow_lossy=True)) >= 3
+
+
+def test_export_checks_transitive_subflow_tools_before_reporting_profile_gap() -> None:
+    flow_document = portable_flow()
+    flow_document["uses"] = [{"ref": "address@1", "with": {"required": False}}]
+    flow_document["path"].insert(2, {"use": "address@1"})
+
+    with pytest.raises(CompatibilityError) as raised_error:
+        export_rasa(flow_document, allow_lossy=True)
+
+    assert "RASA_SUBFLOW_UNSUPPORTED" in diagnostic_codes(raised_error.value)
+    assert "FLOWSPEC_NON_EXECUTABLE" not in diagnostic_codes(raised_error.value)
 
 
 def test_export_terminal_requires_explicit_custom_action_adapter() -> None:
@@ -348,14 +378,11 @@ def test_export_rejects_confirmation_semantics_even_when_lossy_is_allowed() -> N
     assert "RASA_CONFIRM_SEMANTICS_UNSUPPORTED" in diagnostic_codes(raised_error.value)
 
 
-@pytest.mark.parametrize("unsupported_value", ["", "comma,value"])
-def test_export_drops_all_buttons_when_any_setslots_value_is_not_encodable(
-    unsupported_value: str,
-) -> None:
+def test_export_drops_all_buttons_when_any_setslots_value_is_not_encodable() -> None:
     flow_document = portable_flow()
     flow_document["domains"]["Category"]["values"] = [
         "a=b",
-        unsupported_value,
+        "comma,value",
     ]
 
     with pytest.raises(CompatibilityError) as raised_error:
@@ -369,6 +396,17 @@ def test_export_drops_all_buttons_when_any_setslots_value_is_not_encodable(
     conversion = export_rasa(flow_document, allow_lossy=True)
     response = conversion.artifact.domain["responses"]["utter_ask_portable_report_category_1"][0]
     assert response == {"text": "Which category applies?"}
+
+
+def test_export_rejects_empty_categorical_token_as_structurally_invalid() -> None:
+    flow_document = portable_flow()
+    flow_document["domains"]["Category"]["values"] = ["a=b", ""]
+
+    with pytest.raises(CompatibilityError) as raised_error:
+        export_rasa(flow_document, allow_lossy=True)
+
+    assert diagnostic_codes(raised_error.value) == {"FLOWSPEC_INVALID_DOCUMENT"}
+    assert raised_error.value.report.diagnostics[0].source_path == "$.domains.Category"
 
 
 def test_export_rejects_rasa_response_interpolation_in_text_and_buttons() -> None:
@@ -438,10 +476,9 @@ def test_export_rejects_duplicate_derived_compiler_node_ids() -> None:
     assert "FLOWSPEC_NON_EXECUTABLE" in diagnostic_codes(raised_error.value)
 
 
-def test_export_rejects_duplicate_and_empty_explicit_step_ids() -> None:
+def test_export_rejects_duplicate_explicit_step_ids() -> None:
     flow_document = portable_flow()
     flow_document["path"][1]["step"] = flow_document["path"][0]["step"]
-    flow_document["path"][2]["step"] = ""
 
     with pytest.raises(CompatibilityError) as raised_error:
         export_rasa(flow_document, allow_lossy=True)
@@ -449,11 +486,21 @@ def test_export_rejects_duplicate_and_empty_explicit_step_ids() -> None:
     assert {
         "FLOWSPEC_NON_EXECUTABLE",
         "RASA_DUPLICATE_STEP_ID",
-        "RASA_STEP_ID_INVALID",
     }.issubset(diagnostic_codes(raised_error.value))
 
 
-def test_export_rejects_setslots_forbidden_slot_name_but_not_equals_in_value() -> None:
+def test_export_rejects_empty_step_id_as_structurally_invalid() -> None:
+    flow_document = portable_flow()
+    flow_document["path"][2]["step"] = ""
+
+    with pytest.raises(CompatibilityError) as raised_error:
+        export_rasa(flow_document, allow_lossy=True)
+
+    assert diagnostic_codes(raised_error.value) == {"FLOWSPEC_INVALID_DOCUMENT"}
+    assert raised_error.value.report.diagnostics[0].source_path == "$.path[2]"
+
+
+def test_export_rejects_forbidden_slot_name_as_structurally_invalid() -> None:
     flow_document = portable_flow()
     slot_declaration = flow_document["slots"].pop("category")
     flow_document["slots"]["category=bad"] = slot_declaration
@@ -461,12 +508,9 @@ def test_export_rejects_setslots_forbidden_slot_name_but_not_equals_in_value() -
     flow_document["path"][0]["interactive"]["field"] = "category=bad"
 
     with pytest.raises(CompatibilityError) as raised_error:
-        export_rasa(flow_document)
-    assert diagnostic_codes(raised_error.value) == {
-        "RASA_FLOW_VERSION_UNSUPPORTED",
-        "RASA_SETSLOTS_SLOT_NAME_UNSUPPORTED",
-        "RASA_LLM_SLOT_SEMANTICS_UNSUPPORTED",
-    }
+        export_rasa(flow_document, allow_lossy=True)
+
+    assert diagnostic_codes(raised_error.value) == {"FLOWSPEC_INVALID_DOCUMENT"}
 
 
 def test_import_portable_fixture_and_validate_generated_flowspec() -> None:
@@ -503,6 +547,11 @@ def test_import_portable_fixture_and_validate_generated_flowspec() -> None:
         },
     }
     assert conversion.artifact["path"][2]["slot"] == "confirmed"
+    assert conversion.artifact["path"][2]["interactive"] == {
+        "kind": "buttons",
+        "field": "confirmed",
+        "from_domain": "rasa_confirmed",
+    }
     validate_flow(conversion.artifact)
     assert compile_flow(conversion.artifact).entry_node_id == "__init__"
 
@@ -812,7 +861,7 @@ def test_import_final_action_uses_explicit_conservative_terminal_defaults() -> N
         "idempotent": False,
         "outcomes": {
             "success": {"reset_next": True},
-            "retryable": {"preserve_state": True},
+            "retryable": {"preserve_state": False},
             "fatal": {"reset_next": True},
         },
     }

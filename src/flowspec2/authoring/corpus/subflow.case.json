@@ -1,0 +1,66 @@
+{
+  "format": "flowspec2/authoring-case@1",
+  "identifier": "address_subflow",
+  "prompt": "Author a flow that delegates required address collection and confirmation to address@1 with required and needs_confirmation both enabled.",
+  "feature_tags": ["subflow", "address"],
+  "required_constructs": [
+    {
+      "identifier": "subflow-anchor",
+      "pointer_pattern": "/path/*/use",
+      "expected": "address@1"
+    },
+    {
+      "identifier": "subflow-declaration",
+      "pointer_pattern": "/uses/*/ref",
+      "expected": "address@1"
+    },
+    {
+      "identifier": "subflow-configuration",
+      "pointer_pattern": "/uses/*/with",
+      "expected": {
+        "required": true,
+        "needs_confirmation": true
+      }
+    }
+  ],
+  "source": {
+    "schema": "flowspec/2",
+    "flow": "address_collection",
+    "version": "1.0.0",
+    "route": {
+      "description": "Collect and confirm the address for a municipal request."
+    },
+    "domains": {
+      "ReferenceNote": {
+        "type": "free_text",
+        "optional": true
+      }
+    },
+    "slots": {
+      "reference_note": {
+        "domain": "ReferenceNote"
+      }
+    },
+    "path": [
+      {
+        "step": "collect_reference_note",
+        "slot": "reference_note",
+        "prompt": {
+          "text": "Add an optional nearby reference point."
+        }
+      },
+      {
+        "use": "address@1"
+      }
+    ],
+    "uses": [
+      {
+        "ref": "address@1",
+        "with": {
+          "required": true,
+          "needs_confirmation": true
+        }
+      }
+    ]
+  }
+}

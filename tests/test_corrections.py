@@ -34,7 +34,7 @@ async def test_bug_a_address_correction_clears_dependents(luminaria):
 
     # correct the address -> address + its requires-dependents must be cleared,
     # so no stale quadra flag / reference point reaches the ticket.
-    st = await step(luminaria, st, {"correcao": "endereço"})
+    st = await step(luminaria, st, {"correcao": "address"})
     assert "address" not in st.data
     assert "reparo_luminaria_quadra_esportes" not in st.data
     assert "ponto_referencia" not in st.data
@@ -57,7 +57,7 @@ async def test_bug_b_text_reanswer_after_correction_is_not_swallowed(luminaria):
     st = await step(luminaria, st, {"confirmacao": "sim"})
     st = await step(luminaria, st, {"ponto_referencia": "esquina"})
     st = await step(luminaria, st, {"identification_method": "anonimo"})
-    st = await step(luminaria, st, {"correcao": "defeito"})  # clears luminaria_defeito
+    st = await step(luminaria, st, {"correcao": "luminaria_defeito"})  # clears luminaria_defeito
     assert "luminaria_defeito" not in st.data
 
     # the citizen TYPES the new defect — auto_flow must NOT re-fire and swallow it

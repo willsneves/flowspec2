@@ -1,0 +1,94 @@
+{
+  "format": "flowspec2/authoring-case@1",
+  "identifier": "terminal_fulfillment",
+  "prompt": "Author a flow that collects problem_description, passes it to sgrc_open_ticket as problema, enables terminal idempotency, and stores result.protocolo as protocol_id.",
+  "feature_tags": ["terminal", "tool_contract", "idempotency"],
+  "required_constructs": [
+    {
+      "identifier": "terminal-marker",
+      "pointer_pattern": "/path/*/terminal",
+      "expected": true
+    },
+    {
+      "identifier": "terminal-tool",
+      "pointer_pattern": "/terminal/tool",
+      "expected": "sgrc_open_ticket"
+    },
+    {
+      "identifier": "terminal-idempotency",
+      "pointer_pattern": "/terminal/idempotent",
+      "expected": true
+    },
+    {
+      "identifier": "terminal-input",
+      "pointer_pattern": "/terminal/input",
+      "expected": [
+        {
+          "param": "problema",
+          "slot": "problem_description"
+        }
+      ]
+    },
+    {
+      "identifier": "terminal-output",
+      "pointer_pattern": "/terminal/outputs/protocol_id",
+      "expected": "result.protocolo"
+    }
+  ],
+  "source": {
+    "schema": "flowspec/2",
+    "flow": "terminal_ticket_fulfillment",
+    "version": "1.0.0",
+    "route": {
+      "description": "Collect a problem and create a municipal service ticket."
+    },
+    "domains": {
+      "ProblemDescription": {
+        "type": "free_text"
+      }
+    },
+    "slots": {
+      "problem_description": {
+        "domain": "ProblemDescription",
+        "required": true
+      }
+    },
+    "path": [
+      {
+        "step": "collect_problem_description",
+        "slot": "problem_description",
+        "prompt": {
+          "text": "Describe the service problem."
+        }
+      },
+      {
+        "terminal": true
+      }
+    ],
+    "terminal": {
+      "step": "open_ticket",
+      "tool": "sgrc_open_ticket",
+      "idempotent": true,
+      "input": [
+        {
+          "param": "problema",
+          "slot": "problem_description"
+        }
+      ],
+      "outputs": {
+        "protocol_id": "result.protocolo"
+      },
+      "outcomes": {
+        "success": {
+          "reset_next": true
+        },
+        "retryable": {
+          "preserve_state": true
+        },
+        "fatal": {
+          "reset_next": true
+        }
+      }
+    }
+  }
+}

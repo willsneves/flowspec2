@@ -1,0 +1,41 @@
+{
+  "format": "flowspec2/authoring-case@1",
+  "identifier": "linear_collection",
+  "prompt": "Author a flow that asks a citizen for a short description of a maintenance request.",
+  "feature_tags": ["linear", "collection"],
+  "required_constructs": [
+    {
+      "identifier": "collect-step",
+      "pointer_pattern": "/path/*/slot",
+      "expected": "request_description"
+    }
+  ],
+  "source": {
+    "schema": "flowspec/2",
+    "flow": "linear_maintenance_request",
+    "version": "1.0.0",
+    "route": {
+      "description": "Collect a short municipal maintenance request."
+    },
+    "domains": {
+      "RequestDescription": {
+        "type": "free_text"
+      }
+    },
+    "slots": {
+      "request_description": {
+        "domain": "RequestDescription",
+        "required": true
+      }
+    },
+    "path": [
+      {
+        "step": "collect_request_description",
+        "slot": "request_description",
+        "prompt": {
+          "text": "Describe the maintenance request."
+        }
+      }
+    ]
+  }
+}

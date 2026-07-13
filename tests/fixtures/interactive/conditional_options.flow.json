@@ -1,0 +1,51 @@
+{
+  "schema": "flowspec/2",
+  "flow": "conditional_options_contract",
+  "version": "1.0.0",
+  "route": {
+    "description": "Exercise conditional interactive options and payload-field binding."
+  },
+  "config": {
+    "identification_required": false
+  },
+  "domains": {
+    "IdentificationChoice": {
+      "type": "categorical",
+      "values": [
+        "identified",
+        "anonymous"
+      ]
+    }
+  },
+  "slots": {
+    "identification_choice": {
+      "domain": "IdentificationChoice",
+      "required": true
+    }
+  },
+  "path": [
+    {
+      "step": "collect_identification_choice",
+      "slot": "identification_choice",
+      "prompt": {
+        "text": "How would you like to continue?"
+      },
+      "interactive": {
+        "kind": "buttons",
+        "field": "identification_choice_button",
+        "from_domain": "IdentificationChoice",
+        "options_when": [
+          {
+            "value": "anonymous",
+            "gate": {
+              "eq": [
+                "config.identification_required",
+                false
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

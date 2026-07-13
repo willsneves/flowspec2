@@ -13,7 +13,8 @@
       "additionalProperties": false,
       "properties": {
         "payment_reference": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         }
       }
     }
@@ -52,6 +53,7 @@
     {
       "step": "confirm_payment_reference",
       "confirm": "payment_confirmed",
+      "correctable": true,
       "prompt": {
         "text": "Is the payment reference correct?"
       }
@@ -115,6 +117,25 @@
       "kind": "cta_url",
       "step": "await_payment",
       "resume_on": "payment_token",
+      "resume": {
+        "version": "1",
+        "schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "receipt": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "receipt"
+          ]
+        },
+        "correlation": "$token.receipt",
+        "duplicate": "ignore",
+        "late": "reject"
+      },
       "on_resume": {
         "set": {
           "payment_receipt": "$token.receipt"

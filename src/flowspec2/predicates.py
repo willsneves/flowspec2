@@ -9,6 +9,7 @@ Grammar (one operator per object)::
 
     {"in":  ["slots.x", ["a", "b"]]}      # resolved(x) in the literal list
     {"eq":  ["slots.x", "literal"]}       # resolved(x) == literal (either side may be a ref)
+    {"eq":  ["slots.x", {"literal": "config.flag"}]}  # namespaced literal
     {"ne":  ["slots.x", "literal"]}
     {"is_present": "slots.x"}              # filled and non-null/non-empty
     {"and": [<pred>, ...]}
@@ -22,14 +23,14 @@ Namespaces: ``slots.`` (state.data), ``internal.`` (state.internal),
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypeGuard
 
 from .models import ServiceState
 
 NAMESPACES = ("slots", "internal", "payload", "config", "address")
 
 
-def _is_ref(value: Any) -> bool:
+def _is_ref(value: Any) -> TypeGuard[str]:
     return isinstance(value, str) and "." in value and value.split(".", 1)[0] in NAMESPACES
 
 
@@ -44,13 +45,19 @@ def _resolve(ref: str, state: ServiceState, config: dict[str, Any]) -> Any:
     if ns == "config":
         return config.get(key)
     if ns == "address":
-        address = state.data.get("address") or {}
-        return address.get(key) if isinstance(address, dict) else None
+        resolved: Any = state.data.get("address") or {}
+        for path_segment in key.split("."):
+            if not isinstance(resolved, dict) or path_segment not in resolved:
+                return None
+            resolved = resolved[path_segment]
+        return resolved
     raise ValueError(f"unknown predicate namespace: {ns!r}")
 
 
 def _operand(value: Any, state: ServiceState, config: dict[str, Any]) -> Any:
-    """A namespaced string is resolved; anything else is a literal."""
+    """Resolve namespaced strings and unwrap explicit ambiguous literals."""
+    if isinstance(value, dict) and set(value) == {"literal"}:
+        return value["literal"]
     return _resolve(value, state, config) if _is_ref(value) else value
 
 

@@ -11,6 +11,7 @@ from typing import Any
 import jsonschema
 import pytest
 
+from flowspec2 import FlowLinkError
 from flowspec2.compat.models import CompatibilityError
 from flowspec2.compat.open_workflow import (
     OPEN_WORKFLOW_PROFILE_ID,
@@ -164,20 +165,35 @@ def test_export_and_import_round_trip_without_mutating_inputs() -> None:
     assert imported_flow.report.diagnostics == ()
     assert source_flow == source_flow_snapshot
     assert exported_workflow == exported_workflow_snapshot
-    compile_flow(imported_flow.artifact)
+    with pytest.raises(FlowLinkError, match="FLOWSPEC_PROFILE_TOOL_UNAVAILABLE"):
+        compile_flow(imported_flow.artifact)
 
 
-def test_invalid_entry_schema_is_preserved_but_omitted_from_ows_input() -> None:
+def test_compile_only_terminal_contract_materializes_shared_output_paths() -> None:
+    source_flow = _portable_flow()
+    source_flow["terminal"]["outputs"] = {
+        "recorded_status": "result.recorded.status",
+        "repeated_status": "result.recorded.status",
+        "recorded_envelope": "result.recorded",
+        "protocol_status": "result.status",
+    }
+
+    exported_workflow = export_open_workflow(source_flow).artifact
+    imported_flow = import_open_workflow(exported_workflow).artifact
+
+    assert imported_flow["terminal"]["outputs"] == source_flow["terminal"]["outputs"]
+
+
+def test_export_rejects_semantically_invalid_entry_schema() -> None:
     source_flow = _portable_flow()
     source_flow["route"]["entry_args_schema"] = {"type": 42}
 
-    conversion = export_open_workflow(source_flow)
+    with pytest.raises(CompatibilityError) as captured_error:
+        export_open_workflow(source_flow)
 
-    assert "input" not in conversion.artifact
-    assert tuple(diagnostic.code for diagnostic in conversion.report.diagnostics) == (
-        "open_workflow.entry_schema_omitted",
-    )
-    assert import_open_workflow(conversion.artifact).artifact == source_flow
+    diagnostic = captured_error.value.report.diagnostics[0]
+    assert diagnostic.code == "open_workflow.non_executable_flowspec"
+    assert "FLOWSPEC_SEMANTIC_INVALID_ENTRY_SCHEMA" in diagnostic.message
 
 
 def test_import_rejects_arbitrary_open_workflow_document() -> None:
@@ -390,7 +406,7 @@ def test_export_rejects_schema_valid_flow_with_duplicate_compiled_node_ids() -> 
 
     diagnostic = captured_error.value.report.diagnostics[0]
     assert diagnostic.code == "open_workflow.non_executable_flowspec"
-    assert "duplicate node ids" in diagnostic.message
+    assert "FLOWSPEC_SEMANTIC_DUPLICATE_STEP_ID" in diagnostic.message
 
 
 def test_import_rejects_profile_with_duplicate_compiled_node_ids() -> None:
@@ -404,4 +420,4 @@ def test_import_rejects_profile_with_duplicate_compiled_node_ids() -> None:
 
     diagnostic = captured_error.value.report.diagnostics[0]
     assert diagnostic.code == ("open_workflow.non_executable_reconstructed_flowspec")
-    assert "duplicate node ids" in diagnostic.message
+    assert "FLOWSPEC_SEMANTIC_DUPLICATE_STEP_ID" in diagnostic.message

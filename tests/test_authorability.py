@@ -3,7 +3,7 @@ from a one-line description compiles and runs without touching the library."""
 
 from __future__ import annotations
 
-from conftest import step
+from conftest import require_agent_response, step
 
 from flowspec2 import FlowRuntime, validate_flow
 
@@ -15,6 +15,7 @@ async def test_buraco_runs_end_to_end(buraco):
     st = await step(buraco, st, {"address": "Av. Brasil, 1000"})
     st = await step(buraco, st, {"confirmacao": "sim"})
     st = await step(buraco, st, {"identification_method": "anonimo"})
+    assert (require_agent_response(st).interactive or {})["field"] == "confirmacao"
     st = await step(buraco, st, {"confirmacao": "sim"})
     assert st.status == "completed"
     assert st.data["protocol_id"].startswith("SGRC-")
@@ -113,6 +114,7 @@ async def test_new_flow_compiles_and_runs():
     st = await step(rt, st, {"address": "Rua do Lote, 7"})
     st = await step(rt, st, {"confirmacao": "sim"})  # confirm address
     st = await step(rt, st, {"identification_method": "anonimo"})
+    assert (require_agent_response(st).interactive or {})["field"] == "confirmacao"
     st = await step(rt, st, {"confirmacao": "sim"})  # confirm ticket -> open
     assert st.status == "completed"
     assert st.data["protocol_id"].startswith("SGRC-")
