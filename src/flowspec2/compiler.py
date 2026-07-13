@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 from itertools import product
 from typing import Any, Callable, Final, Optional, cast
-from urllib.parse import unquote
 
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError
@@ -60,6 +59,15 @@ from .nodes import (
     make_terminal_node,
 )
 from .observability import SnowflakeIdGenerator, default_log_id_generator
+from .schema_contracts import (
+    schema_reference_target as _schema_reference_target,
+)
+from .schema_contracts import (
+    validate_resume_token_schema as _validate_resume_token_schema,
+)
+from .schema_contracts import (
+    validate_safe_local_schema_references as _validate_safe_local_schema_references,
+)
 from .subflows import SubflowDefinition, SubflowRegistry, default_subflows
 from .tools import ToolDefinition, ToolRegistry, default_tool_registry
 
@@ -67,12 +75,6 @@ END: Final[str] = LANGGRAPH_END
 _CONTRACT_INVALID: Final[int] = -1
 _CONTRACT_UNKNOWN: Final[int] = 0
 _CONTRACT_VALID: Final[int] = 1
-_DRAFT_2020_12_DIALECTS: Final[frozenset[str]] = frozenset(
-    {
-        "https://json-schema.org/draft/2020-12/schema",
-        "https://json-schema.org/draft/2020-12/schema#",
-    }
-)
 _RESUME_REFERENCE_PATTERN: Final[re.Pattern[str]] = re.compile(
     r"^\$token(?:\.[A-Za-z][A-Za-z0-9_]*)+$"
 )
@@ -504,202 +506,6 @@ def _validate_binding_map(
                 or any(not segment for segment in reference_path.split("."))
             ):
                 raise ValueError(f"{location}.{target} must use {prefix}path")
-
-
-def _schema_anchor_target(root_schema: Any, anchor: str) -> Any:
-    matching_targets: list[Any] = []
-
-    def visit(schema_fragment: Any) -> None:
-        if isinstance(schema_fragment, Mapping):
-            if schema_fragment.get("$anchor") == anchor:
-                matching_targets.append(schema_fragment)
-            for nested_schema in schema_fragment.values():
-                visit(nested_schema)
-        elif isinstance(schema_fragment, (list, tuple)):
-            for nested_schema in schema_fragment:
-                visit(nested_schema)
-
-    visit(root_schema)
-    if len(matching_targets) != 1:
-        raise ValueError(
-            f"local tool schema anchor {anchor!r} must resolve exactly once; "
-            f"resolved {len(matching_targets)} times"
-        )
-    return matching_targets[0]
-
-
-def _schema_reference_target(root_schema: Any, reference: str) -> Any:
-    fragment = unquote(reference.removeprefix("#"))
-    if not fragment:
-        return root_schema
-    if not fragment.startswith("/"):
-        return _schema_anchor_target(root_schema, fragment)
-
-    referenced_schema = root_schema
-    for encoded_segment in fragment[1:].split("/"):
-        reference_segment = encoded_segment.replace("~1", "/").replace("~0", "~")
-        if isinstance(referenced_schema, Mapping) and reference_segment in referenced_schema:
-            referenced_schema = referenced_schema[reference_segment]
-            continue
-        if isinstance(referenced_schema, (list, tuple)) and reference_segment.isdigit():
-            reference_index = int(reference_segment)
-            if reference_index < len(referenced_schema):
-                referenced_schema = referenced_schema[reference_index]
-                continue
-        raise ValueError(f"local tool schema reference does not resolve: {reference!r}")
-    return referenced_schema
-
-
-def _validate_safe_local_schema_references(
-    schema: Any,
-    *,
-    location: str,
-) -> None:
-    """Reject reference features whose meaning can escape the embedded schema."""
-
-    reference_edges: dict[int, int] = {}
-    schema_nodes: dict[int, Any] = {}
-
-    def collect(schema_fragment: Any, *, is_root: bool) -> None:
-        if isinstance(schema_fragment, Mapping):
-            fragment_identifier = id(schema_fragment)
-            schema_nodes[fragment_identifier] = schema_fragment
-            if any(
-                dynamic_keyword in schema_fragment
-                for dynamic_keyword in (
-                    "$dynamicAnchor",
-                    "$dynamicRef",
-                    "$recursiveAnchor",
-                    "$recursiveRef",
-                )
-            ):
-                raise ValueError(f"{location} does not support dynamic schema references")
-            if not is_root and "$id" in schema_fragment:
-                raise ValueError(f"{location} does not support nested $id resources")
-            if (reference := schema_fragment.get("$ref")) is not None:
-                if not isinstance(reference, str):
-                    raise ValueError(f"{location} $ref values must be strings")
-                if not reference.startswith("#"):
-                    raise ValueError(
-                        f"{location} only supports local $ref values, got {reference!r}"
-                    )
-                try:
-                    reference_target = _schema_reference_target(schema, reference)
-                except ValueError as reference_error:
-                    raise ValueError(
-                        f"{location} contains an unresolved $ref: {reference!r}"
-                    ) from (reference_error)
-                if isinstance(reference_target, Mapping):
-                    target_identifier = id(reference_target)
-                    reference_edges[fragment_identifier] = target_identifier
-                    schema_nodes[target_identifier] = reference_target
-            for nested_schema in schema_fragment.values():
-                collect(nested_schema, is_root=False)
-        elif isinstance(schema_fragment, (list, tuple)):
-            for nested_schema in schema_fragment:
-                collect(nested_schema, is_root=False)
-
-    collect(schema, is_root=True)
-    visiting: set[int] = set()
-    visited: set[int] = set()
-
-    def visit(fragment_identifier: int) -> None:
-        if fragment_identifier in visited:
-            return
-        if fragment_identifier in visiting:
-            raise ValueError(f"{location} does not support cyclic local references")
-        visiting.add(fragment_identifier)
-        if (target_identifier := reference_edges.get(fragment_identifier)) is not None:
-            visit(target_identifier)
-        visiting.remove(fragment_identifier)
-        visited.add(fragment_identifier)
-
-    for schema_identifier in schema_nodes:
-        visit(schema_identifier)
-
-
-_SINGLE_NESTED_SCHEMA_KEYWORDS: Final[tuple[str, ...]] = (
-    "additionalProperties",
-    "contains",
-    "contentSchema",
-    "else",
-    "if",
-    "items",
-    "not",
-    "propertyNames",
-    "then",
-    "unevaluatedItems",
-    "unevaluatedProperties",
-)
-_ARRAY_NESTED_SCHEMA_KEYWORDS: Final[tuple[str, ...]] = (
-    "allOf",
-    "anyOf",
-    "oneOf",
-    "prefixItems",
-)
-_MAPPING_NESTED_SCHEMA_KEYWORDS: Final[tuple[str, ...]] = (
-    "$defs",
-    "definitions",
-    "dependentSchemas",
-    "patternProperties",
-    "properties",
-)
-
-
-def _nested_schema_fragments(schema_fragment: Mapping[str, Any]) -> tuple[Any, ...]:
-    nested_fragments: list[Any] = []
-    nested_fragments.extend(
-        schema_fragment[keyword]
-        for keyword in _SINGLE_NESTED_SCHEMA_KEYWORDS
-        if keyword in schema_fragment
-    )
-    for keyword in _ARRAY_NESTED_SCHEMA_KEYWORDS:
-        keyword_value = schema_fragment.get(keyword)
-        if isinstance(keyword_value, (list, tuple)):
-            nested_fragments.extend(keyword_value)
-    for keyword in _MAPPING_NESTED_SCHEMA_KEYWORDS:
-        keyword_value = schema_fragment.get(keyword)
-        if isinstance(keyword_value, Mapping):
-            nested_fragments.extend(keyword_value.values())
-    return tuple(nested_fragments)
-
-
-def _validate_resume_token_schema(schema: dict[str, Any]) -> None:
-    location = "$.capabilities.await_external.resume.schema"
-    try:
-        json.dumps(schema, ensure_ascii=False, allow_nan=False)
-        declared_dialect = schema.get("$schema")
-        if not isinstance(declared_dialect, (str, type(None))):
-            raise ValueError("$schema must be a string")
-        if declared_dialect is not None and declared_dialect not in _DRAFT_2020_12_DIALECTS:
-            raise ValueError(f"must use JSON Schema Draft 2020-12, got {declared_dialect!r}")
-        Draft202012Validator.check_schema(schema)
-        _validate_safe_local_schema_references(schema, location=location)
-    except (SchemaError, TypeError, ValueError) as schema_error:
-        detail = (
-            schema_error.message if isinstance(schema_error, SchemaError) else str(schema_error)
-        )
-        raise ValueError(f"{location} is not a valid closed local JSON Schema: {detail}") from (
-            schema_error
-        )
-    if schema.get("type") != "object":
-        raise ValueError(f"{location}.type must be 'object'")
-    if schema.get("additionalProperties") is not False:
-        raise ValueError(f"{location}.additionalProperties must be false")
-
-    pending_fragments: list[Any] = [schema]
-    while pending_fragments:
-        schema_fragment = pending_fragments.pop()
-        if not isinstance(schema_fragment, Mapping):
-            continue
-        declares_object_shape = schema_fragment.get("type") == "object" or isinstance(
-            schema_fragment.get("properties"), Mapping
-        )
-        if declares_object_shape and schema_fragment.get("additionalProperties") is not False:
-            raise ValueError(
-                f"{location} must close every declared object with additionalProperties:false"
-            )
-        pending_fragments.extend(_nested_schema_fragments(schema_fragment))
 
 
 def _resume_reference_segments(reference: str, *, location: str) -> tuple[str, ...]:

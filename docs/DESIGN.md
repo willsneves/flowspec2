@@ -3,13 +3,13 @@
 Table of Contents:
 
 - Files: 28 <!-- section:files -->
-- Authoring-to-execution pipeline: 59 <!-- section:authoring-execution-pipeline -->
-- The one idea: the boundary is the closed value-domain: 119 <!-- section:closed-value-domain -->
-- Top-level shape (the two tiers): 136 <!-- section:top-level-shape -->
-- Mapping table — every construct → its LangGraph primitive: 157 <!-- section:mapping-table -->
-- Rationale (1 page): 217 <!-- section:rationale -->
-    - Rejected alternatives: 234 <!-- section:rationale-rejected-alternatives -->
-- How this was produced: 250 <!-- section:production-method -->
+- Authoring-to-execution pipeline: 62 <!-- section:authoring-execution-pipeline -->
+- The one idea: the boundary is the closed value-domain: 122 <!-- section:closed-value-domain -->
+- Top-level shape (the two tiers): 139 <!-- section:top-level-shape -->
+- Mapping table — every construct → its LangGraph primitive: 160 <!-- section:mapping-table -->
+- Rationale (1 page): 220 <!-- section:rationale -->
+    - Rejected alternatives: 237 <!-- section:rationale-rejected-alternatives -->
+- How this was produced: 253 <!-- section:production-method -->
 
 <!-- /section:toc -->
 
@@ -34,8 +34,11 @@ that graph as a callable tool.
 | [`../src/flowspec2/clock.py`](../src/flowspec2/clock.py) | Injectable UTC clock contract and real boundary adapter. |
 | [`../src/flowspec2/observability.py`](../src/flowspec2/observability.py) | Snowflake correlation IDs and structured event logging. |
 | [`../src/flowspec2/checker.py`](../src/flowspec2/checker.py) | Aggregate structural, semantic, profile, and compilation checks. |
+| [`../src/flowspec2/cli.py`](../src/flowspec2/cli.py) | Command handlers, I/O boundaries, and error reporting. |
+| [`../src/flowspec2/cli_parser.py`](../src/flowspec2/cli_parser.py) | Declarative argument grammar with injected handlers. |
 | [`../src/flowspec2/ir.py`](../src/flowspec2/ir.py) | Canonical normalization and immutable compiler contracts. |
 | [`../src/flowspec2/profiles.py`](../src/flowspec2/profiles.py) | Named executable tool, subflow, domain, and capability catalogs. |
+| [`../src/flowspec2/schema_contracts.py`](../src/flowspec2/schema_contracts.py) | Closed local-reference and external-resume JSON Schema contracts. |
 | [`../src/flowspec2/authoring/benchmark.py`](../src/flowspec2/authoring/benchmark.py) | Provider-neutral AI-authoring and correction benchmark. |
 | [`../src/flowspec2/authoring/corpus.py`](../src/flowspec2/authoring/corpus.py) | Packaged reference-corpus manifest, integrity checks, and content identity. |
 | [`../src/flowspec2/authoring/gemini.py`](../src/flowspec2/authoring/gemini.py) | Explicit-network Gemini source transport over the closed projection. |

@@ -6,7 +6,7 @@ Table of Contents:
 - Version 0.2.0 — 2026-07-13: 27 <!-- section:version-0-2-0 -->
     - Added: 31 <!-- section:version-0-2-0-added -->
     - Changed: 48 <!-- section:version-0-2-0-changed -->
-    - Security: 59 <!-- section:version-0-2-0-security -->
+    - Security: 63 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -52,6 +52,10 @@ No changes yet.
   `flowspec2/authoring-benchmark-evidence@2`.
 - Bound evidence to the configured correction protocol as well as exact
   captures and execution contracts.
+- Separated the declarative CLI grammar from command handlers and I/O
+  boundaries.
+- Extracted closed local-reference and external-resume JSON Schema validation
+  from graph compilation.
 
 <!-- /section:version-0-2-0-changed -->
 <!-- section:version-0-2-0-security -->

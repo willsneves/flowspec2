@@ -11,7 +11,7 @@ import sys
 import tempfile
 from importlib.metadata import version as package_version
 from pathlib import Path
-from typing import Any, Callable, Mapping, Never, cast
+from typing import Any, Mapping, cast
 
 import jsonschema
 
@@ -27,6 +27,7 @@ from .authoring import (
     verify_authoring_evidence,
 )
 from .checker import check_flow, check_json
+from .cli_parser import CliHandlers, CommandHandler, build_parser
 from .compat.models import CompatibilityError, CompatibilityReport
 from .compat.open_workflow import export_open_workflow, import_open_workflow
 from .compat.rasa import RasaBundle, export_rasa, import_rasa
@@ -42,21 +43,7 @@ from .observability import log_event
 from .profiles import reference_profile
 from .schema import load_flow
 
-CommandHandler = Callable[[argparse.Namespace], int]
 logger = logging.getLogger(__name__)
-
-
-class _CorrelatedArgumentParser(argparse.ArgumentParser):
-    def error(self, message: str) -> Never:
-        log_id = log_event(
-            logger,
-            logging.ERROR,
-            "CLI argument parsing failed",
-            operation="parse_arguments",
-            context={"parser": self.prog},
-        )
-        self.print_usage(sys.stderr)
-        self.exit(2, f"{self.prog}: error [log_id={log_id}]: {message}\n")
 
 
 def _load_json_mapping(document_path: str | Path) -> dict[str, Any]:
@@ -410,133 +397,23 @@ def _authoring_evidence_verify(arguments: argparse.Namespace) -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = _CorrelatedArgumentParser(
-        prog="flowspec2",
-        description="Validate, inspect, and convert flowspec2 documents.",
+    return build_parser(
+        CliHandlers(
+            validate=_validate,
+            check=_check,
+            normalize=_normalize,
+            intermediate_representation=_ir,
+            graph=_graph,
+            mermaid=_mermaid,
+            rasa_export=_rasa_export,
+            rasa_import=_rasa_import,
+            open_workflow_export=_open_workflow_export,
+            open_workflow_import=_open_workflow_import,
+            authoring_benchmark_gemini=_authoring_benchmark_gemini,
+            authoring_evidence_verify=_authoring_evidence_verify,
+            default_gemini_model=DEFAULT_GEMINI_AUTHOR_MODEL,
+        )
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    validate_parser = subparsers.add_parser(
-        "validate",
-        help="validate a flowspec2 document",
-    )
-    validate_parser.add_argument("path")
-    validate_parser.set_defaults(handler=_validate)
-
-    check_parser = subparsers.add_parser(
-        "check",
-        help="validate and compile-check a flowspec2 document",
-    )
-    check_parser.add_argument("path")
-    check_parser.add_argument(
-        "--json",
-        action="store_true",
-        dest="json_output",
-        help="emit a deterministic machine-readable report",
-    )
-    check_parser.set_defaults(handler=_check)
-
-    normalize_parser = subparsers.add_parser(
-        "normalize",
-        help="emit the canonical normalized flowspec2 document",
-    )
-    normalize_parser.add_argument("path")
-    normalize_parser.set_defaults(handler=_normalize)
-
-    ir_parser = subparsers.add_parser(
-        "ir",
-        help="emit the canonical intermediate representation",
-    )
-    ir_parser.add_argument("path")
-    ir_parser.set_defaults(handler=_ir)
-
-    graph_parser = subparsers.add_parser("graph", help="list compiled graph nodes")
-    graph_parser.add_argument("path")
-    graph_parser.set_defaults(handler=_graph)
-
-    mermaid_parser = subparsers.add_parser(
-        "mermaid",
-        help="render the compiled graph as Mermaid",
-    )
-    mermaid_parser.add_argument("path")
-    mermaid_parser.set_defaults(handler=_mermaid)
-
-    rasa_export_parser = subparsers.add_parser(
-        "rasa-export",
-        help="export the bounded Rasa CALM portable profile",
-    )
-    rasa_export_parser.add_argument("path")
-    rasa_export_parser.add_argument("--output-dir", required=True)
-    rasa_export_parser.add_argument("--allow-lossy", action="store_true")
-    rasa_export_parser.set_defaults(handler=_rasa_export)
-
-    rasa_import_parser = subparsers.add_parser(
-        "rasa-import",
-        help="import one flow from the bounded Rasa CALM portable profile",
-    )
-    rasa_import_parser.add_argument("path", help="flows.yml path")
-    rasa_import_parser.add_argument("--domain", required=True, help="domain.yml path")
-    rasa_import_parser.add_argument("--flow", help="flow id; required for multi-flow files")
-    rasa_import_parser.add_argument("--version", default="1.0.0", help="flowspec2 version")
-    rasa_import_parser.add_argument("--output", required=True)
-    rasa_import_parser.add_argument("--allow-lossy", action="store_true")
-    rasa_import_parser.set_defaults(handler=_rasa_import)
-
-    open_export_parser = subparsers.add_parser(
-        "open-workflow-export",
-        help="export the lossless Open Workflow conversational profile",
-    )
-    open_export_parser.add_argument("path")
-    open_export_parser.add_argument("--output", required=True)
-    open_export_parser.add_argument("--namespace", default="flowspec2")
-    open_export_parser.set_defaults(handler=_open_workflow_export)
-
-    open_import_parser = subparsers.add_parser(
-        "open-workflow-import",
-        help="import the exact Open Workflow conversational profile",
-    )
-    open_import_parser.add_argument("path")
-    open_import_parser.add_argument("--output", required=True)
-    open_import_parser.set_defaults(handler=_open_workflow_import)
-
-    authoring_benchmark_parser = subparsers.add_parser(
-        "authoring-benchmark-gemini",
-        help="run the packaged AI-authoring corpus through Gemini",
-    )
-    authoring_benchmark_parser.add_argument(
-        "--allow-network",
-        action="store_true",
-        required=True,
-        help="explicitly permit Gemini API requests for this invocation",
-    )
-    authoring_benchmark_parser.add_argument(
-        "--benchmark-identifier",
-        default="gemini_reference",
-    )
-    authoring_benchmark_parser.add_argument("--model", default=DEFAULT_GEMINI_AUTHOR_MODEL)
-    authoring_benchmark_parser.add_argument("--repository-revision", required=True)
-    authoring_benchmark_parser.add_argument("--max-correction-rounds", type=int, default=2)
-    authoring_benchmark_parser.add_argument("--output", required=True)
-    authoring_benchmark_parser.set_defaults(handler=_authoring_benchmark_gemini)
-
-    evidence_verify_parser = subparsers.add_parser(
-        "authoring-evidence-verify",
-        help="verify and deterministically replay an authoring evidence artifact",
-    )
-    evidence_verify_parser.add_argument("path")
-    evidence_verify_parser.add_argument(
-        "--repository-revision",
-        help="require the artifact to name this repository revision",
-    )
-    evidence_verify_parser.add_argument(
-        "--json",
-        action="store_true",
-        dest="json_output",
-        help="emit a deterministic machine-readable verification summary",
-    )
-    evidence_verify_parser.set_defaults(handler=_authoring_evidence_verify)
-
-    return parser
 
 
 def main(argv: list[str] | None = None) -> int:

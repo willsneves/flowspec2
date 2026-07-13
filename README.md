@@ -13,7 +13,7 @@ Table of Contents:
     - The flowspec/2 document: 251 <!-- section:example-document -->
     - Compiled LangGraph: 889 <!-- section:example-compiled-langgraph -->
 - Layout: 1005 <!-- section:layout -->
-- Status: 1039 <!-- section:status -->
+- Status: 1042 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -1019,8 +1019,11 @@ src/flowspec2/
   ir.py            canonical normalization · contracts · state schema · digests
   state_migration.py declarative active-state migration · loss report · schema proofs
   runtime.py       FlowRuntime: validate · compile · execute · as_tool (+ auto_flow short-circuit)
+  cli.py           command handlers · I/O boundaries · error reporting
+  cli_parser.py    declarative argument grammar · injected handlers
   observability.py Snowflake log IDs · structured event helper
   schema.py        load + JSON-Schema validation
+  schema_contracts.py closed local references · external-resume schema contract
   compat/          Rasa CALM adapter · Open Workflow profile + vendored official schema
   authoring/       packaged corpus · benchmark · Gemini transport · evidence · projection · CTK
   experimental/    non-runtime flowspec/3-draft source preview
