@@ -153,7 +153,7 @@ def test_gemini_author_rejects_invalid_projection_envelopes(response_text: str) 
 
 def test_gemini_author_wraps_provider_failures_without_leaking_details() -> None:
     class ProviderFailure(RuntimeError):
-        status_code = 429
+        code = 429
 
     fake_client = FakeGeminiClient()
     provider_failure = ProviderFailure("sentinel-secret-provider-message")
