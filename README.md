@@ -2,18 +2,18 @@
 
 Table of Contents:
 
-- Install: 41 <!-- section:install -->
-- LLM-driven (the engine side): 68 <!-- section:llm-driven -->
-- Quickstart: 118 <!-- section:quickstart -->
-- Real backends: 142 <!-- section:real-backends -->
-- Error correlation: 159 <!-- section:error-correlation -->
-- CLI: 182 <!-- section:cli -->
-- What it compiles: 214 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 240 <!-- section:example -->
-    - The flowspec/2 document: 247 <!-- section:example-document -->
-    - Compiled LangGraph: 885 <!-- section:example-compiled-langgraph -->
-- Layout: 1001 <!-- section:layout -->
-- Status: 1035 <!-- section:status -->
+- Install: 45 <!-- section:install -->
+- LLM-driven (the engine side): 72 <!-- section:llm-driven -->
+- Quickstart: 122 <!-- section:quickstart -->
+- Real backends: 146 <!-- section:real-backends -->
+- Error correlation: 163 <!-- section:error-correlation -->
+- CLI: 186 <!-- section:cli -->
+- What it compiles: 218 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 244 <!-- section:example -->
+    - The flowspec/2 document: 251 <!-- section:example-document -->
+    - Compiled LangGraph: 889 <!-- section:example-compiled-langgraph -->
+- Layout: 1005 <!-- section:layout -->
+- Status: 1039 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -35,6 +35,10 @@ before graph construction. The [AI authoring benchmark](docs/AUTHORING_BENCHMARK
 defines the evidence protocol and executable conformance kit. The
 [FlowSpec3 preview](docs/FLOWSPEC3_DRAFT.md) documents the isolated source
 experiment and its loss accounting.
+
+Release history and compatibility policy live in [CHANGELOG.md](CHANGELOG.md)
+and [VERSIONING.md](docs/VERSIONING.md). Report vulnerabilities through the
+private process in [SECURITY.md](SECURITY.md).
 
 <!-- section:install -->
 

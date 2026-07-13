@@ -11,6 +11,7 @@ See ``docs/DESIGN.md`` for the format rationale and the construct→primitive ma
 from __future__ import annotations
 
 import logging
+from importlib.metadata import version as package_version
 
 from .backends import BackendConfig, make_registry
 from .checker import check_flow, check_json, structural_diagnostics
@@ -47,7 +48,7 @@ from .state_migration import (
 from .subflows import SubflowDefinition, SubflowRegistry, default_subflows
 from .tools import ToolDefinition, ToolEffects, ToolRegistry, default_tool_registry
 
-__version__ = "0.1.0"
+__version__ = package_version("flowspec2")
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
+import tarfile
 import tempfile
 import zipfile
 from collections.abc import Sequence
@@ -15,6 +16,7 @@ PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 EXPECTED_WHEEL_MEMBERS: Final[frozenset[str]] = frozenset(
     {
         "flowspec2/flowspec-2.schema.json",
+        "flowspec2/py.typed",
         "flowspec2/authoring/authoring-evidence.schema.json",
         "flowspec2/experimental/flowspec-3-draft.schema.json",
         "flowspec2/compat/schemas/open-workflow-conversation-1.schema.json",
@@ -30,12 +32,28 @@ EXPECTED_WHEEL_MEMBERS: Final[frozenset[str]] = frozenset(
         "flowspec2/authoring/corpus/terminal.case.json",
     }
 )
+EXPECTED_SDIST_MEMBERS: Final[frozenset[str]] = frozenset(
+    {
+        *(f"src/{member_name}" for member_name in EXPECTED_WHEEL_MEMBERS),
+        "CHANGELOG.md",
+        "LICENSE",
+        "README.md",
+        "SECURITY.md",
+        "docs/VERSIONING.md",
+        "pyproject.toml",
+        "uv.lock",
+    }
+)
 INSTALLED_PACKAGE_SMOKE: Final[str] = """
+from importlib.metadata import version as installed_package_version
+
+from flowspec2 import __version__
 from flowspec2.authoring import authoring_evidence_schema, load_reference_authoring_corpus
 from flowspec2.experimental import V2_SCHEMA_IDENTIFIER, V3_PREVIEW_SCHEMA_IDENTIFIER, preview_schema
 from flowspec2.schema import schema
 
 reference_corpus = load_reference_authoring_corpus()
+assert __version__ == installed_package_version("flowspec2")
 assert reference_corpus.cases
 assert authoring_evidence_schema()["$id"] == "https://wllsena.github.io/flowspec2/schemas/authoring-benchmark-evidence-2.json"
 assert V2_SCHEMA_IDENTIFIER == "flowspec/2"
@@ -65,6 +83,16 @@ def _built_wheel(artifact_directory: Path) -> Path:
     return wheel_paths[0]
 
 
+def _built_sdist(artifact_directory: Path) -> Path:
+    source_distribution_paths = tuple(artifact_directory.glob("flowspec2-*.tar.gz"))
+    if len(source_distribution_paths) != 1:
+        raise RuntimeError(
+            "package check expected one source distribution, "
+            f"found {len(source_distribution_paths)}"
+        )
+    return source_distribution_paths[0]
+
+
 def _check_wheel_members(wheel_path: Path) -> None:
     with zipfile.ZipFile(wheel_path) as wheel_archive:
         wheel_members = tuple(wheel_archive.namelist())
@@ -78,6 +106,26 @@ def _check_wheel_members(wheel_path: Path) -> None:
         raise RuntimeError(f"wheel is missing packaged contracts: {missing_members}")
 
 
+def _check_sdist_members(source_distribution_path: Path) -> None:
+    with tarfile.open(source_distribution_path, mode="r:gz") as source_archive:
+        archive_members = tuple(source_archive.getnames())
+    project_members = tuple(
+        member_name.split("/", maxsplit=1)[1]
+        for member_name in archive_members
+        if "/" in member_name
+    )
+    duplicate_members = sorted(
+        member_name
+        for member_name in set(project_members)
+        if project_members.count(member_name) > 1
+    )
+    if duplicate_members:
+        raise RuntimeError(f"source distribution contains duplicate members: {duplicate_members}")
+    missing_members = sorted(EXPECTED_SDIST_MEMBERS - set(project_members))
+    if missing_members:
+        raise RuntimeError(f"source distribution is missing packaged contracts: {missing_members}")
+
+
 def check_package(python_version: str) -> None:
     uv_executable = shutil.which("uv")
     if uv_executable is None:
@@ -89,9 +137,11 @@ def check_package(python_version: str) -> None:
         requirements_path = temporary_path / "runtime-requirements.txt"
         virtual_environment = temporary_path / "venv"
 
-        _run((uv_executable, "build", "--wheel", "--out-dir", str(artifact_directory)))
+        _run((uv_executable, "build", "--out-dir", str(artifact_directory)))
         wheel_path = _built_wheel(artifact_directory)
+        source_distribution_path = _built_sdist(artifact_directory)
         _check_wheel_members(wheel_path)
+        _check_sdist_members(source_distribution_path)
         _run(
             (
                 uv_executable,
