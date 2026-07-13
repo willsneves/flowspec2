@@ -11,7 +11,12 @@ from typing import Final
 
 from flowspec2.json_codec import strict_json_loads, validate_json_value
 
-from .benchmark import AuthoredSource, AuthoringBenchmarkReport, AuthoringRequest
+from .benchmark import (
+    AuthoredSource,
+    AuthoringBenchmarkLimits,
+    AuthoringBenchmarkReport,
+    AuthoringRequest,
+)
 from .corpus import AuthoringCorpus
 
 AUTHORING_EVIDENCE_FORMAT: Final[str] = "flowspec2/authoring-benchmark-evidence@2"
@@ -215,6 +220,7 @@ class AuthoringBenchmarkEvidence:
 
     package_version: str
     repository_revision: str
+    benchmark_limits: AuthoringBenchmarkLimits
     corpus: AuthoringCorpus
     profile_identifier: str
     profile_digest: str
@@ -229,6 +235,11 @@ class AuthoringBenchmarkEvidence:
             raise ValueError("authoring evidence repository revision must be non-empty")
         if self.profile_identifier != self.report.profile_identifier:
             raise ValueError("authoring evidence profile identifier disagrees with report")
+        if any(
+            case_result.correction_rounds > self.benchmark_limits.max_correction_rounds
+            for case_result in self.report.case_results
+        ):
+            raise ValueError("authoring evidence report exceeds its correction-round limit")
         if not _DIGEST_PATTERN.fullmatch(self.profile_digest):
             raise ValueError("authoring evidence profile digest must be lowercase SHA-256")
         report_case_identifiers = tuple(
@@ -273,6 +284,9 @@ class AuthoringBenchmarkEvidence:
             "format": AUTHORING_EVIDENCE_FORMAT,
             "package_version": self.package_version,
             "repository_revision": self.repository_revision,
+            "benchmark": {
+                "max_correction_rounds": self.benchmark_limits.max_correction_rounds,
+            },
             "corpus": self.corpus.metadata(),
             "profile": {
                 "identifier": self.profile_identifier,

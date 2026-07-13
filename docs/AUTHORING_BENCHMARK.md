@@ -5,10 +5,10 @@ Table of Contents:
 - Purpose: 24 <!-- section:purpose -->
 - Evaluation contract: 39 <!-- section:evaluation-contract -->
 - Author integration: 89 <!-- section:author-integration -->
-- Structured-output projection: 176 <!-- section:structured-output-projection -->
-- Conformance kit: 203 <!-- section:conformance-kit -->
-- Interpreting reports: 229 <!-- section:interpreting-reports -->
-- Format promotion: 263 <!-- section:format-promotion -->
+- Structured-output projection: 186 <!-- section:structured-output-projection -->
+- Conformance kit: 213 <!-- section:conformance-kit -->
+- Interpreting reports: 239 <!-- section:interpreting-reports -->
+- Format promotion: 279 <!-- section:format-promotion -->
 
 <!-- /section:toc -->
 
@@ -164,11 +164,21 @@ The CLI requires explicit network consent even when a key is configured:
 
 ```bash
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output authoring-evidence.json
+flowspec2 authoring-evidence-verify authoring-evidence.json --repository-revision <revision>
 ```
 
 Provider failures produce no partial artifact. Completed semantic failures do
 produce evidence and return a failing command status, preserving negative
 results instead of selecting only successful runs.
+
+The verifier performs no network calls. It requires canonical strict JSON,
+validates the closed packaged evidence schema, recomputes the content digest,
+matches the recorded package, corpus, profile, and source-adapter contracts,
+checks the recorded correction limit and every capture hash, then re-evaluates
+each exact source through the installed adapter and checker. The replayed report
+must equal the recorded report in full. An optional repository-revision
+assertion lets automation bind the artifact to an expected checkout without
+invoking Git inside the library.
 
 <!-- /section:author-integration -->
 <!-- section:structured-output-projection -->
@@ -250,12 +260,18 @@ provider and requested-model identifiers, provider-reported effective model
 version for every Gemini attempt, closed non-secret generation configuration,
 provider SDK, prompt format and digest, package and operator-supplied repository
 revision, source-adapter contract, corpus identity and digest, and exact runtime
-profile identity and digest. The current envelope contract is
+profile identity and digest. It also binds the configured correction-round
+limit, so replay proves the interaction protocol as well as the observed
+attempts. The current envelope contract is
 `flowspec2/authoring-benchmark-evidence@2`. It deliberately excludes timestamps,
 hostnames, latency, request IDs, credentials, and other operational fields that
 would make equivalent semantic evidence unequal. Captures must align exactly
 with every reported case and correction attempt, including matching source
 hashes, before the artifact can serialize.
+
+The content digest detects modification but is not an authenticity mechanism.
+Claims about who ran the benchmark require an external signature or a trusted
+artifact-distribution channel.
 
 <!-- /section:interpreting-reports -->
 <!-- section:format-promotion -->

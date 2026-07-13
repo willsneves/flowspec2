@@ -24,6 +24,7 @@ from .authoring import (
     RecordingAuthor,
     load_reference_authoring_corpus,
     run_authoring_benchmark,
+    verify_authoring_evidence,
 )
 from .checker import check_flow, check_json
 from .compat.models import CompatibilityError, CompatibilityReport
@@ -365,6 +366,7 @@ def _authoring_benchmark_gemini(arguments: argparse.Namespace) -> int:
         evidence = AuthoringBenchmarkEvidence(
             package_version=package_version("flowspec2"),
             repository_revision=arguments.repository_revision,
+            benchmark_limits=benchmark_limits,
             corpus=corpus,
             profile_identifier=flow_profile.identifier,
             profile_digest=flow_profile.digest,
@@ -380,6 +382,31 @@ def _authoring_benchmark_gemini(arguments: argparse.Namespace) -> int:
         f"total_cases={benchmark_report.total_cases}]"
     )
     return 0 if benchmark_report.successful_cases == benchmark_report.total_cases else 1
+
+
+def _authoring_evidence_verify(arguments: argparse.Namespace) -> int:
+    verification = verify_authoring_evidence(
+        Path(arguments.path).read_text(encoding="utf-8"),
+        expected_repository_revision=arguments.repository_revision,
+    )
+    if arguments.json_output:
+        print(
+            json.dumps(
+                verification.to_dict(),
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+    else:
+        print(
+            f"OK: {arguments.path} is valid authoring evidence "
+            f"[digest={verification.digest}, "
+            f"successful_cases={verification.successful_cases}, "
+            f"total_cases={verification.total_cases}]"
+        )
+    return 0
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -491,6 +518,23 @@ def _parser() -> argparse.ArgumentParser:
     authoring_benchmark_parser.add_argument("--max-correction-rounds", type=int, default=2)
     authoring_benchmark_parser.add_argument("--output", required=True)
     authoring_benchmark_parser.set_defaults(handler=_authoring_benchmark_gemini)
+
+    evidence_verify_parser = subparsers.add_parser(
+        "authoring-evidence-verify",
+        help="verify and deterministically replay an authoring evidence artifact",
+    )
+    evidence_verify_parser.add_argument("path")
+    evidence_verify_parser.add_argument(
+        "--repository-revision",
+        help="require the artifact to name this repository revision",
+    )
+    evidence_verify_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="emit a deterministic machine-readable verification summary",
+    )
+    evidence_verify_parser.set_defaults(handler=_authoring_evidence_verify)
 
     return parser
 

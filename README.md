@@ -4,16 +4,16 @@ Table of Contents:
 
 - Install: 41 <!-- section:install -->
 - LLM-driven (the engine side): 68 <!-- section:llm-driven -->
-- Quickstart: 113 <!-- section:quickstart -->
-- Real backends: 137 <!-- section:real-backends -->
-- Error correlation: 154 <!-- section:error-correlation -->
-- CLI: 177 <!-- section:cli -->
-- What it compiles: 208 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 234 <!-- section:example -->
-    - The flowspec/2 document: 241 <!-- section:example-document -->
-    - Compiled LangGraph: 879 <!-- section:example-compiled-langgraph -->
-- Layout: 995 <!-- section:layout -->
-- Status: 1029 <!-- section:status -->
+- Quickstart: 118 <!-- section:quickstart -->
+- Real backends: 142 <!-- section:real-backends -->
+- Error correlation: 159 <!-- section:error-correlation -->
+- CLI: 182 <!-- section:cli -->
+- What it compiles: 214 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 240 <!-- section:example -->
+    - The flowspec/2 document: 247 <!-- section:example-document -->
+    - Compiled LangGraph: 885 <!-- section:example-compiled-langgraph -->
+- Layout: 1001 <!-- section:layout -->
+- Status: 1035 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -101,11 +101,16 @@ from the model transport:
 
 ```bash
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output authoring-evidence.json
+flowspec2 authoring-evidence-verify authoring-evidence.json --repository-revision <revision>
 ```
 
 The command never records or prints the API key, refuses to overwrite an
 existing artifact, and writes nothing when the provider fails. The presence of
-`GEMINI_API_KEY` alone never enables network access.
+`GEMINI_API_KEY` alone never enables network access. Verification is fully
+offline: it checks the closed envelope, content digest, package/corpus/profile
+identity, correction limit, exact capture hashes, and deterministic report
+replay. The digest proves integrity, not who created the artifact; authenticity
+requires an external signature or trusted distribution channel.
 
 <!-- /section:llm-driven -->
 <!-- section:quickstart -->
@@ -188,6 +193,7 @@ flowspec2 rasa-import build/rasa/flows.yml --domain build/rasa/domain.yml --flow
 flowspec2 open-workflow-export examples/reparo_luminaria.flow.json --output build/reparo_luminaria.workflow.yaml
 flowspec2 open-workflow-import build/reparo_luminaria.workflow.yaml --output build/reparo_luminaria.flow.json
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output build/authoring-evidence.json
+flowspec2 authoring-evidence-verify build/authoring-evidence.json --repository-revision <revision>
 ```
 
 The Rasa adapter is a strict, versioned subset; `--allow-lossy` acknowledges its

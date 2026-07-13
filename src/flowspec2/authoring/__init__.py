@@ -18,6 +18,7 @@ from .benchmark import (
     ForbiddenConstruct,
     RequiredFlowConstruct,
     SourceAdaptation,
+    replay_authoring_benchmark,
     run_authoring_benchmark,
 )
 from .corpus import (
@@ -48,6 +49,11 @@ from .evidence import (
     AuthoringCapture,
     AuthoringProviderProvenance,
     RecordingAuthor,
+)
+from .evidence_verification import (
+    AuthoringEvidenceVerification,
+    authoring_evidence_schema,
+    verify_authoring_evidence,
 )
 from .gemini import (
     DEFAULT_GEMINI_AUTHOR_MODEL,
@@ -86,6 +92,7 @@ __all__ = [
     "AuthoringAttempt",
     "AuthoredSource",
     "AuthoringBenchmarkEvidence",
+    "AuthoringEvidenceVerification",
     "AuthoringAuthor",
     "AuthoringBenchmarkCase",
     "AuthoringBenchmarkLimits",
@@ -115,13 +122,16 @@ __all__ = [
     "SourceAdaptation",
     "authoring_projection",
     "authoring_projection_diagnostics",
+    "authoring_evidence_schema",
     "canonical_projection_json",
     "load_ctk_corpus",
     "load_reference_authoring_corpus",
     "lower_authoring_projection",
     "project_flow_document",
+    "replay_authoring_benchmark",
     "run_authoring_benchmark",
     "run_ctk_corpus",
+    "verify_authoring_evidence",
     "GEMINI_AUTHOR_PROMPT_DIGEST",
     "GEMINI_AUTHOR_PROMPT_FORMAT",
     "GeminiAuthor",

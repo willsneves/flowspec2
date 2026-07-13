@@ -1007,3 +1007,60 @@ def run_authoring_benchmark(
             for benchmark_case in sorted_cases
         ),
     )
+
+
+def replay_authoring_benchmark(
+    benchmark_identifier: str,
+    benchmark_cases: Sequence[AuthoringBenchmarkCase],
+    captured_sources: Mapping[str, Sequence[str]],
+    *,
+    source_adapter: AuthoringSourceAdapter | None = None,
+    profile: FlowProfile | None = None,
+) -> AuthoringBenchmarkReport:
+    """Re-evaluate an exact closed capture set without invoking an author."""
+
+    _require_identifier(benchmark_identifier, "benchmark identifier")
+    resolved_source_adapter = source_adapter or FlowSpec2JsonAdapter()
+    resolved_profile = profile or reference_profile()
+    sorted_cases = tuple(
+        sorted(benchmark_cases, key=lambda benchmark_case: benchmark_case.identifier)
+    )
+    case_identifiers = tuple(benchmark_case.identifier for benchmark_case in sorted_cases)
+    if len(set(case_identifiers)) != len(case_identifiers):
+        raise ValueError("benchmark case identifiers must be unique")
+    if set(captured_sources) != set(case_identifiers):
+        raise ValueError("captured source cases do not match the benchmark corpus")
+
+    case_results: list[AuthoringBenchmarkResult] = []
+    for benchmark_case in sorted_cases:
+        case_sources = tuple(captured_sources[benchmark_case.identifier])
+        if not case_sources:
+            raise ValueError(
+                f"captured source case {benchmark_case.identifier!r} requires an attempt"
+            )
+        case_results.append(
+            AuthoringBenchmarkResult(
+                case_identifier=benchmark_case.identifier,
+                feature_tags=benchmark_case.feature_tags,
+                format_identifier=resolved_source_adapter.format_identifier,
+                attempts=tuple(
+                    _evaluate_source(
+                        authored_source,
+                        resolved_source_adapter,
+                        benchmark_case.expected_flow_json,
+                        benchmark_case.required_constructs,
+                        benchmark_case.forbidden_constructs,
+                        correction_round,
+                        resolved_profile,
+                    )
+                    for correction_round, authored_source in enumerate(case_sources)
+                ),
+            )
+        )
+
+    return AuthoringBenchmarkReport(
+        benchmark_identifier=benchmark_identifier,
+        format_identifier=resolved_source_adapter.format_identifier,
+        profile_identifier=resolved_profile.identifier,
+        case_results=tuple(case_results),
+    )

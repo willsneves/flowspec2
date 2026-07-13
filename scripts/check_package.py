@@ -15,6 +15,7 @@ PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 EXPECTED_WHEEL_MEMBERS: Final[frozenset[str]] = frozenset(
     {
         "flowspec2/flowspec-2.schema.json",
+        "flowspec2/authoring/authoring-evidence.schema.json",
         "flowspec2/experimental/flowspec-3-draft.schema.json",
         "flowspec2/compat/schemas/open-workflow-conversation-1.schema.json",
         "flowspec2/compat/schemas/vendor/open-workflow-1.0.3.LICENSE",
@@ -30,12 +31,13 @@ EXPECTED_WHEEL_MEMBERS: Final[frozenset[str]] = frozenset(
     }
 )
 INSTALLED_PACKAGE_SMOKE: Final[str] = """
-from flowspec2.authoring import load_reference_authoring_corpus
+from flowspec2.authoring import authoring_evidence_schema, load_reference_authoring_corpus
 from flowspec2.experimental import V2_SCHEMA_IDENTIFIER, V3_PREVIEW_SCHEMA_IDENTIFIER, preview_schema
 from flowspec2.schema import schema
 
 reference_corpus = load_reference_authoring_corpus()
 assert reference_corpus.cases
+assert authoring_evidence_schema()["$id"] == "https://wllsena.github.io/flowspec2/schemas/authoring-benchmark-evidence-2.json"
 assert V2_SCHEMA_IDENTIFIER == "flowspec/2"
 assert V3_PREVIEW_SCHEMA_IDENTIFIER == "flowspec/3-draft"
 assert schema()["$id"] == "https://wllsena.github.io/flowspec2/schemas/flowspec-2.json"
