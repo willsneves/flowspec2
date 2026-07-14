@@ -2,14 +2,15 @@
 
 Table of Contents:
 
-- Purpose: 25 <!-- section:purpose -->
-- Evaluation contract: 40 <!-- section:evaluation-contract -->
-- Author integration: 102 <!-- section:author-integration -->
-- Structured-output projection: 213 <!-- section:structured-output-projection -->
-- Conformance kit: 240 <!-- section:conformance-kit -->
-- Interpreting reports: 269 <!-- section:interpreting-reports -->
-- Evidence authenticity: 325 <!-- section:evidence-authenticity -->
-- Format promotion: 360 <!-- section:format-promotion -->
+- Purpose: 26 <!-- section:purpose -->
+- Evaluation contract: 41 <!-- section:evaluation-contract -->
+- Author integration: 104 <!-- section:author-integration -->
+- Operational model evidence: 215 <!-- section:operational-evidence -->
+- Structured-output projection: 252 <!-- section:structured-output-projection -->
+- Conformance kit: 279 <!-- section:conformance-kit -->
+- Interpreting reports: 308 <!-- section:interpreting-reports -->
+- Evidence authenticity: 364 <!-- section:evidence-authenticity -->
+- Format promotion: 399 <!-- section:format-promotion -->
 
 <!-- /section:toc -->
 
@@ -62,8 +63,8 @@ source, and a public `AuthoringAcceptanceContract`. The loader canonicalizes
 internal domain and step identifiers, projects every resulting semantic leaf
 into that contract, and keeps source syntax out of the provider request.
 Required and forbidden constructs are public focused constraints, while flow identity,
-version labels, route prose, and non-verbatim path prompt text are explicitly
-variable presentation paths. A case passes only when its executable flow
+version labels, route descriptions and trigger examples, and non-verbatim path
+prompt text and extraction hints are explicitly variable presentation paths. A case passes only when its executable flow
 compiles, matches every public semantic observation, adds no unexpected
 observation, and contains no forbidden source construct. A merely valid but
 irrelevant flow, or a flow that adds unrelated slots, requirements, or steps,
@@ -78,7 +79,8 @@ suggested fix for the next repair request.
 
 The acceptance projection is complete by construction: every scalar or empty
 container in the canonical semantic projection is public. Exact source identity,
-route prose, and non-verbatim prompt text are explicitly variable; consistent
+route descriptions and trigger examples, and non-verbatim prompt text and
+extraction hints are explicitly variable; consistent
 domain and step renaming lowers to the same semantic observations. New
 unclassified normalized fields therefore become public grading dimensions
 instead of silently entering a private oracle. Unexpected observations are
@@ -208,6 +210,43 @@ assertion lets automation bind the artifact to an expected checkout without
 invoking Git inside the library.
 
 <!-- /section:author-integration -->
+<!-- section:operational-evidence -->
+
+## Operational model evidence
+
+Authoring conformance does not claim that a particular model routes or extracts
+well. A separate operational evidence protocol exercises the final successful
+sources from verified authoring evidence against a packaged public probe corpus.
+Routing probes observe `route.trigger_phrases` as non-exclusive catalog examples;
+extraction probes observe `prompt.extract_hint` through the exact payload-schema
+description submitted to the model. Every operational subject is exercised as a
+paired authored and counterfactual probe with the same operation, source,
+pointer, and citizen input but a replacement subject and distinct expected
+outcome. A matched pair therefore records causal sensitivity to the field rather
+than merely proving that the field appeared in a request.
+
+The operational artifact binds each probe to the authoring-evidence digest,
+final source digest and correction round, subject JSON Pointer and value digest,
+installed corpus and profile identities, provider configuration, exact rendered
+system instruction, prompt and response schema, raw model output, parsed output,
+pair identity and subject mode, and replayed match result. Offline verification
+reconstructs every request and
+replays strict parsing and closed-schema validation without invoking a provider.
+
+Operational evidence is classified as `report_only`. A mismatch is useful model
+quality evidence but does not change source validity, deterministic benchmark
+success, presentation-review success, or promotion eligibility. Transport
+failure produces no artifact; a completed mismatching run remains an attributable
+artifact. [ADR 0007](adr/0007-operational-llm-evidence-boundary.md) records the
+trust boundary and the conditions for considering a future blocking policy.
+
+```bash
+flowspec2 operational-benchmark-gemini authoring-evidence.json --allow-network --repository-revision <revision> --output operational-evidence.json
+uv run --python 3.12 --with ~/Code/public-provider flowspec2 operational-benchmark-codex authoring-evidence.json --allow-network --repository-revision <revision> --output codex-operational-evidence.json
+flowspec2 operational-evidence-verify operational-evidence.json --authoring-evidence authoring-evidence.json --repository-revision <revision> --json
+```
+
+<!-- /section:operational-evidence -->
 <!-- section:structured-output-projection -->
 
 ## Structured-output projection

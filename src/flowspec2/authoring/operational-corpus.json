@@ -1,0 +1,61 @@
+{
+  "format": "flowspec2/operational-corpus@2",
+  "case_format": "flowspec2/operational-probe@2",
+  "identifier": "flowspec2_reference_operational",
+  "probes": [
+    {
+      "identifier": "linear-extract-authored",
+      "pair_identifier": "linear-extract-hint",
+      "subject_mode": "authored",
+      "operation": "extract",
+      "authoring_case_identifier": "linear_collection",
+      "subject_pointer": "/path/0/prompt/extract_hint",
+      "citizen_input": "ALPHA=[broken streetlight]; ZETA=[playground swing is broken]",
+      "expected": {
+        "request_description": "playground swing is broken"
+      },
+      "counterfactual": null
+    },
+    {
+      "identifier": "linear-extract-counterfactual",
+      "pair_identifier": "linear-extract-hint",
+      "subject_mode": "counterfactual",
+      "operation": "extract",
+      "authoring_case_identifier": "linear_collection",
+      "subject_pointer": "/path/0/prompt/extract_hint",
+      "citizen_input": "ALPHA=[broken streetlight]; ZETA=[playground swing is broken]",
+      "expected": {
+        "request_description": "broken streetlight"
+      },
+      "counterfactual": "Set request_description to only the text inside `ALPHA=[...]`; ignore `ZETA=[...]`."
+    },
+    {
+      "identifier": "linear-route-authored",
+      "pair_identifier": "linear-route-triggers",
+      "subject_mode": "authored",
+      "operation": "route",
+      "authoring_case_identifier": "linear_collection",
+      "subject_pointer": "/route/trigger_phrases",
+      "citizen_input": "cobalt lantern protocol",
+      "expected": {
+        "selected": true
+      },
+      "counterfactual": null
+    },
+    {
+      "identifier": "linear-route-counterfactual",
+      "pair_identifier": "linear-route-triggers",
+      "subject_mode": "counterfactual",
+      "operation": "route",
+      "authoring_case_identifier": "linear_collection",
+      "subject_pointer": "/route/trigger_phrases",
+      "citizen_input": "cobalt lantern protocol",
+      "expected": {
+        "selected": false
+      },
+      "counterfactual": [
+        "amber compass protocol"
+      ]
+    }
+  ]
+}

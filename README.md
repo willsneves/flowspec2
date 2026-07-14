@@ -2,18 +2,18 @@
 
 Table of Contents:
 
-- Install: 53 <!-- section:install -->
-- LLM-driven (the engine side): 80 <!-- section:llm-driven -->
-- Quickstart: 150 <!-- section:quickstart -->
-- Real backends: 174 <!-- section:real-backends -->
-- Error correlation: 191 <!-- section:error-correlation -->
-- CLI: 214 <!-- section:cli -->
-- What it compiles: 267 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 293 <!-- section:example -->
-    - The flowspec/2 document: 300 <!-- section:example-document -->
-    - Compiled LangGraph: 938 <!-- section:example-compiled-langgraph -->
-- Layout: 1054 <!-- section:layout -->
-- Status: 1105 <!-- section:status -->
+- Install: 58 <!-- section:install -->
+- LLM-driven (the engine side): 85 <!-- section:llm-driven -->
+- Quickstart: 166 <!-- section:quickstart -->
+- Real backends: 190 <!-- section:real-backends -->
+- Error correlation: 207 <!-- section:error-correlation -->
+- CLI: 230 <!-- section:cli -->
+- What it compiles: 283 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 309 <!-- section:example -->
+    - The flowspec/2 document: 316 <!-- section:example-document -->
+    - Compiled LangGraph: 954 <!-- section:example-compiled-langgraph -->
+- Layout: 1070 <!-- section:layout -->
+- Status: 1121 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -41,6 +41,11 @@ syntax remains private. The
 [presentation-review decision](docs/adr/0006-authoring-presentation-review.md)
 separates source-bound human review of route and prompt prose from deterministic
 semantic success. The
+[operational-evidence decision](docs/adr/0007-operational-llm-evidence-boundary.md)
+keeps model-specific routing and extraction observations attributable and
+replayable without turning stochastic behavior into format conformance. Paired
+authored and counterfactual probes isolate whether trigger examples and
+extraction guidance change the observed model output. The
 [FlowSpec3 preview](docs/FLOWSPEC3_DRAFT.md) documents the isolated source
 experiment and its loss accounting.
 
@@ -99,7 +104,9 @@ FLOWSPEC2_RUN_CODEX_TESTS=1 uv run --python 3.12 --with ~/Code/public-provider -
 ```
 
 The LLM does exactly two non-deterministic jobs, the rails hold everything else:
-- **route** — decide whether the citizen's free-text opener enters the flow (from `route.description`);
+- **route** — decide whether the citizen's free-text opener enters the flow
+  (from `route.description`, with `route.trigger_phrases` as non-exclusive
+  examples);
 - **extract** — read the messy message and the node's `payload_schema` / interactive options, and produce the **closed token** for the slot.
 
 flowspec2's validators then enforce the rail: an out-of-domain extraction is
@@ -128,6 +135,8 @@ uv run --python 3.12 --with ~/Code/public-provider flowspec2 authoring-benchmark
 flowspec2 authoring-evidence-verify authoring-evidence.json --repository-revision <revision>
 flowspec2 authoring-evidence-sign authoring-evidence.json --private-key authoring-private-key.pem --repository-revision <revision> --output authoring-evidence.signature.json
 flowspec2 authoring-evidence-signature-verify authoring-evidence.json --signature authoring-evidence.signature.json --public-key authoring-public-key.pem --repository-revision <revision>
+uv run --python 3.12 --with ~/Code/public-provider flowspec2 operational-benchmark-codex authoring-evidence.json --allow-network --repository-revision <revision> --output operational-evidence.json
+flowspec2 operational-evidence-verify operational-evidence.json --authoring-evidence authoring-evidence.json --repository-revision <revision>
 ```
 
 The commands refuse to overwrite an existing artifact and write nothing when a
@@ -143,6 +152,13 @@ signature. The verifier takes the trusted public key explicitly, checks its
 derived key identifier, and never treats a key embedded beside the artifact as
 a trust root. Signing keys are read only from explicit PEM paths, are never
 serialized, and cannot be loaded from environment files.
+
+Operational evidence is separately classified as `report_only`. It captures
+model-specific routing over trigger examples and extraction over schema-baked
+hints, including the exact request and raw response. A completed mismatch is
+preserved with `all_matched:false` under a successful report-only command; it
+does not change deterministic source conformance or presentation-review
+eligibility.
 
 <!-- /section:llm-driven -->
 <!-- section:quickstart -->

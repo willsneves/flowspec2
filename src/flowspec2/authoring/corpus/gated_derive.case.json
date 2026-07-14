@@ -1,5 +1,5 @@
 {
-  "format": "flowspec2/authoring-case@2",
+  "format": "flowspec2/authoring-case@3",
   "identifier": "gated_derivation",
   "prompt": "Author the ordered steps collect_issue_category, collect_issue_detail, and derive_backend_classification. Collect required issue_category from the categorical IssueCategory values Pothole and Obstruction. Collect required issue_detail from categorical IssueDetail values Small and Large, require issue_category first, and ask only when slots.issue_category equals Pothole. Derive backend_classification from issue_category followed by issue_detail with Pothole|Small to POTHOLE_SMALL, Pothole|Large to POTHOLE_LARGE, Obstruction|null to STREET_OBSTRUCTION, and default $from[0]. Add no other semantic behavior. Flow identity, version, route prose, and non-verbatim prompt wording may vary.",
   "feature_tags": ["gate", "derive", "closed_domain"],

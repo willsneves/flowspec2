@@ -4,12 +4,12 @@ Table of Contents:
 
 - Unreleased: 23 <!-- section:unreleased -->
     - Added: 27 <!-- section:unreleased-added -->
-    - Changed: 40 <!-- section:unreleased-changed -->
-    - Security: 59 <!-- section:unreleased-security -->
-- Version 0.2.0 — 2026-07-13: 73 <!-- section:version-0-2-0 -->
-    - Added: 77 <!-- section:version-0-2-0-added -->
-    - Changed: 94 <!-- section:version-0-2-0-changed -->
-    - Security: 109 <!-- section:version-0-2-0-security -->
+    - Changed: 44 <!-- section:unreleased-changed -->
+    - Security: 68 <!-- section:unreleased-security -->
+- Version 0.2.0 — 2026-07-13: 82 <!-- section:version-0-2-0 -->
+    - Added: 86 <!-- section:version-0-2-0-added -->
+    - Changed: 103 <!-- section:version-0-2-0-changed -->
+    - Security: 118 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -33,6 +33,10 @@ All notable project changes are recorded here. Versioning follows
   verification, and detached reviewer authentication.
 - Subscription-authenticated Codex authoring, routing, and extraction through
   an isolated local `public-provider` transport with opt-in live tests.
+- Canonical report-only operational evidence for model-specific routing and
+  extraction probes, bound to verified final sources, exact request contracts,
+  raw responses, and deterministic offline replay. Authored/counterfactual probe
+  pairs isolate the influence of trigger examples and extraction guidance.
 
 <!-- /section:unreleased-added -->
 <!-- section:unreleased-changed -->
@@ -52,6 +56,11 @@ All notable project changes are recorded here. Versioning follows
   prompt, Codex prompt, and evidence-envelope identities advanced together.
 - Expanded the conformance kit with gated-derivation traces for open and closed
   guards, ignored gated input, ordered lookup, and declared fallback behavior.
+- Reused a compiled Draft 2020-12 validator while preserving best-match error
+  diagnostics, and made routing catalogs include non-exclusive trigger examples.
+- Advanced authoring acceptance, case, corpus, and provider-prompt contracts so
+  trigger examples and extraction hints are presence-checked but graded only by
+  report-only operational evidence.
 
 <!-- /section:unreleased-changed -->
 <!-- section:unreleased-security -->

@@ -24,13 +24,16 @@ from flowspec2.profiles import FlowProfile, reference_profile
 _IDENTIFIER_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 TOKEN_PROXY_METHOD: Final[str] = "utf8_byte_quartets"
 TOKEN_PROXY_BYTES_PER_UNIT: Final[int] = 4
-AUTHORING_ACCEPTANCE_FORMAT: Final[str] = "flowspec2/authoring-acceptance@1"
+AUTHORING_ACCEPTANCE_FORMAT: Final[str] = "flowspec2/authoring-acceptance@2"
 DEFAULT_VARIABLE_POINTER_PATTERNS: Final[tuple[str, ...]] = (
     "/flow",
     "/route/description",
+    "/route/trigger_phrases",
     "/version",
 )
-_VARIABLE_PATH_PROMPT_PATTERN: Final[re.Pattern[str]] = re.compile(r"^/path/[0-9]+/prompt/text$")
+_VARIABLE_PATH_PROMPT_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"^/path/[0-9]+/prompt/(?:extract_hint|text)$"
+)
 
 
 def _require_identifier(identifier: str, contract_name: str) -> None:
@@ -256,15 +259,15 @@ class RequiredFlowConstruct:
         )
 
     def to_dict(self) -> dict[str, object]:
-        """Return the public exact-value requirement."""
+        """Return the public presence or exact-value requirement."""
 
-        return {
+        required_construct: dict[str, object] = {
             "identifier": self.identifier,
             "pointer_pattern": self.pointer_pattern,
-            "expected": (
-                None if self.expected_json is None else strict_json_loads(self.expected_json)
-            ),
         }
+        if self.expected_json is not None:
+            required_construct["expected"] = strict_json_loads(self.expected_json)
+        return required_construct
 
 
 @dataclass(frozen=True)
@@ -858,7 +861,10 @@ def _semantic_flow_value(
             property_path = (*path_segments, property_name)
             if not path_segments and property_name in {"domains", "flow", "version"}:
                 continue
-            if path_segments == ("route",) and property_name == "description":
+            if path_segments == ("route",) and property_name in {
+                "description",
+                "trigger_phrases",
+            }:
                 continue
             if property_name == "prompt" and isinstance(property_value, Mapping):
                 semantic_mapping[property_name] = _semantic_prompt(
@@ -974,6 +980,8 @@ def authoring_acceptance_for_flow(
             prompt_contract = path_step.get("prompt")
             if isinstance(prompt_contract, dict) and prompt_contract.get("verbatim") is not True:
                 resolved_variable_pointer_patterns.append(f"/path/{path_index}/prompt/text")
+            if isinstance(prompt_contract, dict):
+                resolved_variable_pointer_patterns.append(f"/path/{path_index}/prompt/extract_hint")
     resolved_patterns = tuple(sorted(resolved_variable_pointer_patterns))
     observations = observe_authoring_flow(
         normalized_flow,

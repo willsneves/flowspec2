@@ -169,7 +169,7 @@ success.
 
 Three impossibilities are therefore **structural, not policed**: the LLM cannot invent a transition (synthesized routers only return declared targets), cannot skip a required ungated slot unless the author explicitly declares an exhaustion transition, and cannot widen a value-domain (the before-validator raises).
 
-What the LLM *is* free to do: choose which flow to enter (`route.description`), extract the token from free text/voice/photo, phrase prompts (unless `verbatim:true`), and choose/order the non-deterministic `capabilities` side-calls.
+What the LLM *is* free to do: choose which flow to enter (`route.description`, with `route.trigger_phrases` as non-exclusive examples), extract the token from free text/voice/photo, phrase prompts (unless `verbatim:true`), and choose/order the non-deterministic `capabilities` side-calls.
 
 ---
 

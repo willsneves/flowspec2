@@ -1,8 +1,9 @@
 """An LLM driver — the *non-deterministic execution* side of the boundary.
 
 flowspec2 pins the rails (states, closed value-domains, transitions). This module
-is the agent that reasons *within* them: given a flow's ``route.description`` it
-decides whether to enter, and at each pause it reads the citizen's free
+is the agent that reasons *within* them: given a flow's ``route.description`` and
+non-exclusive ``route.trigger_phrases`` examples it decides whether to enter,
+and at each pause it reads the citizen's free
 text/voice and the node's ``payload_schema`` (or the interactive options) and
 extracts the **closed token** for the slot. The flowspec2 validators then enforce
 the rail — an out-of-domain extraction is rejected and the node re-asks.
@@ -17,6 +18,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from jsonschema import Draft202012Validator
@@ -37,6 +39,15 @@ EXTRACT_SYS = (
     "quando houver lista fechada. Interprete sinônimos, gírias, números e emojis. "
     "Responda APENAS com JSON, sem comentários."
 )
+
+
+@dataclass(frozen=True)
+class StructuredOutputRequest:
+    """Exact provider-neutral inputs for one closed structured-output turn."""
+
+    system: str
+    prompt: str
+    response_schema: dict[str, Any]
 
 
 def _enum_of(prop: dict[str, Any]) -> Optional[list[Any]]:
@@ -130,6 +141,43 @@ def _route_response_schema(flows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def build_route_request(
+    text: str,
+    flows: list[dict[str, Any]],
+) -> StructuredOutputRequest:
+    """Render the exact routing request, including non-exclusive trigger examples."""
+
+    catalog = [
+        {
+            "service": flow["flow"],
+            "description": flow["route"]["description"],
+            "trigger_phrases": list(flow["route"].get("trigger_phrases", [])),
+        }
+        for flow in flows
+    ]
+    serialized_catalog = json.dumps(
+        catalog,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    prompt = (
+        f"Catálogo de serviços em JSON:\n{serialized_catalog}\n\n"
+        "Use description como a definição principal de cada serviço. "
+        "trigger_phrases contém apenas exemplos de mensagens compatíveis; "
+        "não trate esses exemplos como lista exclusiva nem como garantia de correspondência.\n\n"
+        f'Mensagem do cidadão: "{text}"\n\n'
+        'Devolva {"service": "<nome do serviço>"} se algum atende, '
+        'ou {"service": null} se nenhum atende.'
+    )
+    return StructuredOutputRequest(
+        system=ROUTE_SYS,
+        prompt=prompt,
+        response_schema=_route_response_schema(flows),
+    )
+
+
 def _extraction_response_schema(agent_response: AgentResponse) -> dict[str, Any]:
     payload_schema = agent_response.payload_schema or {}
     properties = copy.deepcopy(payload_schema.get("properties", {}))
@@ -176,6 +224,60 @@ def _extraction_response_schema(agent_response: AgentResponse) -> dict[str, Any]
     return response_schema
 
 
+def build_extraction_request(
+    text: str,
+    agent_response: AgentResponse,
+) -> StructuredOutputRequest:
+    """Render the exact extraction request, preserving payload-schema guidance."""
+
+    spec = _fields_spec(agent_response)
+    lines: list[str] = []
+    for field, kind, allowed, nullable in spec:
+        null_alternative = " ou null" if nullable and kind != "closed" else ""
+        if kind == "closed":
+            values = ", ".join(
+                json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+                for value in (allowed or [])
+            )
+            lines.append(f'- "{field}": um destes valores EXATOS: [{values}]')
+        elif kind == "bool":
+            lines.append(
+                f'- "{field}": true (sim/afirmativo), false (não/negativo){null_alternative}'
+            )
+        elif kind == "integer":
+            lines.append(f'- "{field}": número inteiro em JSON, sem aspas{null_alternative}')
+        elif kind == "number":
+            lines.append(f'- "{field}": número finito em JSON, sem aspas{null_alternative}')
+        elif kind == "null":
+            lines.append(f'- "{field}": null')
+        else:
+            lines.append(f'- "{field}": string JSON com o texto informado{null_alternative}')
+    options = _interactive_options(agent_response)
+    options_hint = f"\nOpções oferecidas ao cidadão: {', '.join(options)}." if options else ""
+    correction_targets = (agent_response.payload_schema or {}).get(CORRECTION_TARGETS_SCHEMA_KEY)
+    correction_rule = (
+        "- Se o cidadão quer CORRIGIR algo já informado, devolva somente "
+        '{"correcao": "<identificador>"}, usando um destes identificadores EXATOS: '
+        f"{json.dumps(correction_targets, ensure_ascii=False)}.\n"
+        if isinstance(correction_targets, list) and correction_targets
+        else ""
+    )
+    prompt = (
+        f'Pergunta do bot: "{agent_response.description}"\n'
+        f"Campos a extrair:\n" + "\n".join(lines) + options_hint + "\n\n"
+        f'Resposta do cidadão: "{text}"\n\n'
+        "Regras:\n"
+        "- Use SOMENTE os valores permitidos nas listas fechadas.\n"
+        f"{correction_rule}"
+        "- Devolva apenas o JSON com os campos pedidos."
+    )
+    return StructuredOutputRequest(
+        system=EXTRACT_SYS,
+        prompt=prompt,
+        response_schema=_extraction_response_schema(agent_response),
+    )
+
+
 class StructuredOutputAgent:
     """Provider-neutral routing and extraction over one closed JSON completion."""
 
@@ -188,58 +290,12 @@ class StructuredOutputAgent:
         raise NotImplementedError
 
     def route(self, text: str, flows: list[dict[str, Any]]) -> Optional[str]:
-        catalog = "\n".join(f"- {f['flow']}: {f['route']['description']}" for f in flows)
-        prompt = (
-            f"Serviços disponíveis:\n{catalog}\n\n"
-            f'Mensagem do cidadão: "{text}"\n\n'
-            'Devolva {"service": "<nome do serviço>"} se algum atende, '
-            'ou {"service": null} se nenhum atende.'
-        )
-        return self._json(ROUTE_SYS, prompt, _route_response_schema(flows)).get("service")
+        request = build_route_request(text, flows)
+        return self._json(request.system, request.prompt, request.response_schema).get("service")
 
     def extract(self, text: str, ar: AgentResponse) -> dict[str, Any]:
-        spec = _fields_spec(ar)
-        lines: list[str] = []
-        for field, kind, allowed, nullable in spec:
-            null_alternative = " ou null" if nullable and kind != "closed" else ""
-            if kind == "closed":
-                vals = ", ".join(
-                    json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-                    for value in (allowed or [])
-                )
-                lines.append(f'- "{field}": um destes valores EXATOS: [{vals}]')
-            elif kind == "bool":
-                lines.append(
-                    f'- "{field}": true (sim/afirmativo), false (não/negativo){null_alternative}'
-                )
-            elif kind == "integer":
-                lines.append(f'- "{field}": número inteiro em JSON, sem aspas{null_alternative}')
-            elif kind == "number":
-                lines.append(f'- "{field}": número finito em JSON, sem aspas{null_alternative}')
-            elif kind == "null":
-                lines.append(f'- "{field}": null')
-            else:
-                lines.append(f'- "{field}": string JSON com o texto informado{null_alternative}')
-        options = _interactive_options(ar)
-        opt_hint = f"\nOpções oferecidas ao cidadão: {', '.join(options)}." if options else ""
-        correction_targets = (ar.payload_schema or {}).get(CORRECTION_TARGETS_SCHEMA_KEY)
-        correction_rule = (
-            "- Se o cidadão quer CORRIGIR algo já informado, devolva somente "
-            '{"correcao": "<identificador>"}, usando um destes identificadores EXATOS: '
-            f"{json.dumps(correction_targets, ensure_ascii=False)}.\n"
-            if isinstance(correction_targets, list) and correction_targets
-            else ""
-        )
-        prompt = (
-            f'Pergunta do bot: "{ar.description}"\n'
-            f"Campos a extrair:\n" + "\n".join(lines) + opt_hint + "\n\n"
-            f'Resposta do cidadão: "{text}"\n\n'
-            "Regras:\n"
-            "- Use SOMENTE os valores permitidos nas listas fechadas.\n"
-            f"{correction_rule}"
-            "- Devolva apenas o JSON com os campos pedidos."
-        )
-        return self._json(EXTRACT_SYS, prompt, _extraction_response_schema(ar))
+        request = build_extraction_request(text, ar)
+        return self._json(request.system, request.prompt, request.response_schema)
 
 
 class GeminiAgent(StructuredOutputAgent):

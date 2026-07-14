@@ -9,6 +9,7 @@ import os
 import shutil
 import sys
 import tempfile
+from collections.abc import Callable
 from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any, Mapping, cast
@@ -22,17 +23,22 @@ from .authoring import (
     AuthoringEvidenceVerification,
     CodexAuthor,
     CodexAuthorError,
+    CodexOperationalExecutor,
     GeminiAuthor,
     GeminiAuthorError,
+    GeminiOperationalExecutor,
+    OperationalProviderError,
     RecordingAuthor,
     finalize_presentation_review_draft,
     load_reference_authoring_corpus,
     presentation_review_draft,
     run_authoring_benchmark,
+    run_authoring_operational_evidence,
     sign_authoring_evidence,
     sign_presentation_review,
     verify_authoring_evidence,
     verify_authoring_evidence_signature,
+    verify_authoring_operational_evidence,
     verify_authoring_promotion,
     verify_presentation_review,
     verify_presentation_review_signature,
@@ -361,6 +367,22 @@ def _create_codex_author(model: str, effort: str, timeout_seconds: float) -> Cod
     return CodexAuthor(model=model, effort=effort, timeout_seconds=timeout_seconds)
 
 
+def _create_gemini_operational_executor(model: str) -> GeminiOperationalExecutor:
+    return GeminiOperationalExecutor(model=model)
+
+
+def _create_codex_operational_executor(
+    model: str,
+    effort: str,
+    timeout_seconds: float,
+) -> CodexOperationalExecutor:
+    return CodexOperationalExecutor(
+        model=model,
+        effort=effort,
+        timeout_seconds=timeout_seconds,
+    )
+
+
 def _write_authoring_benchmark_evidence(
     arguments: argparse.Namespace,
     model_author: GeminiAuthor | CodexAuthor,
@@ -423,6 +445,86 @@ def _authoring_benchmark_codex(arguments: argparse.Namespace) -> int:
         arguments,
         _create_codex_author(arguments.model, arguments.effort, arguments.timeout_seconds),
     )
+
+
+def _write_operational_evidence(
+    arguments: argparse.Namespace,
+    operational_executor_factory: Callable[
+        [], GeminiOperationalExecutor | CodexOperationalExecutor
+    ],
+) -> int:
+    output_path = Path(arguments.output)
+    if output_path.exists():
+        raise FileExistsError(f"output already exists: {output_path}")
+    serialized_authoring_evidence, verified_authoring_evidence = _verified_authoring_evidence(
+        arguments.path, arguments.repository_revision
+    )
+    operational_executor = operational_executor_factory()
+    with operational_executor:
+        operational_evidence = run_authoring_operational_evidence(
+            serialized_authoring_evidence,
+            verified_authoring_evidence,
+            provider=operational_executor.provenance(),
+            executor=operational_executor,
+        )
+    _write_text_exclusive(output_path, f"{operational_evidence.to_json()}\n")
+    print(
+        f"Wrote report-only operational evidence to {output_path} "
+        f"[digest={operational_evidence.digest}, "
+        f"matched_probes={operational_evidence.matched_probes}, "
+        f"total_probes={operational_evidence.total_probes}]"
+    )
+    return 0
+
+
+def _operational_benchmark_gemini(arguments: argparse.Namespace) -> int:
+    if Path(arguments.output).exists():
+        raise FileExistsError(f"output already exists: {arguments.output}")
+    return _write_operational_evidence(
+        arguments,
+        lambda: _create_gemini_operational_executor(arguments.model),
+    )
+
+
+def _operational_benchmark_codex(arguments: argparse.Namespace) -> int:
+    if Path(arguments.output).exists():
+        raise FileExistsError(f"output already exists: {arguments.output}")
+    return _write_operational_evidence(
+        arguments,
+        lambda: _create_codex_operational_executor(
+            arguments.model, arguments.effort, arguments.timeout_seconds
+        ),
+    )
+
+
+def _operational_evidence_verify(arguments: argparse.Namespace) -> int:
+    serialized_authoring_evidence, verified_authoring_evidence = _verified_authoring_evidence(
+        arguments.authoring_evidence,
+        arguments.repository_revision,
+    )
+    verification = verify_authoring_operational_evidence(
+        Path(arguments.path).read_text(encoding="utf-8"),
+        serialized_authoring_evidence,
+        verified_authoring_evidence,
+    )
+    if arguments.json_output:
+        print(
+            json.dumps(
+                verification.to_dict(),
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+    else:
+        print(
+            f"OK: {arguments.path} is valid report-only operational evidence "
+            f"[digest={verification.digest}, "
+            f"matched_probes={verification.matched_probes}, "
+            f"total_probes={verification.total_probes}]"
+        )
+    return 0
 
 
 def _authoring_evidence_verify(arguments: argparse.Namespace) -> int:
@@ -666,6 +768,9 @@ def _parser() -> argparse.ArgumentParser:
             open_workflow_import=_open_workflow_import,
             authoring_benchmark_codex=_authoring_benchmark_codex,
             authoring_benchmark_gemini=_authoring_benchmark_gemini,
+            operational_benchmark_codex=_operational_benchmark_codex,
+            operational_benchmark_gemini=_operational_benchmark_gemini,
+            operational_evidence_verify=_operational_evidence_verify,
             authoring_evidence_verify=_authoring_evidence_verify,
             authoring_evidence_sign=_authoring_evidence_sign,
             authoring_evidence_signature_verify=_authoring_evidence_signature_verify,
@@ -700,7 +805,7 @@ def main(argv: list[str] | None = None) -> int:
     except CompatibilityError as compatibility_error:
         _print_report(compatibility_error.report)
         return 1
-    except (CodexAuthorError, GeminiAuthorError) as provider_error:
+    except (CodexAuthorError, GeminiAuthorError, OperationalProviderError) as provider_error:
         provider_identifier = (
             "openai_codex"
             if str(getattr(arguments, "command", "")).endswith("codex")
@@ -709,7 +814,7 @@ def main(argv: list[str] | None = None) -> int:
         log_id = log_event(
             logger,
             logging.ERROR,
-            "Authoring provider failed",
+            "Model provider failed",
             operation=str(getattr(arguments, "command", "unknown")),
             context={
                 "provider": provider_identifier,

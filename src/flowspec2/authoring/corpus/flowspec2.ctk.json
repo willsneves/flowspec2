@@ -15,13 +15,13 @@
           "ir_format": "flowspec2/ir@1",
           "flow": "linear_maintenance_request",
           "version": "1.0.0",
-          "source_digest": "f2245343ad392625ecd114f6273cc87c0f37eddea59ef65e523b8713873f0e34",
+          "source_digest": "8d0fc6b9e48ed28092d670b9ae0fd3fadc8dfbc17f73c2f3104ef64a55af343f",
           "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
           "dependency_digest": "fedc868783841382d0969ddb2c3d84a886bba6406e2d978cf64185bb16e013ec",
-          "digest": "6d179ef50a1cbc7523e04e040c1bd5302bc6541e6eb1c552548293e3847e801c",
-          "canonical_document_digest": "7ebe5686db48ae1bc246a395fe32573d2643346816ea7b760eb2487e38f1c490",
-          "canonical_execution_ir_digest": "49dea87756411b4ec35986e0341b375f443b5e065f4928539fcf064b50eb5ef7",
-          "canonical_ir_digest": "cbfee79b5b1eb0328c437ce3b27628d81f4465aa7a759ca7c270f146dd236d64"
+          "digest": "b829dd1981d2d11cac40de240753e65ecbe2fde16333a57d32e1270b93945b8a",
+          "canonical_document_digest": "7ef8e510c22e58c1746488adade9c17da2a127bab62c37acc9c6c7d73afb2acf",
+          "canonical_execution_ir_digest": "43c3708bf68b342bc5da9dd9a6f8c28876cbc3fb8babb98a0471bc109d663c95",
+          "canonical_ir_digest": "352b8502c5b6e35a65782305ff552431666b2a3f7d90aaa3cfce91a1eb08b3cf"
         }
       },
       "turns": [
@@ -39,7 +39,7 @@
                   "request_description": {
                     "type": "string",
                     "title": "Request Description",
-                    "description": "Valor para request_description.",
+                    "description": "Set request_description to only the text inside `ZETA=[...]`; ignore `ALPHA=[...]`.",
                     "minLength": 1
                   }
                 },

@@ -16,11 +16,15 @@ import pytest
 
 from flowspec2 import FlowRuntime
 from flowspec2.llm import (
+    EXTRACT_SYS,
+    ROUTE_SYS,
     GeminiAgent,
     _enum_of,
     _extraction_response_schema,
     _fields_spec,
     _route_response_schema,
+    build_extraction_request,
+    build_route_request,
 )
 from flowspec2.models import CORRECTION_TARGETS_SCHEMA_KEY, AgentResponse
 
@@ -97,21 +101,7 @@ def test_fields_spec_falls_back_to_interactive_buttons():
 
 
 def _capture_extraction_prompt(agent_response: AgentResponse) -> str:
-    captured_prompts: list[str] = []
-    agent = object.__new__(GeminiAgent)
-
-    def capture_json(
-        system: str,
-        prompt: str,
-        response_schema: dict[str, Any],
-    ) -> dict[str, Any]:
-        del system, response_schema
-        captured_prompts.append(prompt)
-        return {}
-
-    cast(Any, agent)._json = capture_json
-    agent.extract("resposta", agent_response)
-    return captured_prompts[0]
+    return build_extraction_request("resposta", agent_response).prompt
 
 
 def test_extraction_prompt_uses_exact_json_scalar_types_and_null() -> None:
@@ -176,6 +166,83 @@ def test_route_response_schema_closes_service_to_catalog() -> None:
         "repair_road",
         None,
     ]
+
+
+def test_route_request_renders_description_first_and_trigger_phrases_as_examples() -> None:
+    request = build_route_request(
+        "o poste da esquina apagou",
+        [
+            {
+                "flow": "repair_light",
+                "route": {
+                    "description": "Registra defeitos na iluminação pública.",
+                    "trigger_phrases": ["poste apagado", "luz piscando"],
+                },
+            },
+            {
+                "flow": "repair_road",
+                "route": {"description": "Registra defeitos no pavimento."},
+            },
+        ],
+    )
+
+    assert request.system == ROUTE_SYS
+    assert request.prompt == (
+        "Catálogo de serviços em JSON:\n"
+        '[{"description":"Registra defeitos na iluminação pública.","service":"repair_light",'
+        '"trigger_phrases":["poste apagado","luz piscando"]},{"description":"Registra '
+        'defeitos no pavimento.","service":"repair_road","trigger_phrases":[]}]\n\n'
+        "Use description como a definição principal de cada serviço. trigger_phrases contém "
+        "apenas exemplos de mensagens compatíveis; não trate esses exemplos como lista "
+        "exclusiva nem como garantia de correspondência.\n\n"
+        'Mensagem do cidadão: "o poste da esquina apagou"\n\n'
+        'Devolva {"service": "<nome do serviço>"} se algum atende, ou {"service": null} se '
+        "nenhum atende."
+    )
+    assert request.response_schema["properties"]["service"]["enum"] == [
+        "repair_light",
+        "repair_road",
+        None,
+    ]
+
+
+def test_extraction_request_preserves_extract_hint_in_closed_response_schema() -> None:
+    request = build_extraction_request(
+        "tá tudo escuro",
+        AgentResponse(
+            description="Qual é o defeito?",
+            payload_schema={
+                "type": "object",
+                "properties": {
+                    "defect": {
+                        "description": "Mapeie escuridão para Off.",
+                        "enum": ["Off", "Flashing"],
+                    }
+                },
+                "required": ["defect"],
+            },
+        ),
+    )
+
+    assert request.system == EXTRACT_SYS
+    assert request.prompt == (
+        'Pergunta do bot: "Qual é o defeito?"\n'
+        'Campos a extrair:\n- "defect": um destes valores EXATOS: ["Off", "Flashing"]\n\n'
+        'Resposta do cidadão: "tá tudo escuro"\n\n'
+        "Regras:\n- Use SOMENTE os valores permitidos nas listas fechadas.\n"
+        "- Devolva apenas o JSON com os campos pedidos."
+    )
+    assert request.response_schema == {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "defect": {
+                "description": "Mapeie escuridão para Off.",
+                "enum": ["Off", "Flashing"],
+            }
+        },
+        "required": ["defect"],
+    }
 
 
 def test_extraction_response_schema_supports_payload_or_correction() -> None:
