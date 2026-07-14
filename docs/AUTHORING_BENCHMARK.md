@@ -2,13 +2,14 @@
 
 Table of Contents:
 
-- Purpose: 24 <!-- section:purpose -->
-- Evaluation contract: 39 <!-- section:evaluation-contract -->
-- Author integration: 89 <!-- section:author-integration -->
-- Structured-output projection: 186 <!-- section:structured-output-projection -->
-- Conformance kit: 213 <!-- section:conformance-kit -->
-- Interpreting reports: 239 <!-- section:interpreting-reports -->
-- Format promotion: 279 <!-- section:format-promotion -->
+- Purpose: 25 <!-- section:purpose -->
+- Evaluation contract: 40 <!-- section:evaluation-contract -->
+- Author integration: 90 <!-- section:author-integration -->
+- Structured-output projection: 187 <!-- section:structured-output-projection -->
+- Conformance kit: 214 <!-- section:conformance-kit -->
+- Interpreting reports: 240 <!-- section:interpreting-reports -->
+- Evidence authenticity: 279 <!-- section:evidence-authenticity -->
+- Format promotion: 304 <!-- section:format-promotion -->
 
 <!-- /section:toc -->
 
@@ -270,10 +271,34 @@ with every reported case and correction attempt, including matching source
 hashes, before the artifact can serialize.
 
 The content digest detects modification but is not an authenticity mechanism.
-Claims about who ran the benchmark require an external signature or a trusted
-artifact-distribution channel.
+Unsigned evidence remains valid integrity-only evidence.
 
 <!-- /section:interpreting-reports -->
+<!-- section:evidence-authenticity -->
+
+## Evidence authenticity
+
+Authenticity is an explicit optional layer over verified evidence. Signing
+first performs the complete offline replay, then signs a domain-separated
+message that binds the verified evidence digest. Verification repeats the
+evidence replay before authenticating the detached signature against the public
+key supplied by the caller:
+
+```bash
+flowspec2 authoring-evidence-sign authoring-evidence.json --private-key authoring-private-key.pem --repository-revision <revision> --output authoring-evidence.signature.json
+flowspec2 authoring-evidence-signature-verify authoring-evidence.json --signature authoring-evidence.signature.json --public-key authoring-public-key.pem --repository-revision <revision> --json
+```
+
+The signature artifact uses the closed canonical
+`flowspec2/authoring-evidence-signature@1` contract and records the Ed25519
+algorithm, verified evidence digest, signature, and public-key identifier. It
+does not contain the public key: the caller-managed key file or trust store is
+the trust root. Private keys use unencrypted PKCS8 PEM, public keys use
+SubjectPublicKeyInfo PEM, and key files are never evidence inputs or benchmark
+captures. See [ADR 0004](adr/0004-evidence-authenticity.md) for the trust and
+rotation decision.
+
+<!-- /section:evidence-authenticity -->
 <!-- section:format-promotion -->
 
 ## Format promotion

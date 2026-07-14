@@ -7,6 +7,8 @@ import logging
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from flowspec2.authoring import (
     AuthoredSource,
@@ -62,6 +64,26 @@ def _arguments(output_path: Path) -> list[str]:
         "--output",
         str(output_path),
     ]
+
+
+def _write_ed25519_keys(directory_path: Path) -> tuple[Path, Path]:
+    private_key = Ed25519PrivateKey.from_private_bytes(bytes([7]) * 32)
+    private_key_path = directory_path / "authoring-private-key.pem"
+    public_key_path = directory_path / "authoring-public-key.pem"
+    private_key_path.write_bytes(
+        private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    public_key_path.write_bytes(
+        private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    return private_key_path, public_key_path
 
 
 def test_cli_requires_explicit_network_opt_in_before_provider_creation(
@@ -206,3 +228,124 @@ def test_cli_preserves_existing_output(
     assert main(_arguments(output_path)) == 1
     assert output_path.read_text(encoding="utf-8") == "existing"
     assert provider_created is False
+
+
+def test_cli_signs_and_authenticates_evidence_without_exposing_key_material(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        "flowspec2.cli._create_gemini_author",
+        lambda _model: FakeCliAuthor(),
+    )
+    evidence_path = tmp_path / "evidence.json"
+    signature_path = tmp_path / "evidence.signature.json"
+    private_key_path, public_key_path = _write_ed25519_keys(tmp_path)
+    assert main(_arguments(evidence_path)) == 0
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "authoring-evidence-sign",
+                str(evidence_path),
+                "--private-key",
+                str(private_key_path),
+                "--repository-revision",
+                "revision-under-test",
+                "--output",
+                str(signature_path),
+            ]
+        )
+        == 0
+    )
+    signature_output = capsys.readouterr().out
+    signature_document = json.loads(signature_path.read_text(encoding="utf-8"))
+    assert signature_document["algorithm"] == "ed25519"
+    assert "PRIVATE KEY" not in signature_path.read_text(encoding="utf-8")
+    assert "PRIVATE KEY" not in signature_output
+
+    assert (
+        main(
+            [
+                "authoring-evidence-signature-verify",
+                str(evidence_path),
+                "--signature",
+                str(signature_path),
+                "--public-key",
+                str(public_key_path),
+                "--repository-revision",
+                "revision-under-test",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    authentication_document = json.loads(capsys.readouterr().out)
+    assert authentication_document["authenticated"] is True
+    assert authentication_document["key_id"] == signature_document["key_id"]
+    assert authentication_document["evidence"]["digest"] == signature_document["evidence_digest"]
+    assert "authored_source" not in json.dumps(authentication_document)
+
+
+def test_cli_preserves_existing_signature_and_rejects_environment_key_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "flowspec2.cli._create_gemini_author",
+        lambda _model: FakeCliAuthor(),
+    )
+    evidence_path = tmp_path / "evidence.json"
+    signature_path = tmp_path / "existing-signature.json"
+    private_key_path, _public_key_path = _write_ed25519_keys(tmp_path)
+    assert main(_arguments(evidence_path)) == 0
+    signature_path.write_text("existing", encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "authoring-evidence-sign",
+                str(evidence_path),
+                "--private-key",
+                str(private_key_path),
+                "--output",
+                str(signature_path),
+            ]
+        )
+        == 1
+    )
+
+    environment_key_path = tmp_path / ".env.signing"
+    environment_key_path.write_bytes(private_key_path.read_bytes())
+    aliased_environment_key_path = tmp_path / "aliased-private-key.pem"
+    aliased_environment_key_path.symlink_to(environment_key_path)
+    assert (
+        main(
+            [
+                "authoring-evidence-sign",
+                str(evidence_path),
+                "--private-key",
+                str(aliased_environment_key_path),
+                "--output",
+                str(tmp_path / "aliased-signature.json"),
+            ]
+        )
+        == 1
+    )
+    assert signature_path.read_text(encoding="utf-8") == "existing"
+
+    assert (
+        main(
+            [
+                "authoring-evidence-sign",
+                str(evidence_path),
+                "--private-key",
+                str(tmp_path / ".env.keys"),
+                "--output",
+                str(tmp_path / "new-signature.json"),
+            ]
+        )
+        == 1
+    )

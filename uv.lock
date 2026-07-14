@@ -238,6 +238,7 @@ name = "flowspec2"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "jsonschema" },
     { name = "langgraph" },
     { name = "pydantic" },
@@ -265,6 +266,7 @@ llm = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = "==49.0.0" },
     { name = "google-genai", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "google-genai", marker = "extra == 'llm'", specifier = ">=1.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },

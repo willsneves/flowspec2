@@ -24,7 +24,9 @@ from .authoring import (
     RecordingAuthor,
     load_reference_authoring_corpus,
     run_authoring_benchmark,
+    sign_authoring_evidence,
     verify_authoring_evidence,
+    verify_authoring_evidence_signature,
 )
 from .checker import check_flow, check_json
 from .cli_parser import CliHandlers, CommandHandler, build_parser
@@ -52,6 +54,17 @@ def _load_json_mapping(document_path: str | Path) -> dict[str, Any]:
     if not isinstance(document, dict) or not document:
         raise ValueError(f"JSON document {path} must be a non-empty object")
     return document
+
+
+def _read_key_material(key_path: str | Path) -> bytes:
+    path = Path(key_path)
+    resolved_path = path.resolve(strict=False)
+    if any(
+        candidate_path.name == ".env" or candidate_path.name.startswith(".env.")
+        for candidate_path in (path, resolved_path)
+    ):
+        raise ValueError("key material must not be loaded from an environment file")
+    return path.read_bytes()
 
 
 def _load_structured_mapping(document_path: str | Path) -> dict[str, Any]:
@@ -396,6 +409,49 @@ def _authoring_evidence_verify(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _authoring_evidence_sign(arguments: argparse.Namespace) -> int:
+    output_path = Path(arguments.output)
+    if output_path.exists():
+        raise FileExistsError(f"output already exists: {output_path}")
+    evidence_signature = sign_authoring_evidence(
+        Path(arguments.path).read_text(encoding="utf-8"),
+        _read_key_material(arguments.private_key),
+        expected_repository_revision=arguments.repository_revision,
+    )
+    _write_text_exclusive(output_path, f"{evidence_signature.to_json()}\n")
+    print(
+        f"Wrote authoring evidence signature to {output_path} "
+        f"[evidence_digest={evidence_signature.evidence_digest}, "
+        f"key_id={evidence_signature.key_id}]"
+    )
+    return 0
+
+
+def _authoring_evidence_signature_verify(arguments: argparse.Namespace) -> int:
+    authentication = verify_authoring_evidence_signature(
+        Path(arguments.path).read_text(encoding="utf-8"),
+        Path(arguments.signature).read_text(encoding="utf-8"),
+        _read_key_material(arguments.public_key),
+        expected_repository_revision=arguments.repository_revision,
+    )
+    if arguments.json_output:
+        print(
+            json.dumps(
+                authentication.to_dict(),
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+    else:
+        print(
+            f"OK: {arguments.path} is authenticated authoring evidence "
+            f"[digest={authentication.evidence.digest}, key_id={authentication.key_id}]"
+        )
+    return 0
+
+
 def _parser() -> argparse.ArgumentParser:
     return build_parser(
         CliHandlers(
@@ -411,6 +467,8 @@ def _parser() -> argparse.ArgumentParser:
             open_workflow_import=_open_workflow_import,
             authoring_benchmark_gemini=_authoring_benchmark_gemini,
             authoring_evidence_verify=_authoring_evidence_verify,
+            authoring_evidence_sign=_authoring_evidence_sign,
+            authoring_evidence_signature_verify=_authoring_evidence_signature_verify,
             default_gemini_model=DEFAULT_GEMINI_AUTHOR_MODEL,
         )
     )

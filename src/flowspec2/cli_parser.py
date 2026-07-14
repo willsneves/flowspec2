@@ -46,6 +46,8 @@ class CliHandlers:
     open_workflow_import: CommandHandler
     authoring_benchmark_gemini: CommandHandler
     authoring_evidence_verify: CommandHandler
+    authoring_evidence_sign: CommandHandler
+    authoring_evidence_signature_verify: CommandHandler
     default_gemini_model: str
 
 
@@ -182,5 +184,31 @@ def build_parser(cli_handlers: CliHandlers) -> argparse.ArgumentParser:
         help="emit a deterministic machine-readable verification summary",
     )
     evidence_verify_parser.set_defaults(handler=cli_handlers.authoring_evidence_verify)
+
+    evidence_sign_parser = subparsers.add_parser(
+        "authoring-evidence-sign",
+        help="sign a verified authoring evidence digest with Ed25519",
+    )
+    evidence_sign_parser.add_argument("path")
+    evidence_sign_parser.add_argument("--private-key", required=True)
+    evidence_sign_parser.add_argument("--repository-revision")
+    evidence_sign_parser.add_argument("--output", required=True)
+    evidence_sign_parser.set_defaults(handler=cli_handlers.authoring_evidence_sign)
+
+    signature_verify_parser = subparsers.add_parser(
+        "authoring-evidence-signature-verify",
+        help="authenticate authoring evidence with a trusted Ed25519 public key",
+    )
+    signature_verify_parser.add_argument("path")
+    signature_verify_parser.add_argument("--signature", required=True)
+    signature_verify_parser.add_argument("--public-key", required=True)
+    signature_verify_parser.add_argument("--repository-revision")
+    signature_verify_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="emit a deterministic machine-readable authentication summary",
+    )
+    signature_verify_parser.set_defaults(handler=cli_handlers.authoring_evidence_signature_verify)
 
     return parser

@@ -2,9 +2,10 @@
 
 Table of Contents:
 
-- Supported versions: 15 <!-- section:supported-versions -->
-- Reporting a vulnerability: 27 <!-- section:reporting -->
-- Scope and handling: 41 <!-- section:scope-handling -->
+- Supported versions: 16 <!-- section:supported-versions -->
+- Reporting a vulnerability: 28 <!-- section:reporting -->
+- Evidence signing keys: 42 <!-- section:evidence-signing-keys -->
+- Scope and handling: 59 <!-- section:scope-handling -->
 
 <!-- /section:toc -->
 
@@ -36,13 +37,30 @@ credential was exposed while investigating, rotate it through its owning
 platform rather than attaching it to the report.
 
 <!-- /section:reporting -->
+<!-- section:evidence-signing-keys -->
+
+## Evidence signing keys
+
+Treat authoring-evidence private keys as deployment secrets. Provision them
+through the owning platform or secret store, expose them to the signing process
+through a narrowly scoped file, and never commit or attach them to evidence.
+The CLI rejects environment-file key paths and never emits key material.
+
+Distribute trusted public keys independently from evidence and signature
+artifacts. A valid signature proves control of the corresponding private key;
+the trust policy that maps a key identifier to an operator or automation
+identity remains an external operational responsibility. Rotate a compromised
+key, remove it from trust stores, and re-authenticate retained evidence only
+when policy requires a currently trusted signer.
+
+<!-- /section:evidence-signing-keys -->
 <!-- section:scope-handling -->
 
 ## Scope and handling
 
 Reports involving structural validation bypasses, profile or tool-boundary
 escapes, unsafe state restoration, idempotency failures, secret disclosure, or
-evidence-verification bypasses are in scope.
+evidence-verification and evidence-signature bypasses are in scope.
 
 The maintainer will validate the report privately, coordinate a fix and release,
 and publish an advisory when disclosure is safe. Public artifacts never include

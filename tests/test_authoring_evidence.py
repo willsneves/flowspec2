@@ -8,6 +8,8 @@ from dataclasses import replace
 
 import jsonschema
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from flowspec2 import __version__
 from flowspec2.authoring import (
@@ -15,13 +17,17 @@ from flowspec2.authoring import (
     AuthoredSource,
     AuthoringBenchmarkEvidence,
     AuthoringBenchmarkLimits,
+    AuthoringEvidenceSignature,
     AuthoringProviderProvenance,
     AuthoringRequest,
     RecordingAuthor,
     authoring_evidence_schema,
+    authoring_evidence_signature_schema,
     load_reference_authoring_corpus,
     run_authoring_benchmark,
+    sign_authoring_evidence,
     verify_authoring_evidence,
+    verify_authoring_evidence_signature,
 )
 from flowspec2.profiles import reference_profile
 
@@ -86,6 +92,20 @@ def _resign(evidence_document: dict[str, object]) -> str:
         _canonical_json(unsigned_document).encode("utf-8")
     ).hexdigest()
     return _canonical_json(evidence_document)
+
+
+def _ed25519_key_material(seed_byte: int = 7) -> tuple[bytes, bytes]:
+    private_key = Ed25519PrivateKey.from_private_bytes(bytes([seed_byte]) * 32)
+    private_key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    public_key_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return private_key_pem, public_key_pem
 
 
 def test_evidence_is_canonical_deterministic_and_defensively_projected() -> None:
@@ -290,4 +310,99 @@ def test_evidence_verifier_rejects_capture_and_report_tampering_after_resigning(
         verify_authoring_evidence(
             _evidence().to_json(),
             expected_repository_revision="different-revision",
+        )
+
+
+def test_evidence_signature_is_deterministic_and_authenticates_safe_summary() -> None:
+    serialized_evidence = _evidence().to_json()
+    private_key_pem, public_key_pem = _ed25519_key_material()
+
+    first_signature = sign_authoring_evidence(
+        serialized_evidence,
+        private_key_pem,
+        expected_repository_revision="revision-under-test",
+    )
+    second_signature = sign_authoring_evidence(serialized_evidence, private_key_pem)
+    authentication = verify_authoring_evidence_signature(
+        serialized_evidence,
+        first_signature.to_json(),
+        public_key_pem,
+        expected_repository_revision="revision-under-test",
+    )
+
+    assert first_signature == second_signature
+    assert first_signature.evidence_digest == _evidence().digest
+    assert authentication.key_id == first_signature.key_id
+    assert authentication.evidence.digest == first_signature.evidence_digest
+    assert "authored_source" not in _canonical_json(authentication.to_dict())
+    assert "PRIVATE KEY" not in first_signature.to_json()
+
+
+def test_evidence_signature_schema_is_closed_and_defensively_projected() -> None:
+    first_schema = authoring_evidence_signature_schema()
+    first_schema["properties"]["unexpected"] = {"type": "string"}
+
+    assert "unexpected" not in authoring_evidence_signature_schema()["properties"]
+
+    private_key_pem, _public_key_pem = _ed25519_key_material()
+    signature_document = json.loads(
+        sign_authoring_evidence(_evidence().to_json(), private_key_pem).to_json()
+    )
+    signature_document["unexpected"] = True
+    with pytest.raises(jsonschema.ValidationError, match="Additional properties are not allowed"):
+        AuthoringEvidenceSignature.from_json(_canonical_json(signature_document))
+
+
+def test_evidence_signature_rejects_wrong_key_tampering_and_digest_mismatch() -> None:
+    serialized_evidence = _evidence().to_json()
+    private_key_pem, public_key_pem = _ed25519_key_material()
+    _other_private_key_pem, other_public_key_pem = _ed25519_key_material(seed_byte=8)
+    evidence_signature = sign_authoring_evidence(serialized_evidence, private_key_pem)
+
+    with pytest.raises(ValueError, match="different public key"):
+        verify_authoring_evidence_signature(
+            serialized_evidence,
+            evidence_signature.to_json(),
+            other_public_key_pem,
+        )
+
+    tampered_signature = json.loads(evidence_signature.to_json())
+    tampered_signature["signature"] = (
+        "A" if tampered_signature["signature"][0] != "A" else "B"
+    ) + tampered_signature["signature"][1:]
+    with pytest.raises(ValueError, match="signature is invalid"):
+        verify_authoring_evidence_signature(
+            serialized_evidence,
+            _canonical_json(tampered_signature),
+            public_key_pem,
+        )
+
+    mismatched_digest = json.loads(evidence_signature.to_json())
+    mismatched_digest["evidence_digest"] = "0" * 64
+    with pytest.raises(ValueError, match="different evidence digest"):
+        verify_authoring_evidence_signature(
+            serialized_evidence,
+            _canonical_json(mismatched_digest),
+            public_key_pem,
+        )
+
+
+def test_evidence_signature_rejects_invalid_keys_and_noncanonical_json() -> None:
+    serialized_evidence = _evidence().to_json()
+    private_key_pem, public_key_pem = _ed25519_key_material()
+    evidence_signature = sign_authoring_evidence(serialized_evidence, private_key_pem)
+
+    with pytest.raises(ValueError, match="private key"):
+        sign_authoring_evidence(serialized_evidence, b"not a private key")
+    with pytest.raises(ValueError, match="public key"):
+        verify_authoring_evidence_signature(
+            serialized_evidence,
+            evidence_signature.to_json(),
+            b"not a public key",
+        )
+    with pytest.raises(ValueError, match="canonical compact JSON"):
+        verify_authoring_evidence_signature(
+            serialized_evidence,
+            json.dumps(json.loads(evidence_signature.to_json()), indent=2),
+            public_key_pem,
         )
