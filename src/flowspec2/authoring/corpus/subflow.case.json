@@ -1,5 +1,5 @@
 {
-  "format": "flowspec2/authoring-case@2",
+  "format": "flowspec2/authoring-case@3",
   "identifier": "address_subflow",
   "prompt": "Author an ordered flow that first runs collect_reference_note for optional reference_note in the optional free-text ReferenceNote domain, then delegates address collection to address@1. Declare address@1 exactly once with required and needs_confirmation both true. Add no other semantic behavior. Flow identity, version, route prose, and non-verbatim prompt wording may vary.",
   "feature_tags": ["subflow", "address"],

@@ -1,5 +1,5 @@
 {
-  "format": "flowspec2/authoring-case@2",
+  "format": "flowspec2/authoring-case@3",
   "identifier": "await_and_correction",
   "prompt": "Author the ordered steps collect_request_description, authenticate_requester, confirm_ticket_data, and the open_ticket terminal. Collect required request_description through free-text RequestDescription. Persist cpf internally through the Cpf domain. Suspend authenticate_requester with a verbatim cta_url prompt and out-of-band authentication_token field. Use resume contract version 1 with an exact eleven-digit cpf object schema, correlation $token.cpf, duplicate ignore, late reject, and set cpf from $token.cpf. Timeout, abort, and switch return to collect_request_description; resend returns to authenticate_requester. Confirm through ticket_data_confirmed in bool domain SimNao with affirmation and emoji_veto normalization, buttons sourced from SimNao, and allow correction of request_description. Call sgrc_open_ticket idempotently with request_description as problema and cpf as solicitante, store result.protocolo as protocol_id, reset on success and fatal, and preserve state on retryable. Add no other semantic behavior. Flow identity, version, route prose, and non-verbatim path-prompt wording may vary.",
   "feature_tags": ["await_external", "correction", "terminal"],

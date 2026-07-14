@@ -7,7 +7,7 @@ import json
 from collections.abc import Callable
 from dataclasses import FrozenInstanceError, dataclass, fields, replace
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, NotRequired, TypedDict, cast
 
 import pytest
 
@@ -35,7 +35,7 @@ _FIXTURE_DIRECTORY = Path(__file__).parents[1] / "src" / "flowspec2" / "authorin
 class RequiredConstructFixture(TypedDict):
     identifier: str
     pointer_pattern: str
-    expected: object
+    expected: NotRequired[object]
 
 
 class AuthoringFixture(TypedDict):
@@ -56,10 +56,17 @@ def _authoring_fixtures() -> tuple[AuthoringFixture, ...]:
 
 def _benchmark_case(authoring_fixture: AuthoringFixture) -> AuthoringBenchmarkCase:
     required_constructs = tuple(
-        RequiredFlowConstruct.expecting(
-            required_construct["identifier"],
-            required_construct["pointer_pattern"],
-            required_construct["expected"],
+        (
+            RequiredFlowConstruct.expecting(
+                required_construct["identifier"],
+                required_construct["pointer_pattern"],
+                required_construct["expected"],
+            )
+            if "expected" in required_construct
+            else RequiredFlowConstruct(
+                identifier=required_construct["identifier"],
+                pointer_pattern=required_construct["pointer_pattern"],
+            )
         )
         for required_construct in authoring_fixture["required_constructs"]
     )
@@ -158,14 +165,42 @@ def test_fixture_corpus_compiles_and_serializes_deterministically() -> None:
         )
 
 
-def test_fixture_oracles_require_exact_values() -> None:
-    required_constructs = (
+def test_fixture_oracles_distinguish_exact_rails_from_operational_presence() -> None:
+    required_constructs = tuple(
         required_construct
         for authoring_fixture in _authoring_fixtures()
         for required_construct in authoring_fixture["required_constructs"]
     )
+    presence_only_identifiers = {
+        "route-trigger-examples",
+        "request-description-extraction-hint",
+    }
 
-    assert all("expected" in required_construct for required_construct in required_constructs)
+    assert {
+        required_construct["identifier"]
+        for required_construct in required_constructs
+        if "expected" not in required_construct
+    } == presence_only_identifiers
+    assert all(
+        "expected" in required_construct
+        for required_construct in required_constructs
+        if required_construct["identifier"] not in presence_only_identifiers
+    )
+
+
+def test_required_construct_projection_distinguishes_presence_from_exact_null() -> None:
+    presence_requirement = RequiredFlowConstruct(
+        identifier="presence-only",
+        pointer_pattern="/route/trigger_phrases",
+    )
+    exact_null_requirement = RequiredFlowConstruct.expecting(
+        "exact-null",
+        "/route/trigger_phrases",
+        None,
+    )
+
+    assert "expected" not in presence_requirement.to_dict()
+    assert exact_null_requirement.to_dict()["expected"] is None
 
 
 def test_author_request_exposes_public_acceptance_without_reference_source() -> None:
@@ -200,7 +235,7 @@ def test_author_request_exposes_public_acceptance_without_reference_source() -> 
         "prompt",
     }
     acceptance_document = authoring_request.task.acceptance.to_dict()
-    assert acceptance_document["format"] == "flowspec2/authoring-acceptance@1"
+    assert acceptance_document["format"] == "flowspec2/authoring-acceptance@2"
     assert acceptance_document["expectations"]
     assert acceptance_document["required_constructs"]
     assert acceptance_document["forbidden_constructs"]
@@ -602,8 +637,12 @@ def test_acceptance_ignores_declared_presentation_choices() -> None:
     cast(dict[str, Any], alternate_source["route"])["description"] = (
         "Route any municipal maintenance description."
     )
+    cast(dict[str, Any], alternate_source["route"])["trigger_phrases"] = [
+        "a different trigger example"
+    ]
     cast(list[dict[str, Any]], alternate_source["path"])[0]["prompt"] = {
-        "text": "What should the city maintain?"
+        "text": "What should the city maintain?",
+        "extract_hint": "Retain the maintenance details supplied by the citizen.",
     }
 
     authoring_attempt = (

@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prefeitura.rio/flowspec2/authoring-operational-evidence-2.json",
+  "title": "FlowSpec2 report-only authoring operational evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "classification",
+    "package_version",
+    "repository_revision",
+    "benchmark_evidence_digest",
+    "corpus",
+    "provider",
+    "catalog",
+    "captures",
+    "matched_probes",
+    "total_probes",
+    "all_matched",
+    "digest"
+  ],
+  "properties": {
+    "format": {"const": "flowspec2/authoring-operational-evidence@2"},
+    "classification": {"const": "report_only"},
+    "package_version": {"type": "string", "minLength": 1},
+    "repository_revision": {"type": "string", "minLength": 1},
+    "benchmark_evidence_digest": {"$ref": "#/$defs/digest"},
+    "corpus": {"$ref": "#/$defs/corpus"},
+    "provider": {"$ref": "#/$defs/provider"},
+    "catalog": {"$ref": "#/$defs/catalog"},
+    "captures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/capture"}
+    },
+    "matched_probes": {"type": "integer", "minimum": 0},
+    "total_probes": {"type": "integer", "minimum": 1},
+    "all_matched": {"type": "boolean"},
+    "digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "corpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "probe_format", "identifier", "digest", "probe_identifiers"],
+      "properties": {
+        "format": {"const": "flowspec2/operational-corpus@2"},
+        "probe_format": {"const": "flowspec2/operational-probe@2"},
+        "identifier": {"const": "flowspec2_reference_operational"},
+        "digest": {"$ref": "#/$defs/digest"},
+        "probe_identifiers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/identifier"}
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identifier",
+        "model",
+        "sdk",
+        "sdk_version",
+        "prompt_format",
+        "prompt_digest",
+        "generation_configuration"
+      ],
+      "properties": {
+        "identifier": {"$ref": "#/$defs/identifier"},
+        "model": {"type": "string", "minLength": 1},
+        "sdk": {"type": "string", "minLength": 1},
+        "sdk_version": {"type": "string", "minLength": 1},
+        "prompt_format": {"const": "flowspec2/operational-structured-output@1"},
+        "prompt_digest": {"$ref": "#/$defs/digest"},
+        "generation_configuration": {"type": "object"}
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_closure", "digest"],
+      "properties": {
+        "source_closure": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["case_identifier", "correction_round", "source_sha256"],
+            "properties": {
+              "case_identifier": {"$ref": "#/$defs/identifier"},
+              "correction_round": {"type": "integer", "minimum": 0},
+              "source_sha256": {"$ref": "#/$defs/digest"}
+            }
+          }
+        },
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system_instruction", "prompt", "response_schema"],
+      "properties": {
+        "system_instruction": {"type": "string", "minLength": 1},
+        "prompt": {"type": "string", "minLength": 1},
+        "response_schema": {"type": "object"}
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probe_identifier",
+        "pair_identifier",
+        "subject_mode",
+        "operation",
+        "authoring_case_identifier",
+        "correction_round",
+        "source_sha256",
+        "subject_pointer",
+        "subject_sha256",
+        "request",
+        "expected_output",
+        "raw_output",
+        "raw_output_sha256",
+        "parsed_output",
+        "effective_model_version",
+        "matched",
+        "diagnostic"
+      ],
+      "properties": {
+        "probe_identifier": {"$ref": "#/$defs/identifier"},
+        "pair_identifier": {"$ref": "#/$defs/identifier"},
+        "subject_mode": {"enum": ["authored", "counterfactual"]},
+        "operation": {"enum": ["route", "extract"]},
+        "authoring_case_identifier": {"$ref": "#/$defs/identifier"},
+        "correction_round": {"type": "integer", "minimum": 0},
+        "source_sha256": {"$ref": "#/$defs/digest"},
+        "subject_pointer": {"type": "string", "pattern": "^/"},
+        "subject_sha256": {"$ref": "#/$defs/digest"},
+        "request": {"$ref": "#/$defs/request"},
+        "expected_output": {},
+        "raw_output": {"type": "string"},
+        "raw_output_sha256": {"$ref": "#/$defs/digest"},
+        "parsed_output": {},
+        "effective_model_version": {"type": ["string", "null"]},
+        "matched": {"type": "boolean"},
+        "diagnostic": {
+          "enum": [null, "invalid_json", "schema_mismatch", "semantic_mismatch"]
+        }
+      }
+    }
+  }
+}

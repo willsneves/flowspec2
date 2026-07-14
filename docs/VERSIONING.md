@@ -4,9 +4,9 @@ Table of Contents:
 
 - Package versions: 20 <!-- section:package-versions -->
 - Format and contract versions: 35 <!-- section:contract-versions -->
-- Compatibility promises: 62 <!-- section:compatibility-promises -->
-- Release procedure: 77 <!-- section:release-procedure -->
-- Artifact rollback: 95 <!-- section:artifact-rollback -->
+- Compatibility promises: 75 <!-- section:compatibility-promises -->
+- Release procedure: 90 <!-- section:release-procedure -->
+- Artifact rollback: 108 <!-- section:artifact-rollback -->
 
 <!-- /section:toc -->
 
@@ -36,9 +36,9 @@ artifact. Dependency locks change in the same commit as package metadata.
 
 Versioned identifiers such as `flowspec/2`, `flowspec2/ir@1`, corpus formats,
 prompt formats, projection formats, evidence envelopes, presentation rubrics,
-presentation reviews, and detached signatures are independent protocol
-contracts. An incompatible contract change receives a new identifier. Existing
-identifiers are never silently reinterpreted.
+presentation reviews, operational probes and evidence, and detached signatures
+are independent protocol contracts. An incompatible contract change receives a
+new identifier. Existing identifiers are never silently reinterpreted.
 
 Provider transports retain distinct versioned prompt identities while sharing
 the same closed authoring projection. Evidence records an effective model
@@ -51,8 +51,21 @@ public semantic acceptance projection and versioned provider prompt contracts;
 evidence produced against the earlier corpus is intentionally not comparable as
 model-quality evidence without naming that older contract.
 
+The next authoring contract generation classifies trigger examples and
+extraction hints as operational presentation choices, requires their presence
+where a case exercises them, and advances the acceptance, case, corpus, and
+provider-prompt identities together.
+
+The operational evidence, corpus, and probe contracts advance together when
+single observations become paired authored/counterfactual interventions. The
+new generation makes pair identity and subject mode explicit and rejects pairs
+whose inputs are not controlled or whose expected outcomes are identical.
+
 Runtime profiles and packaged corpora additionally carry canonical content
 digests. A known identifier with a different digest is drift and fails closed.
+Operational evidence also pins the exact authoring source closure, model request
+contract, and provider configuration. It is comparable only within those
+identities and remains independent of deterministic format conformance.
 Draft identifiers are experimental and provide no execution or compatibility
 promise unless their documentation says otherwise.
 

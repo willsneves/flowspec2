@@ -1,31 +1,31 @@
 {
-  "format": "flowspec2/authoring-corpus@2",
+  "format": "flowspec2/authoring-corpus@3",
   "identifier": "flowspec2_reference",
   "cases": [
     {
       "identifier": "address_subflow",
       "path": "subflow.case.json",
-      "sha256": "de2c956b2be83036e24f33a44a89b09101a6cc6e2e1dabfd72b1472f578ff900"
+      "sha256": "e7fe2fb903cc6557443fd8a9c37bbf2a68aa6ed914fa51952a7960179546ed31"
     },
     {
       "identifier": "await_and_correction",
       "path": "await_correction.case.json",
-      "sha256": "5016f3583d49d41170788ee9121d0c2f4143a6347aa795338682115a35888234"
+      "sha256": "68d254106aa2ee68c8de41df849b2d3ba618388f63b6322ff7330c231939ff6c"
     },
     {
       "identifier": "gated_derivation",
       "path": "gated_derive.case.json",
-      "sha256": "44ef00adaf5199994eb4b61673e073abf09db4b103e9bd94208b848543470292"
+      "sha256": "643c7bbf085e685fa2237578d5940bb89f1343f44d92bdc9d4033c53bc0259cd"
     },
     {
       "identifier": "linear_collection",
       "path": "linear.case.json",
-      "sha256": "d24d2f1b239542ac53a22fd917160af15234593d2a47056214e3b32757651f67"
+      "sha256": "dbdb6535bfba1400513748fbbdd7527dcd3db6025492c166e0674cbce1e11048"
     },
     {
       "identifier": "terminal_fulfillment",
       "path": "terminal.case.json",
-      "sha256": "2873c6da9034c59d23864768ee06fc2de9018f97826ea2c4a884cc4245e40f4c"
+      "sha256": "a745731bd94d9a098ac387b384e51e8118d6b5acc5b1dad01ef66ebb369fcb61"
     }
   ]
 }

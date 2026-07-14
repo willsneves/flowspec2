@@ -17,8 +17,8 @@ from flowspec2.json_codec import strict_json_loads
 
 from .benchmark import AuthoringBenchmarkCase, RequiredFlowConstruct
 
-AUTHORING_CASE_FORMAT: Final[str] = "flowspec2/authoring-case@2"
-AUTHORING_CORPUS_FORMAT: Final[str] = "flowspec2/authoring-corpus@2"
+AUTHORING_CASE_FORMAT: Final[str] = "flowspec2/authoring-case@3"
+AUTHORING_CORPUS_FORMAT: Final[str] = "flowspec2/authoring-corpus@3"
 REFERENCE_AUTHORING_CORPUS_ID: Final[str] = "flowspec2_reference"
 
 _IDENTIFIER_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -77,7 +77,7 @@ _CASE_SCHEMA: Final[dict[str, Any]] = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["identifier", "pointer_pattern", "expected"],
+                "required": ["identifier", "pointer_pattern"],
                 "properties": {
                     "identifier": {
                         "type": "string",
@@ -145,10 +145,17 @@ def _load_manifest(corpus_directory: Traversable) -> dict[str, Any]:
 
 def _benchmark_case(case_document: dict[str, Any]) -> AuthoringBenchmarkCase:
     required_constructs = tuple(
-        RequiredFlowConstruct.expecting(
-            cast(str, required_construct["identifier"]),
-            cast(str, required_construct["pointer_pattern"]),
-            required_construct["expected"],
+        (
+            RequiredFlowConstruct.expecting(
+                cast(str, required_construct["identifier"]),
+                cast(str, required_construct["pointer_pattern"]),
+                required_construct["expected"],
+            )
+            if "expected" in required_construct
+            else RequiredFlowConstruct(
+                identifier=cast(str, required_construct["identifier"]),
+                pointer_pattern=cast(str, required_construct["pointer_pattern"]),
+            )
         )
         for required_construct in cast(
             list[dict[str, Any]],

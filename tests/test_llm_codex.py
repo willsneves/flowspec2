@@ -11,6 +11,7 @@ import pytest
 
 from flowspec2 import AgentResponse, CodexAgent, FlowRuntime
 from flowspec2.codex_transport import DEFAULT_CODEX_MODEL
+from flowspec2.llm import build_route_request
 
 
 @dataclass(frozen=True)
@@ -51,14 +52,26 @@ class FakeCodexProvider:
 def test_codex_agent_routes_with_closed_ephemeral_output() -> None:
     fake_provider = FakeCodexProvider(['{"service":"repair_light"}'])
     agent = CodexAgent(provider=fake_provider, timeout_seconds=30.0)
-    flows = [{"flow": "repair_light", "route": {"description": "Repair street lights."}}]
+    flows = [
+        {
+            "flow": "repair_light",
+            "route": {
+                "description": "Repair street lights.",
+                "trigger_phrases": ["street light is off"],
+            },
+        }
+    ]
 
     assert agent.route("the street light is off", flows) == "repair_light"
 
     provider_call = fake_provider.calls[0]
+    expected_request = build_route_request("the street light is off", flows)
     assert provider_call["ephemeral"] is True
     assert provider_call["persist_session"] is False
     assert provider_call["timeout_s"] == 30.0
+    assert provider_call["system"] == expected_request.system
+    assert provider_call["messages"] == [{"role": "user", "content": expected_request.prompt}]
+    assert '"trigger_phrases":["street light is off"]' in expected_request.prompt
     assert provider_call["response_schema"]["properties"]["service"]["enum"] == [
         "repair_light",
         None,

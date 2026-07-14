@@ -19,6 +19,8 @@ EXPECTED_WHEEL_MEMBERS: Final[frozenset[str]] = frozenset(
         "flowspec2/py.typed",
         "flowspec2/authoring/authoring-evidence.schema.json",
         "flowspec2/authoring/authoring-evidence-signature.schema.json",
+        "flowspec2/authoring/authoring-operational-evidence.schema.json",
+        "flowspec2/authoring/operational-corpus.json",
         "flowspec2/experimental/flowspec-3-draft.schema.json",
         "flowspec2/compat/schemas/open-workflow-conversation-1.schema.json",
         "flowspec2/compat/schemas/vendor/open-workflow-1.0.3.LICENSE",
@@ -51,23 +53,30 @@ from importlib.metadata import version as installed_package_version
 from flowspec2 import CodexAgent, __version__
 from flowspec2.authoring import (
     CodexAuthor,
+    OPERATIONAL_EVIDENCE_CLASSIFICATION,
     PRESENTATION_REVIEW_FORMAT,
     authoring_evidence_schema,
     authoring_evidence_signature_schema,
+    authoring_operational_evidence_schema,
     authoring_presentation_review_signature_schema,
     load_reference_authoring_corpus,
+    load_reference_operational_corpus,
     presentation_review_schema,
 )
 from flowspec2.experimental import V2_SCHEMA_IDENTIFIER, V3_PREVIEW_SCHEMA_IDENTIFIER, preview_schema
 from flowspec2.schema import schema
 
 reference_corpus = load_reference_authoring_corpus()
+operational_corpus = load_reference_operational_corpus()
 assert __version__ == installed_package_version("flowspec2")
 assert CodexAgent.__name__ == "CodexAgent"
 assert CodexAuthor.__name__ == "CodexAuthor"
 assert reference_corpus.cases
+assert operational_corpus.probes
 assert authoring_evidence_schema()["$id"] == "https://prefeitura.rio/flowspec2/authoring-benchmark-evidence-2.json"
 assert authoring_evidence_signature_schema()["$id"] == "https://prefeitura.rio/flowspec2/authoring-evidence-signature-1.json"
+assert OPERATIONAL_EVIDENCE_CLASSIFICATION == "report_only"
+assert authoring_operational_evidence_schema()["$id"] == "https://prefeitura.rio/flowspec2/authoring-operational-evidence-2.json"
 assert PRESENTATION_REVIEW_FORMAT == "flowspec2/authoring-presentation-review@1"
 assert presentation_review_schema()["$id"] == "https://prefeitura.rio/flowspec2/authoring-presentation-review-1.json"
 assert authoring_presentation_review_signature_schema()["$id"] == "https://prefeitura.rio/flowspec2/authoring-presentation-review-signature-1.json"

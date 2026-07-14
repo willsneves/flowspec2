@@ -30,7 +30,7 @@ from .provider_prompt import (
     authoring_prompt_digest,
 )
 
-CODEX_AUTHOR_PROMPT_FORMAT: Final[str] = "flowspec2/codex-author-prompt@2"
+CODEX_AUTHOR_PROMPT_FORMAT: Final[str] = "flowspec2/codex-author-prompt@3"
 CODEX_AUTHOR_PROMPT_DIGEST: Final[str] = authoring_prompt_digest(CODEX_AUTHOR_PROMPT_FORMAT)
 
 

@@ -96,10 +96,10 @@
       ],
       "properties": {
         "format": {
-          "const": "flowspec2/authoring-corpus@2"
+          "const": "flowspec2/authoring-corpus@3"
         },
         "case_format": {
-          "const": "flowspec2/authoring-case@2"
+          "const": "flowspec2/authoring-case@3"
         },
         "identifier": {
           "$ref": "#/$defs/identifier"

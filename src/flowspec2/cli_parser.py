@@ -46,6 +46,9 @@ class CliHandlers:
     open_workflow_import: CommandHandler
     authoring_benchmark_codex: CommandHandler
     authoring_benchmark_gemini: CommandHandler
+    operational_benchmark_codex: CommandHandler
+    operational_benchmark_gemini: CommandHandler
+    operational_evidence_verify: CommandHandler
     authoring_evidence_verify: CommandHandler
     authoring_evidence_sign: CommandHandler
     authoring_evidence_signature_verify: CommandHandler
@@ -210,6 +213,69 @@ def build_parser(cli_handlers: CliHandlers) -> argparse.ArgumentParser:
     codex_benchmark_parser.add_argument("--max-correction-rounds", type=int, default=2)
     codex_benchmark_parser.add_argument("--output", required=True)
     codex_benchmark_parser.set_defaults(handler=cli_handlers.authoring_benchmark_codex)
+
+    operational_gemini_parser = subparsers.add_parser(
+        "operational-benchmark-gemini",
+        help="probe final authored flows through Gemini routing and extraction",
+    )
+    operational_gemini_parser.add_argument("path")
+    operational_gemini_parser.add_argument(
+        "--allow-network",
+        action="store_true",
+        required=True,
+        help="explicitly permit Gemini API requests for this invocation",
+    )
+    operational_gemini_parser.add_argument(
+        "--model",
+        default=cli_handlers.default_gemini_model,
+    )
+    operational_gemini_parser.add_argument("--repository-revision", required=True)
+    operational_gemini_parser.add_argument("--output", required=True)
+    operational_gemini_parser.set_defaults(handler=cli_handlers.operational_benchmark_gemini)
+
+    operational_codex_parser = subparsers.add_parser(
+        "operational-benchmark-codex",
+        help="probe final authored flows through subscription-authenticated Codex",
+    )
+    operational_codex_parser.add_argument("path")
+    operational_codex_parser.add_argument(
+        "--allow-network",
+        action="store_true",
+        required=True,
+        help="explicitly permit Codex model requests for this invocation",
+    )
+    operational_codex_parser.add_argument(
+        "--model",
+        default=cli_handlers.default_codex_model,
+    )
+    operational_codex_parser.add_argument(
+        "--effort",
+        choices=("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+        default=cli_handlers.default_codex_effort,
+    )
+    operational_codex_parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=cli_handlers.default_codex_timeout_seconds,
+    )
+    operational_codex_parser.add_argument("--repository-revision", required=True)
+    operational_codex_parser.add_argument("--output", required=True)
+    operational_codex_parser.set_defaults(handler=cli_handlers.operational_benchmark_codex)
+
+    operational_verify_parser = subparsers.add_parser(
+        "operational-evidence-verify",
+        help="verify and replay report-only operational model evidence",
+    )
+    operational_verify_parser.add_argument("path")
+    operational_verify_parser.add_argument("--authoring-evidence", required=True)
+    operational_verify_parser.add_argument("--repository-revision")
+    operational_verify_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="emit a deterministic machine-readable verification summary",
+    )
+    operational_verify_parser.set_defaults(handler=cli_handlers.operational_evidence_verify)
 
     evidence_verify_parser = subparsers.add_parser(
         "authoring-evidence-verify",

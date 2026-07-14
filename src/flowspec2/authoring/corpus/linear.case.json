@@ -1,13 +1,21 @@
 {
-  "format": "flowspec2/authoring-case@2",
+  "format": "flowspec2/authoring-case@3",
   "identifier": "linear_collection",
-  "prompt": "Author a flow with the single ordered step collect_request_description. It collects the required request_description slot through the free-text RequestDescription domain and asks the citizen for a short maintenance-request description. Add no other domain, slot, path step, derive, subflow, confirmation, capability, or terminal behavior. Flow identity, version, route prose, and non-verbatim prompt wording may vary.",
+  "prompt": "Author a flow with the single ordered step collect_request_description. It collects the required request_description slot through the free-text RequestDescription domain and asks the citizen for a short maintenance-request description. Include route trigger examples and an extraction hint. Add no other domain, slot, path step, derive, subflow, confirmation, capability, or terminal behavior. Flow identity, version, route prose, trigger examples, non-verbatim prompt wording, and extraction guidance may vary.",
   "feature_tags": ["linear", "collection"],
   "required_constructs": [
     {
       "identifier": "collect-step",
       "pointer_pattern": "/path/*/slot",
       "expected": "request_description"
+    },
+    {
+      "identifier": "route-trigger-examples",
+      "pointer_pattern": "/route/trigger_phrases"
+    },
+    {
+      "identifier": "request-description-extraction-hint",
+      "pointer_pattern": "/path/*/prompt/extract_hint"
     }
   ],
   "source": {
@@ -15,7 +23,12 @@
     "flow": "linear_maintenance_request",
     "version": "1.0.0",
     "route": {
-      "description": "Collect a short municipal maintenance request."
+      "description": "Collect a short municipal maintenance request.",
+      "trigger_phrases": [
+        "cobalt lantern protocol",
+        "describe a maintenance request",
+        "report municipal maintenance"
+      ]
     },
     "domains": {
       "RequestDescription": {
@@ -33,7 +46,8 @@
         "step": "collect_request_description",
         "slot": "request_description",
         "prompt": {
-          "text": "Describe the maintenance request."
+          "text": "Describe the maintenance request.",
+          "extract_hint": "Set request_description to only the text inside `ZETA=[...]`; ignore `ALPHA=[...]`."
         }
       }
     ]

@@ -23,7 +23,7 @@ from .provider_prompt import (
 
 DEFAULT_GEMINI_AUTHOR_MODEL: Final[str] = "gemini-2.5-flash"
 DEFAULT_GEMINI_AUTHOR_TIMEOUT_MILLISECONDS: Final[int] = 120_000
-GEMINI_AUTHOR_PROMPT_FORMAT: Final[str] = "flowspec2/gemini-author-prompt@2"
+GEMINI_AUTHOR_PROMPT_FORMAT: Final[str] = "flowspec2/gemini-author-prompt@3"
 
 _PROVIDER_IDENTIFIER: Final[str] = "google_gemini"
 _SDK_NAME: Final[str] = "google-genai"
