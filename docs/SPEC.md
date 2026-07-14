@@ -17,7 +17,7 @@ Table of Contents:
 - `auto_flow` (RAIL): 341 <!-- section:auto-flow -->
 - `capabilities` (LLM — fenced): 362 <!-- section:capabilities -->
 - Runtime response contract: 391 <!-- section:runtime-response-contract -->
-- AI authoring benchmark: 422 <!-- section:ai-authoring-benchmark -->
+- AI authoring benchmark: 428 <!-- section:ai-authoring-benchmark -->
 
 <!-- /section:toc -->
 
@@ -411,10 +411,16 @@ proves supported schema compatibility, validates the target atomically, and
 returns a canonical loss report bound to the plan and both states. Ordinary
 runtime restore never performs or infers migration.
 
-Gemini requests use provider-native `response_json_schema` generated from the
-same route and extraction contracts. Provider output is validated locally with
-Draft 2020-12 before any route or slot value is accepted, so constrained
-decoding is an optimization and not the trust boundary.
+Gemini and Codex requests use provider-native structured output generated from
+the same route and extraction contracts. Provider output is validated locally
+with Draft 2020-12 before any route or slot value is accepted, so constrained
+decoding is an optimization and not the trust boundary. The Codex path requires
+ChatGPT subscription authentication through the known local `llmgate`, disables
+built-in tools, excludes API-key inheritance, and executes ephemeral turns in a
+read-only isolated workspace. The correction hub's root `oneOf` is projected
+for Codex into an all-required nullable transport object. The inactive branch's
+`null` members are removed before the response is validated against the
+original `oneOf`, so provider schema limitations do not weaken the runtime rail.
 
 <!-- /section:runtime-response-contract -->
 <!-- section:ai-authoring-benchmark -->
@@ -423,16 +429,19 @@ decoding is an optimization and not the trust boundary.
 
 The provider-neutral authoring harness evaluates a source adapter with the same
 scenario corpus, runtime profile, and deterministic checker. An injected author
-receives an oracle-free task projection, canonical complete profile contract,
-prior source, and aggregate diagnostics; the evaluator-private case containing
-the reference flow and assertions is not reachable through the request object
-graph. A bounded correction protocol records every attempt without hiding
-invalid source behind an adapter.
+receives a source-answer-free task, its complete public semantic acceptance
+contract, canonical complete profile contract, prior source, and aggregate
+diagnostics. The evaluator-private reference source is not reachable through
+the request object graph, and runtime grading uses only the public contract. A
+bounded correction protocol records every attempt without hiding invalid source
+behind an adapter.
 
-Each case combines expected validity with positive required constructs and
-forbidden constructs such as arbitrary expressions, scripts, manual graph
-transitions, loops, or parallel branches. This prevents a trivial valid flow
-from satisfying a non-trivial scenario. Reports include compact UTF-8 source
+Each case combines exact semantic observations, intentionally variable
+presentation paths, positive required constructs, and forbidden constructs such
+as arbitrary expressions, scripts, manual graph transitions, loops, or parallel
+branches. Missing, mismatched, and unexpected observations are reported
+together, which prevents a trivial valid flow from satisfying a non-trivial
+scenario without forcing repeated discovery of hidden values. Reports include compact UTF-8 source
 size, a declared token proxy, source digest, diagnostic codes, correction
 outcome, and profile identifier. The installed reference corpus has a closed
 manifest with case integrity digests. A live provider run records the report,
@@ -440,7 +449,9 @@ exact source captures, corpus/profile identities, provider configuration,
 prompt identity, package version, and repository revision in one canonical
 content-addressed evidence envelope. Every Gemini capture also records the
 provider-reported effective model version rather than treating the requested
-model alias as the executed identity. The envelope binds the configured
+model alias as the executed identity. Providers that expose no distinct
+effective version record `null` while preserving the requested model and SDK
+identity in provenance. The envelope binds the configured
 correction limit. Offline verification validates its closed schema and digest,
 matches installed contracts, checks every capture hash, and deterministically
 replays the complete report. The digest provides integrity rather than signer
@@ -449,6 +460,14 @@ over the verified evidence digest. Its key identifier detects the wrong key;
 the caller-supplied public key remains the trust root, so the signature artifact
 cannot authorize itself. Network use requires an explicit CLI opt-in; a
 configured credential alone is never consent.
+
+Route descriptions and author-owned non-verbatim prompts are reviewed outside
+the deterministic semantic report. A fixed public presentation rubric binds
+human criterion decisions to exact candidate-source pointers and digests. The
+review is verified against successful captures, contains no fixture prose, and
+may be authenticated by a detached reviewer signature. During its report-only
+trial, presentation outcome is observational and does not alter the
+benchmark's semantic success fields.
 
 The included corpus is a deterministic infrastructure baseline, not evidence
 about model quality. A format revision may become stable only after controlled

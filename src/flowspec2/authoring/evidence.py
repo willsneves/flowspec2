@@ -19,7 +19,7 @@ from .benchmark import (
 )
 from .corpus import AuthoringCorpus
 
-AUTHORING_EVIDENCE_FORMAT: Final[str] = "flowspec2/authoring-benchmark-evidence@2"
+AUTHORING_EVIDENCE_FORMAT: Final[str] = "flowspec2/authoring-benchmark-evidence@3"
 SOURCE_ADAPTER_CONTRACT: Final[dict[str, str]] = {
     "format": "flowspec/2",
     "implementation": "FlowSpec2JsonAdapter",

@@ -2,18 +2,18 @@
 
 Table of Contents:
 
-- Install: 47 <!-- section:install -->
-- LLM-driven (the engine side): 74 <!-- section:llm-driven -->
-- Quickstart: 130 <!-- section:quickstart -->
-- Real backends: 154 <!-- section:real-backends -->
-- Error correlation: 171 <!-- section:error-correlation -->
-- CLI: 194 <!-- section:cli -->
-- What it compiles: 228 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 254 <!-- section:example -->
-    - The flowspec/2 document: 261 <!-- section:example-document -->
-    - Compiled LangGraph: 899 <!-- section:example-compiled-langgraph -->
-- Layout: 1015 <!-- section:layout -->
-- Status: 1064 <!-- section:status -->
+- Install: 53 <!-- section:install -->
+- LLM-driven (the engine side): 80 <!-- section:llm-driven -->
+- Quickstart: 150 <!-- section:quickstart -->
+- Real backends: 174 <!-- section:real-backends -->
+- Error correlation: 191 <!-- section:error-correlation -->
+- CLI: 214 <!-- section:cli -->
+- What it compiles: 267 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 293 <!-- section:example -->
+    - The flowspec/2 document: 300 <!-- section:example-document -->
+    - Compiled LangGraph: 938 <!-- section:example-compiled-langgraph -->
+- Layout: 1054 <!-- section:layout -->
+- Status: 1105 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -35,6 +35,12 @@ before graph construction. The [AI authoring benchmark](docs/AUTHORING_BENCHMARK
 defines the evidence protocol and executable conformance kit. The
 [evidence-authenticity decision](docs/adr/0004-evidence-authenticity.md)
 defines optional detached signatures and their external trust root. The
+[authoring-acceptance decision](docs/adr/0005-authoring-acceptance-semantics.md)
+defines why every graded semantic observation is public while fixture source
+syntax remains private. The
+[presentation-review decision](docs/adr/0006-authoring-presentation-review.md)
+separates source-bound human review of route and prompt prose from deterministic
+semantic success. The
 [FlowSpec3 preview](docs/FLOWSPEC3_DRAFT.md) documents the isolated source
 experiment and its loss accounting.
 
@@ -73,7 +79,10 @@ the uv toolchain to immutable versions.
 
 ## LLM-driven (the engine side)
 
-The simulations above feed already-extracted tokens. To exercise the *non-deterministic execution* side — a real LLM doing the work the format leaves open — there's a Gemini driver (`flowspec2.llm.GeminiAgent`, model `gemini-2.5-flash`, the model the production bot uses):
+The simulations above feed already-extracted tokens. To exercise the
+*non-deterministic execution* side, `GeminiAgent` remains the production-shaped
+driver and `CodexAgent` provides an isolated subscription-authenticated test
+driver through the operator's local `llmgate` checkout:
 
 ```bash
 uv sync --extra llm                       # google-genai
@@ -81,48 +90,59 @@ export GEMINI_API_KEY=...
 uv run python examples/llm_bot.py         # the citizen speaks free text; the LLM routes + extracts
 ```
 
+Codex tests require Python 3.12 because the known sibling library does. The
+same package name on PyPI belongs to an unrelated project, so pass the local
+checkout explicitly rather than installing it from the registry:
+
+```bash
+FLOWSPEC2_RUN_CODEX_TESTS=1 uv run --python 3.12 --with ~/Code/llmgate --extra dev pytest tests/test_llm_codex.py
+```
+
 The LLM does exactly two non-deterministic jobs, the rails hold everything else:
 - **route** — decide whether the citizen's free-text opener enters the flow (from `route.description`);
 - **extract** — read the messy message and the node's `payload_schema` / interactive options, and produce the **closed token** for the slot.
 
 flowspec2's validators then enforce the rail: an out-of-domain extraction is
-rejected and the node re-asks. The Gemini request also carries a closed response
-JSON Schema built from the route catalog or active slot contract; parsed output
-is checked again locally before it reaches the runtime. The transcript shows the
+rejected and the node re-asks. Both transports receive a closed response JSON
+Schema built from the route catalog or active slot contract; parsed output is
+checked again locally before it reaches the runtime. The transcript shows the
 boundary per turn: `👤 free text → 🧠 LLM extraction → 🤖 the rail's next state`.
-The driver is a thin protocol (`route` + `extract`), so any provider can
-implement it. Live-model tests are explicitly opted into; the default suite
-stays offline.
+Live-model tests are explicitly opted into; the default suite stays offline.
 
-Authoring evaluation is a separate boundary. `GeminiAuthor` receives the
-packaged reference corpus, the complete runtime-profile contract, and repair
-diagnostics, then returns source through the closed authoring projection. A
-live run requires explicit network consent and writes one content-addressed
-evidence envelope containing exact emitted sources, report, corpus/profile
-digests, requested model configuration, provider-reported effective model
-version for every attempt, prompt identity, package version, and the
-operator-supplied repository revision. The author request is an oracle-free
-task projection; reference answers and evaluator assertions are not reachable
-from the model transport:
+Authoring evaluation is a separate boundary. `GeminiAuthor` and `CodexAuthor`
+receive the packaged reference corpus, complete runtime-profile contract, and
+repair diagnostics, then return source through the same closed authoring
+projection. A live run requires explicit network consent and writes one
+content-addressed evidence envelope containing exact emitted sources, report,
+corpus/profile digests, requested model configuration, any effective model
+identity exposed by the provider, prompt identity, package version, and the
+operator-supplied repository revision. The author request contains a versioned
+public acceptance contract: every graded semantic observation, required
+construct, forbidden construct, and intentionally variable presentation path.
+The private reference source remains unreachable from the model transport, and
+the evaluator grades only the public contract:
 
 ```bash
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output authoring-evidence.json
+uv run --python 3.12 --with ~/Code/llmgate flowspec2 authoring-benchmark-codex --allow-network --repository-revision <revision> --output codex-authoring-evidence.json
 flowspec2 authoring-evidence-verify authoring-evidence.json --repository-revision <revision>
 flowspec2 authoring-evidence-sign authoring-evidence.json --private-key authoring-private-key.pem --repository-revision <revision> --output authoring-evidence.signature.json
 flowspec2 authoring-evidence-signature-verify authoring-evidence.json --signature authoring-evidence.signature.json --public-key authoring-public-key.pem --repository-revision <revision>
 ```
 
-The command never records or prints the API key, refuses to overwrite an
-existing artifact, and writes nothing when the provider fails. The presence of
-`GEMINI_API_KEY` alone never enables network access. Verification is fully
-offline: it checks the closed envelope, content digest, package/corpus/profile
-identity, correction limit, exact capture hashes, and deterministic report
-replay. The digest proves integrity, not who created the artifact; authenticity
-is optional and uses a canonical detached Ed25519 signature. The verifier takes
-the trusted public key explicitly, checks its derived key identifier, and never
-treats a key embedded beside the artifact as a trust root. Signing keys are read
-only from explicit PEM paths, are never serialized, and cannot be loaded from
-environment files.
+The commands refuse to overwrite an existing artifact and write nothing when a
+provider fails. Gemini never records or prints its API key. Codex excludes API
+key inheritance, requires ChatGPT authentication, ignores user/project rules,
+disables built-in tools, and runs each request ephemerally in a read-only
+sandbox. Configured credentials alone never enable model execution.
+Verification is fully offline: it checks the closed envelope, content digest,
+package/corpus/profile identity, correction limit, exact capture hashes, and
+deterministic report replay. The digest proves integrity, not who created the
+artifact; authenticity is optional and uses a canonical detached Ed25519
+signature. The verifier takes the trusted public key explicitly, checks its
+derived key identifier, and never treats a key embedded beside the artifact as
+a trust root. Signing keys are read only from explicit PEM paths, are never
+serialized, and cannot be loaded from environment files.
 
 <!-- /section:llm-driven -->
 <!-- section:quickstart -->
@@ -205,10 +225,20 @@ flowspec2 rasa-import build/rasa/flows.yml --domain build/rasa/domain.yml --flow
 flowspec2 open-workflow-export examples/reparo_luminaria.flow.json --output build/reparo_luminaria.workflow.yaml
 flowspec2 open-workflow-import build/reparo_luminaria.workflow.yaml --output build/reparo_luminaria.flow.json
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output build/authoring-evidence.json
+uv run --python 3.12 --with ~/Code/llmgate flowspec2 authoring-benchmark-codex --allow-network --repository-revision <revision> --output build/codex-authoring-evidence.json
 flowspec2 authoring-evidence-verify build/authoring-evidence.json --repository-revision <revision>
 flowspec2 authoring-evidence-sign build/authoring-evidence.json --private-key authoring-private-key.pem --repository-revision <revision> --output build/authoring-evidence.signature.json
 flowspec2 authoring-evidence-signature-verify build/authoring-evidence.json --signature build/authoring-evidence.signature.json --public-key authoring-public-key.pem --repository-revision <revision> --json
+flowspec2 authoring-presentation-review-init build/authoring-evidence.json --repository-revision <revision> --output build/presentation-review.draft.json
+flowspec2 authoring-presentation-review-finalize build/authoring-evidence.json --draft build/presentation-review.draft.json --repository-revision <revision> --output build/presentation-review.json
+flowspec2 authoring-presentation-review-verify build/authoring-evidence.json --review build/presentation-review.json --repository-revision <revision> --json
+flowspec2 authoring-presentation-review-sign build/authoring-evidence.json --review build/presentation-review.json --private-key reviewer-private-key.pem --repository-revision <revision> --output build/presentation-review.signature.json
+flowspec2 authoring-presentation-review-signature-verify build/authoring-evidence.json --review build/presentation-review.json --signature build/presentation-review.signature.json --public-key reviewer-public-key.pem --repository-revision <revision> --json
+flowspec2 authoring-promotion-verify build/authoring-evidence.json --review build/presentation-review.json --signature build/presentation-review.signature.json --public-key reviewer-public-key.pem --repository-revision <revision> --json
 ```
+
+Before finalization, edit only the `reviewer_identifier`, `decision`, and
+`rationale` fields in the draft.
 
 The Rasa adapter is a strict, versioned subset; `--allow-lossy` acknowledges its
 reported metadata and lifecycle differences. The Open Workflow adapter is a
@@ -221,6 +251,15 @@ fix. Structural errors are aggregated first; semantic and runtime-profile
 linking run only when the source shape is safe to traverse; compilation is the
 final check. `normalize` and `ir` write only to standard output and never mutate
 the source document.
+
+Presentation-review initialization first verifies and replays the evidence,
+then writes an editable packet containing candidate prose and only public task,
+acceptance, and interaction context. Finalization rejects edits outside the
+reviewer identifier, criterion decisions, and rationales. Verification and
+signing repeat exact evidence and subject closure offline. Promotion
+verification reports the composite deterministic, review, and authentication
+decision; under [ADR 0006](docs/adr/0006-authoring-presentation-review.md) it is
+report-only until the documented promotion signal is satisfied.
 
 <!-- /section:cli -->
 <!-- section:what-it-compiles -->
@@ -1047,7 +1086,9 @@ src/flowspec2/
   schema.py        load + JSON-Schema validation
   schema_contracts.py closed local references · external-resume schema contract
   compat/          directional Rasa import/export · Open Workflow profile + vendored schema
-  authoring/       corpus · benchmark · Gemini · evidence verification/signing · projection · CTK
+  authoring/       corpus · benchmark · Gemini/Codex · evidence verification/signing · projection · CTK
+  codex_agent.py   subscription-authenticated route/extract driver
+  codex_transport.py lazy isolated llmgate boundary
   experimental/    non-runtime flowspec/3-draft source preview
   interactive.py   buttons / list / flow envelope builders (Meta limits)
   tools.py         ToolRegistry + injectable fake backends + idempotency replay

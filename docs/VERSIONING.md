@@ -4,9 +4,9 @@ Table of Contents:
 
 - Package versions: 20 <!-- section:package-versions -->
 - Format and contract versions: 35 <!-- section:contract-versions -->
-- Compatibility promises: 50 <!-- section:compatibility-promises -->
-- Release procedure: 65 <!-- section:release-procedure -->
-- Artifact rollback: 83 <!-- section:artifact-rollback -->
+- Compatibility promises: 62 <!-- section:compatibility-promises -->
+- Release procedure: 77 <!-- section:release-procedure -->
+- Artifact rollback: 95 <!-- section:artifact-rollback -->
 
 <!-- /section:toc -->
 
@@ -35,9 +35,21 @@ artifact. Dependency locks change in the same commit as package metadata.
 ## Format and contract versions
 
 Versioned identifiers such as `flowspec/2`, `flowspec2/ir@1`, corpus formats,
-prompt formats, projection formats, and evidence envelopes are independent
-protocol contracts. An incompatible contract change receives a new identifier.
-Existing identifiers are never silently reinterpreted.
+prompt formats, projection formats, evidence envelopes, presentation rubrics,
+presentation reviews, and detached signatures are independent protocol
+contracts. An incompatible contract change receives a new identifier. Existing
+identifiers are never silently reinterpreted.
+
+Provider transports retain distinct versioned prompt identities while sharing
+the same closed authoring projection. Evidence records an effective model
+version only when the provider exposes one; `null` is the explicit compatible
+representation for transports that expose only the requested model identity.
+
+Authoring case and corpus contracts version their grading semantics separately.
+The second contract generation replaces hidden complete-source equality with a
+public semantic acceptance projection and versioned provider prompt contracts;
+evidence produced against the earlier corpus is intentionally not comparable as
+model-quality evidence without naming that older contract.
 
 Runtime profiles and packaged corpora additionally carry canonical content
 digests. A known identifier with a different digest is drift and fails closed.

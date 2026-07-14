@@ -47,13 +47,21 @@ async def test_corpus_executes_validation_diagnostic_ir_and_trace_oracles() -> N
         "terminal_success_runtime",
         "address_subflow_runtime",
         "typed_external_resume_policies",
+        "gated_derivation_gate_true_runtime",
+        "gated_derivation_gate_false_runtime",
+        "gated_derivation_default_runtime",
     ]
-    positive_contract = first_report.case_reports[0].to_dict()
+    report_by_identifier = {
+        case_report.identifier: case_report.to_dict() for case_report in first_report.case_reports
+    }
+    positive_contract = report_by_identifier["linear_valid_runtime"]
     assert positive_contract["runtime_trace"]
     positive_ir = cast(dict[str, Any], positive_contract["ir"])
     assert positive_ir["ir_format"] == FLOW_IR_FORMAT
     assert positive_ir["canonical_ir"]["nodes"][0]["identifier"] == "__init__"
-    negative_check = cast(dict[str, Any], first_report.case_reports[1].to_dict()["check"])
+    negative_check = cast(
+        dict[str, Any], report_by_identifier["structural_diagnostic_order"]["check"]
+    )
     assert [
         (diagnostic["code"], diagnostic["path"])
         for diagnostic in cast(list[dict[str, str]], negative_check["diagnostics"])
@@ -62,17 +70,17 @@ async def test_corpus_executes_validation_diagnostic_ir_and_trace_oracles() -> N
         ("FLOWSPEC_SCHEMA_PATTERN", "/flow"),
         ("FLOWSPEC_SCHEMA_PATTERN", "/version"),
     ]
-    terminal_contract = first_report.case_reports[2].to_dict()
+    terminal_contract = report_by_identifier["terminal_success_runtime"]
     terminal_trace = cast(list[dict[str, Any]], terminal_contract["runtime_trace"])
     assert terminal_trace[-1]["data"] == {
         "_reset_on_next_call": True,
         "problem_description": "Broken signal cabinet",
         "protocol_id": "SGRC-72E4E60B8E",
     }
-    subflow_contract = first_report.case_reports[3].to_dict()
+    subflow_contract = report_by_identifier["address_subflow_runtime"]
     subflow_trace = cast(list[dict[str, Any]], subflow_contract["runtime_trace"])
     assert subflow_trace[-1]["data"]["address_confirmed"] is True
-    external_contract = first_report.case_reports[4].to_dict()
+    external_contract = report_by_identifier["typed_external_resume_policies"]
     external_trace = cast(list[dict[str, Any]], external_contract["runtime_trace"])
     resume_marker = external_trace[1]["agent_response"]["interactive"]["resume_contract"]
     assert resume_marker["duplicate"] == "ignore"
@@ -80,6 +88,64 @@ async def test_corpus_executes_validation_diagnostic_ir_and_trace_oracles() -> N
     assert external_trace[2] == external_trace[3]
     assert external_trace[-1]["status"] == "error"
     assert "rejected late resume delivery" in external_trace[-1]["agent_response"]["error_message"]
+
+    gate_true_trace = cast(
+        list[dict[str, Any]],
+        report_by_identifier["gated_derivation_gate_true_runtime"]["runtime_trace"],
+    )
+    assert gate_true_trace[1]["agent_response"]["description"] == "How large is the pothole?"
+    assert gate_true_trace[-1] == {
+        "status": "completed",
+        "data": {
+            "backend_classification": "POTHOLE_SMALL",
+            "issue_category": "Pothole",
+            "issue_detail": "Small",
+        },
+        "agent_response": {"description": "Serviço concluído com sucesso."},
+    }
+
+    case_by_identifier = {
+        conformance_case.identifier: conformance_case
+        for conformance_case in conformance_corpus.cases
+    }
+    gate_false_case = case_by_identifier["gated_derivation_gate_false_runtime"]
+    assert gate_false_case.turns[-1].payload() == {
+        "issue_category": "Obstruction",
+        "issue_detail": "Large",
+    }
+    gate_false_trace = cast(
+        list[dict[str, Any]],
+        report_by_identifier["gated_derivation_gate_false_runtime"]["runtime_trace"],
+    )
+    assert gate_false_trace[-1] == {
+        "status": "completed",
+        "data": {
+            "backend_classification": "STREET_OBSTRUCTION",
+            "issue_category": "Obstruction",
+        },
+        "agent_response": {"description": "Serviço concluído com sucesso."},
+    }
+
+    default_case = case_by_identifier["gated_derivation_default_runtime"]
+    default_derive = default_case.source_document()["derive"][0]
+    assert default_derive["lookup"] == {
+        "Obstruction|null": "STREET_OBSTRUCTION",
+        "Pothole|Small": "POTHOLE_SMALL",
+    }
+    assert default_derive["default"] == "$from[0]"
+    default_trace = cast(
+        list[dict[str, Any]],
+        report_by_identifier["gated_derivation_default_runtime"]["runtime_trace"],
+    )
+    assert default_trace[-1] == {
+        "status": "completed",
+        "data": {
+            "backend_classification": "Pothole",
+            "issue_category": "Pothole",
+            "issue_detail": "Large",
+        },
+        "agent_response": {"description": "Serviço concluído com sucesso."},
+    }
 
 
 async def test_report_exposes_exact_ir_oracle_mismatch() -> None:

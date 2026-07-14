@@ -13,7 +13,9 @@ import pytest
 
 from flowspec2.authoring import (
     TOKEN_PROXY_BYTES_PER_UNIT,
+    AcceptanceExpectation,
     AuthoredSource,
+    AuthoringAcceptanceContract,
     AuthoringAttempt,
     AuthoringBenchmarkCase,
     AuthoringBenchmarkLimits,
@@ -166,8 +168,14 @@ def test_fixture_oracles_require_exact_values() -> None:
     assert all("expected" in required_construct for required_construct in required_constructs)
 
 
-def test_author_request_exposes_only_an_oracle_free_task() -> None:
-    benchmark_case = _benchmark_case(_authoring_fixtures()[0])
+def test_author_request_exposes_public_acceptance_without_reference_source() -> None:
+    benchmark_case = _benchmark_case(
+        next(
+            authoring_fixture
+            for authoring_fixture in _authoring_fixtures()
+            if authoring_fixture["identifier"] == "linear_collection"
+        )
+    )
     observed_requests: list[AuthoringRequest] = []
 
     def inspecting_author(authoring_request: AuthoringRequest) -> AuthoredSource:
@@ -187,13 +195,38 @@ def test_author_request_exposes_only_an_oracle_free_task() -> None:
         "previous_diagnostics",
     }
     assert {contract_field.name for contract_field in fields(authoring_request.task)} == {
+        "acceptance",
         "identifier",
         "prompt",
     }
+    acceptance_document = authoring_request.task.acceptance.to_dict()
+    assert acceptance_document["format"] == "flowspec2/authoring-acceptance@1"
+    assert acceptance_document["expectations"]
+    assert acceptance_document["required_constructs"]
+    assert acceptance_document["forbidden_constructs"]
     assert not hasattr(authoring_request, "benchmark_case")
     assert not hasattr(authoring_request.task, "expected_flow_json")
-    assert not hasattr(authoring_request.task, "required_constructs")
-    assert not hasattr(authoring_request.task, "forbidden_constructs")
+    acceptance_json = json.dumps(
+        acceptance_document,
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    assert benchmark_case.expected_flow_json not in acceptance_json
+    expected_flow = cast(dict[str, Any], json.loads(benchmark_case.expected_flow_json))
+    assert expected_flow["flow"] not in acceptance_json
+    assert cast(dict[str, Any], expected_flow["route"])["description"] not in acceptance_json
+    assert all(domain_name not in acceptance_json for domain_name in expected_flow["domains"])
+    assert all(
+        cast(str, path_step["step"]) not in acceptance_json
+        for path_step in cast(list[dict[str, Any]], expected_flow["path"])
+        if isinstance(path_step.get("step"), str)
+    )
+    assert all(
+        cast(dict[str, Any], path_step["prompt"])["text"] not in acceptance_json
+        for path_step in cast(list[dict[str, Any]], expected_flow["path"])
+        if "prompt" in path_step
+        and cast(dict[str, Any], path_step["prompt"]).get("verbatim") is not True
+    )
 
 
 def test_terminal_oracle_rejects_semantically_opposite_values() -> None:
@@ -325,9 +358,10 @@ def test_gated_derive_oracle_rejects_opposite_gate_and_source_order() -> None:
     )
     assert opposite_gate_attempt.compilation == "succeeded"
     assert not opposite_gate_attempt.succeeded
-    assert [diagnostic.code for diagnostic in opposite_gate_attempt.diagnostics] == [
-        "AUTHORING_REQUIRED_CONDITIONAL_GATE_MISMATCH"
-    ]
+    assert {diagnostic.code for diagnostic in opposite_gate_attempt.diagnostics} == {
+        "AUTHORING_ACCEPTANCE_MISMATCH",
+        "AUTHORING_REQUIRED_CONDITIONAL_GATE_MISMATCH",
+    }
 
     reversed_sources_attempt = (
         run_authoring_benchmark(
@@ -368,9 +402,10 @@ def test_address_oracle_rejects_disabled_confirmation() -> None:
     authoring_attempt = benchmark_report.case_results[0].attempts[0]
     assert authoring_attempt.compilation == "succeeded"
     assert not authoring_attempt.succeeded
-    assert [diagnostic.code for diagnostic in authoring_attempt.diagnostics] == [
-        "AUTHORING_REQUIRED_SUBFLOW_CONFIGURATION_MISMATCH"
-    ]
+    assert {diagnostic.code for diagnostic in authoring_attempt.diagnostics} == {
+        "AUTHORING_ACCEPTANCE_MISMATCH",
+        "AUTHORING_REQUIRED_SUBFLOW_CONFIGURATION_MISMATCH",
+    }
 
 
 def test_correction_protocol_supplies_previous_source_and_diagnostics() -> None:
@@ -429,16 +464,21 @@ def test_valid_but_irrelevant_flow_fails_required_constructs() -> None:
     authoring_attempt = benchmark_report.case_results[0].attempts[0]
     assert authoring_attempt.compilation == "succeeded"
     assert not authoring_attempt.succeeded
-    assert {diagnostic.code for diagnostic in authoring_attempt.diagnostics} == {
+    diagnostic_codes = {diagnostic.code for diagnostic in authoring_attempt.diagnostics}
+    assert {
         "AUTHORING_REQUIRED_TERMINAL_IDEMPOTENCY_MISSING",
         "AUTHORING_REQUIRED_TERMINAL_INPUT_MISSING",
         "AUTHORING_REQUIRED_TERMINAL_MARKER_MISSING",
         "AUTHORING_REQUIRED_TERMINAL_OUTPUT_MISSING",
         "AUTHORING_REQUIRED_TERMINAL_TOOL_MISSING",
-    }
+    }.issubset(diagnostic_codes)
+    assert {
+        "AUTHORING_ACCEPTANCE_MISSING",
+        "AUTHORING_ACCEPTANCE_UNEXPECTED",
+    }.issubset(diagnostic_codes)
 
 
-def test_closed_oracle_rejects_an_unrelated_required_secret_step() -> None:
+def test_public_acceptance_rejects_every_unrelated_secret_observation() -> None:
     linear_fixture = next(
         authoring_fixture
         for authoring_fixture in _authoring_fixtures()
@@ -473,10 +513,113 @@ def test_closed_oracle_rejects_an_unrelated_required_secret_step() -> None:
 
     assert authoring_attempt.compilation == "succeeded"
     assert not authoring_attempt.succeeded
-    assert [diagnostic.code for diagnostic in authoring_attempt.diagnostics] == [
-        "AUTHORING_CLOSED_FLOW_MISMATCH"
-    ]
-    assert authoring_attempt.diagnostics[0].path == "/domains/SecretValue"
+    assert {diagnostic.code for diagnostic in authoring_attempt.diagnostics} == {
+        "AUTHORING_ACCEPTANCE_UNEXPECTED"
+    }
+    diagnostic_paths = {diagnostic.path for diagnostic in authoring_attempt.diagnostics}
+    assert {
+        "/path/1/slot",
+        "/slots/secret_value/domain_contract/type",
+        "/slots/secret_value/required",
+    }.issubset(diagnostic_paths)
+
+
+def test_acceptance_allows_consistent_internal_identifier_renaming() -> None:
+    linear_fixture = next(
+        authoring_fixture
+        for authoring_fixture in _authoring_fixtures()
+        if authoring_fixture["identifier"] == "linear_collection"
+    )
+    alternate_source = copy.deepcopy(linear_fixture["source"])
+    alternate_source["domains"] = {"CitizenRequest": {"type": "free_text"}}
+    cast(dict[str, Any], alternate_source["slots"])["request_description"]["domain"] = (
+        "CitizenRequest"
+    )
+    cast(list[dict[str, Any]], alternate_source["path"])[0]["step"] = "ask_for_request"
+
+    authoring_attempt = (
+        run_authoring_benchmark(
+            "aggregate_acceptance",
+            (_benchmark_case(linear_fixture),),
+            lambda _authoring_request: _authored(_pretty_source(alternate_source)),
+            limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
+        )
+        .case_results[0]
+        .attempts[0]
+    )
+
+    assert authoring_attempt.compilation == "succeeded"
+    assert authoring_attempt.succeeded
+    assert authoring_attempt.diagnostics == ()
+
+
+def test_acceptance_aggregates_all_semantic_differences_in_one_attempt() -> None:
+    linear_fixture = next(
+        authoring_fixture
+        for authoring_fixture in _authoring_fixtures()
+        if authoring_fixture["identifier"] == "linear_collection"
+    )
+    alternate_source = copy.deepcopy(linear_fixture["source"])
+    request_slot = cast(dict[str, Any], alternate_source["slots"])["request_description"]
+    request_slot["required"] = False
+    request_slot["persist"] = "internal"
+    cast(dict[str, Any], alternate_source["domains"])["UnusedDomain"] = {"type": "free_text"}
+
+    authoring_attempt = (
+        run_authoring_benchmark(
+            "aggregate_acceptance",
+            (_benchmark_case(linear_fixture),),
+            lambda _authoring_request: _authored(_pretty_source(alternate_source)),
+            limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
+        )
+        .case_results[0]
+        .attempts[0]
+    )
+
+    assert authoring_attempt.compilation == "succeeded"
+    assert not authoring_attempt.succeeded
+    assert {
+        "/slots/request_description/persist",
+        "/slots/request_description/required",
+        "/unused_domain_contracts/0/type",
+    }.issubset({diagnostic.path for diagnostic in authoring_attempt.diagnostics})
+    assert {diagnostic.code for diagnostic in authoring_attempt.diagnostics} == {
+        "AUTHORING_ACCEPTANCE_MISMATCH",
+        "AUTHORING_ACCEPTANCE_MISSING",
+        "AUTHORING_ACCEPTANCE_UNEXPECTED",
+    }
+
+
+def test_acceptance_ignores_declared_presentation_choices() -> None:
+    linear_fixture = next(
+        authoring_fixture
+        for authoring_fixture in _authoring_fixtures()
+        if authoring_fixture["identifier"] == "linear_collection"
+    )
+    alternate_source = copy.deepcopy(linear_fixture["source"])
+    alternate_source["flow"] = "citizen_chosen_flow_name"
+    alternate_source["version"] = "9.8.7"
+    cast(dict[str, Any], alternate_source["route"])["description"] = (
+        "Route any municipal maintenance description."
+    )
+    cast(list[dict[str, Any]], alternate_source["path"])[0]["prompt"] = {
+        "text": "What should the city maintain?"
+    }
+
+    authoring_attempt = (
+        run_authoring_benchmark(
+            "presentation_choices",
+            (_benchmark_case(linear_fixture),),
+            lambda _authoring_request: _authored(_pretty_source(alternate_source)),
+            limits=AuthoringBenchmarkLimits(max_correction_rounds=0),
+        )
+        .case_results[0]
+        .attempts[0]
+    )
+
+    assert authoring_attempt.compilation == "succeeded"
+    assert authoring_attempt.succeeded
+    assert authoring_attempt.diagnostics == ()
 
 
 @dataclass(frozen=True)
@@ -710,6 +853,12 @@ def test_case_attempt_result_and_report_contracts_are_immutable() -> None:
 
 
 def test_contracts_reject_inconsistent_attempt_and_report_state() -> None:
+    with pytest.raises(ValueError, match="restricted to versioned presentation"):
+        AuthoringAcceptanceContract(
+            expectations=(AcceptanceExpectation.expecting("/schema", "flowspec/2"),),
+            variable_pointer_patterns=("/terminal/tool",),
+        )
+
     with pytest.raises(ValueError, match="token proxy"):
         AuthoringAttempt(
             correction_round=0,

@@ -3,13 +3,13 @@
 Table of Contents:
 
 - Files: 28 <!-- section:files -->
-- Authoring-to-execution pipeline: 80 <!-- section:authoring-execution-pipeline -->
-- The one idea: the boundary is the closed value-domain: 149 <!-- section:closed-value-domain -->
-- Top-level shape (the two tiers): 166 <!-- section:top-level-shape -->
-- Mapping table — every construct → its LangGraph primitive: 187 <!-- section:mapping-table -->
-- Rationale (1 page): 247 <!-- section:rationale -->
-    - Rejected alternatives: 264 <!-- section:rationale-rejected-alternatives -->
-- How this was produced: 280 <!-- section:production-method -->
+- Authoring-to-execution pipeline: 83 <!-- section:authoring-execution-pipeline -->
+- The one idea: the boundary is the closed value-domain: 162 <!-- section:closed-value-domain -->
+- Top-level shape (the two tiers): 179 <!-- section:top-level-shape -->
+- Mapping table — every construct → its LangGraph primitive: 200 <!-- section:mapping-table -->
+- Rationale (1 page): 260 <!-- section:rationale -->
+    - Rejected alternatives: 277 <!-- section:rationale-rejected-alternatives -->
+- How this was produced: 293 <!-- section:production-method -->
 
 <!-- /section:toc -->
 
@@ -55,6 +55,9 @@ that graph as a callable tool.
 | [`../src/flowspec2/authoring/benchmark.py`](../src/flowspec2/authoring/benchmark.py) | Provider-neutral AI-authoring and correction benchmark. |
 | [`../src/flowspec2/authoring/corpus.py`](../src/flowspec2/authoring/corpus.py) | Packaged reference-corpus manifest, integrity checks, and content identity. |
 | [`../src/flowspec2/authoring/gemini.py`](../src/flowspec2/authoring/gemini.py) | Explicit-network Gemini source transport over the closed projection. |
+| [`../src/flowspec2/authoring/codex.py`](../src/flowspec2/authoring/codex.py) | Subscription-authenticated Codex source transport over the closed projection. |
+| [`../src/flowspec2/codex_transport.py`](../src/flowspec2/codex_transport.py) | Lazy isolated `llmgate` boundary shared by Codex authoring and execution. |
+| [`../src/flowspec2/codex_agent.py`](../src/flowspec2/codex_agent.py) | Codex route/extract implementation over the shared closed schemas. |
 | [`../src/flowspec2/authoring/evidence.py`](../src/flowspec2/authoring/evidence.py) | Exact captures and content-addressed real-model evidence. |
 | [`../src/flowspec2/authoring/evidence_verification.py`](../src/flowspec2/authoring/evidence_verification.py) | Closed-schema verification and deterministic offline replay. |
 | [`../src/flowspec2/authoring/evidence_signature.py`](../src/flowspec2/authoring/evidence_signature.py) | Detached Ed25519 signing and authentication over verified evidence. |
@@ -128,20 +131,30 @@ contracts are documented in [AUTHORING_BENCHMARK.md](AUTHORING_BENCHMARK.md) and
 [FLOWSPEC3_DRAFT.md](FLOWSPEC3_DRAFT.md).
 
 The reference authoring and CTK cases are package resources pinned by a closed
-manifest, rather than test-only fixtures. A live model receives an oracle-free
-task projection, the normative schema, and the same complete `FlowProfile`
-contract whose digest binds IR and restored state. Benchmark answer flows and
-evaluation assertions are absent from the author-facing object graph, not only
-from the rendered prompt. The resulting evidence envelope binds exact captured
-sources and provider-reported effective model versions to every report attempt
-and records only deterministic, non-secret provenance. This keeps provider
-operation at the edge while making later comparison and offline review
-independently verifiable. Offline verification matches the installed package,
+manifest, rather than test-only fixtures. A live model receives a
+source-answer-free task, a complete versioned public acceptance contract, the
+normative schema, and the same complete `FlowProfile` contract whose digest
+binds IR and restored state. Every graded semantic leaf and source-policy rule
+is present in the author-facing object graph; only the private fixture source is
+absent. The resulting evidence envelope binds exact captured
+sources, the requested model, and any provider-reported effective model version
+to every report attempt and records only deterministic, non-secret provenance.
+This keeps provider operation at the edge while making later comparison and
+offline review independently verifiable. Offline verification matches the installed package,
 corpus, profile, adapter, and correction protocol before replaying every exact
 capture and requiring complete report equality. Its content digest proves
 integrity rather than author identity. Optional detached signing authenticates
 that verified digest against a caller-managed Ed25519 trust root without
 coupling evidence identity to key rotation.
+
+Candidate route descriptions and non-verbatim prompt prose cross a separate
+presentation-review boundary. A deterministic extractor selects only
+author-owned text from final successful captures and binds each subject to its
+source and evidence identities. Human decisions use a fixed public rubric and
+are stored in a content-addressed artifact; fixture wording never becomes a
+quality oracle. Detached reviewer authentication and a caller-managed trust
+root keep subjective review attributable without changing semantic benchmark
+success.
 
 <!-- /section:authoring-execution-pipeline -->
 <!-- section:closed-value-domain -->
@@ -237,7 +250,7 @@ The `domains` registry is the spine: one declaration materializes the Pydantic v
 | `capabilities.session_reset` | `reset_session_state` / `_reset_on_next_call` | session reset. |
 | `capabilities.await_external` | suspend node: emit a typed out-of-band resume contract and absolute timeout deadline, resume on a host-delivered `resume_on` signal, apply bounded token/result mappings atomically, and route host-delivered abort/resend/switch/timeout events | early timeout is rejected; recovery ending at `END` resets on the next call. |
 | `predicate` object grammar | pure boolean fn over `ServiceState` (frozen namespaces) compiled into routers/early-returns | no arbitrary Python; verifiable/diffable. |
-| `GeminiAgent` route/extract call | provider response JSON Schema derived from the active catalog or payload schema, followed by local Draft validation | invalid provider JSON never reaches the rail. |
+| `GeminiAgent` / `CodexAgent` route/extract call | provider response JSON Schema derived from the active catalog or payload schema, followed by local Draft validation; Codex lowers the correction union to nullable transport fields and restores the exclusive branch before validation | invalid provider JSON never reaches the rail, and the provider's schema subset does not redefine correction semantics. |
 
 ---
 

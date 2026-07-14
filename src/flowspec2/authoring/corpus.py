@@ -17,8 +17,8 @@ from flowspec2.json_codec import strict_json_loads
 
 from .benchmark import AuthoringBenchmarkCase, RequiredFlowConstruct
 
-AUTHORING_CASE_FORMAT: Final[str] = "flowspec2/authoring-case@1"
-AUTHORING_CORPUS_FORMAT: Final[str] = "flowspec2/authoring-corpus@1"
+AUTHORING_CASE_FORMAT: Final[str] = "flowspec2/authoring-case@2"
+AUTHORING_CORPUS_FORMAT: Final[str] = "flowspec2/authoring-corpus@2"
 REFERENCE_AUTHORING_CORPUS_ID: Final[str] = "flowspec2_reference"
 
 _IDENTIFIER_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -251,13 +251,6 @@ def _load_authoring_corpus(
             )
         case_documents.append(case_document)
 
-    contract_document = {
-        "format": AUTHORING_CORPUS_FORMAT,
-        "case_format": AUTHORING_CASE_FORMAT,
-        "identifier": manifest_document["identifier"],
-        "cases": case_documents,
-    }
-    corpus_digest = hashlib.sha256(_canonical_json(contract_document).encode("utf-8")).hexdigest()
     try:
         benchmark_cases = tuple(
             sorted(
@@ -269,6 +262,20 @@ def _load_authoring_corpus(
         raise ValueError(
             "authoring corpus contains an invalid reference flow"
         ) from case_contract_error
+    contract_document = {
+        "format": AUTHORING_CORPUS_FORMAT,
+        "case_format": AUTHORING_CASE_FORMAT,
+        "identifier": manifest_document["identifier"],
+        "cases": case_documents,
+        "resolved_acceptance": [
+            {
+                "identifier": benchmark_case.identifier,
+                "contract": benchmark_case.authoring_task().acceptance.to_dict(),
+            }
+            for benchmark_case in benchmark_cases
+        ],
+    }
+    corpus_digest = hashlib.sha256(_canonical_json(contract_document).encode("utf-8")).hexdigest()
     return AuthoringCorpus(
         format_identifier=AUTHORING_CORPUS_FORMAT,
         case_format_identifier=AUTHORING_CASE_FORMAT,

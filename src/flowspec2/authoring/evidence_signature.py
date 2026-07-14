@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import base64
-import binascii
 import copy
-import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -13,15 +10,16 @@ from pathlib import Path
 from typing import Any, Final, cast
 
 import jsonschema
-from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import (
-    Ed25519PrivateKey,
-    Ed25519PublicKey,
-)
 
 from flowspec2.json_codec import strict_json_loads
 
+from .detached_signature import (
+    DetachedEd25519KeyMismatchError,
+    DetachedEd25519VerificationError,
+    canonical_ed25519_signature_bytes,
+    sign_detached_ed25519,
+    verify_detached_ed25519,
+)
 from .evidence_verification import (
     AuthoringEvidenceVerification,
     verify_authoring_evidence,
@@ -33,7 +31,6 @@ _SIGNATURE_SCHEMA_PATH: Final[Path] = Path(__file__).with_name(
     "authoring-evidence-signature.schema.json"
 )
 _DIGEST_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{64}$")
-_ED25519_SIGNATURE_BYTES: Final[int] = 64
 _SIGNATURE_MESSAGE_PREFIX: Final[bytes] = b"flowspec2/authoring-evidence-signature@1\x00ed25519\x00"
 _signature_schema_cache: dict[str, Any] | None = None
 
@@ -67,38 +64,10 @@ def authoring_evidence_signature_schema() -> dict[str, Any]:
     return copy.deepcopy(_signature_schema())
 
 
-def _public_key_id(public_key: Ed25519PublicKey) -> str:
-    public_key_bytes = public_key.public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw,
-    )
-    return hashlib.sha256(public_key_bytes).hexdigest()
-
-
 def _signature_message(evidence_digest: str) -> bytes:
     if not _DIGEST_PATTERN.fullmatch(evidence_digest):
         raise ValueError("signed evidence digest must be lowercase SHA-256")
     return _SIGNATURE_MESSAGE_PREFIX + evidence_digest.encode("ascii")
-
-
-def _load_private_key(private_key_pem: bytes) -> Ed25519PrivateKey:
-    try:
-        private_key = serialization.load_pem_private_key(private_key_pem, password=None)
-    except (TypeError, UnsupportedAlgorithm, ValueError) as key_error:
-        raise ValueError("private key must be unencrypted PKCS8 PEM") from key_error
-    if not isinstance(private_key, Ed25519PrivateKey):
-        raise ValueError("private key must use Ed25519")
-    return private_key
-
-
-def _load_public_key(public_key_pem: bytes) -> Ed25519PublicKey:
-    try:
-        public_key = serialization.load_pem_public_key(public_key_pem)
-    except (TypeError, UnsupportedAlgorithm, ValueError) as key_error:
-        raise ValueError("public key must be SubjectPublicKeyInfo PEM") from key_error
-    if not isinstance(public_key, Ed25519PublicKey):
-        raise ValueError("public key must use Ed25519")
-    return public_key
 
 
 @dataclass(frozen=True)
@@ -114,19 +83,11 @@ class AuthoringEvidenceSignature:
             raise ValueError("signature evidence digest must be lowercase SHA-256")
         if not _DIGEST_PATTERN.fullmatch(self.key_id):
             raise ValueError("signature key identifier must be lowercase SHA-256")
-        try:
-            signature_bytes = base64.b64decode(self.signature_base64, validate=True)
-        except (binascii.Error, ValueError) as decoding_error:
-            raise ValueError("signature must be canonical base64") from decoding_error
-        if (
-            len(signature_bytes) != _ED25519_SIGNATURE_BYTES
-            or base64.b64encode(signature_bytes).decode("ascii") != self.signature_base64
-        ):
-            raise ValueError("signature must be a canonical Ed25519 signature")
+        canonical_ed25519_signature_bytes(self.signature_base64)
 
     @property
     def signature_bytes(self) -> bytes:
-        return base64.b64decode(self.signature_base64, validate=True)
+        return canonical_ed25519_signature_bytes(self.signature_base64)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -185,12 +146,14 @@ def sign_authoring_evidence(
         serialized_evidence,
         expected_repository_revision=expected_repository_revision,
     )
-    private_key = _load_private_key(private_key_pem)
-    signature_bytes = private_key.sign(_signature_message(evidence_verification.digest))
+    detached_signature = sign_detached_ed25519(
+        _signature_message(evidence_verification.digest),
+        private_key_pem,
+    )
     return AuthoringEvidenceSignature(
         evidence_digest=evidence_verification.digest,
-        key_id=_public_key_id(private_key.public_key()),
-        signature_base64=base64.b64encode(signature_bytes).decode("ascii"),
+        key_id=detached_signature.key_id,
+        signature_base64=detached_signature.signature_base64,
     )
 
 
@@ -210,15 +173,15 @@ def verify_authoring_evidence_signature(
     evidence_signature = AuthoringEvidenceSignature.from_json(serialized_signature)
     if evidence_signature.evidence_digest != evidence_verification.digest:
         raise ValueError("authoring evidence signature names a different evidence digest")
-    public_key = _load_public_key(public_key_pem)
-    public_key_id = _public_key_id(public_key)
-    if evidence_signature.key_id != public_key_id:
-        raise ValueError("authoring evidence signature names a different public key")
     try:
-        public_key.verify(
-            evidence_signature.signature_bytes,
+        public_key_id = verify_detached_ed25519(
             _signature_message(evidence_verification.digest),
+            evidence_signature.signature_base64,
+            public_key_pem,
+            expected_key_id=evidence_signature.key_id,
         )
-    except InvalidSignature as signature_error:
+    except DetachedEd25519KeyMismatchError:
+        raise ValueError("authoring evidence signature names a different public key") from None
+    except DetachedEd25519VerificationError as signature_error:
         raise ValueError("authoring evidence signature is invalid") from signature_error
     return AuthoringEvidenceAuthentication(evidence=evidence_verification, key_id=public_key_id)
