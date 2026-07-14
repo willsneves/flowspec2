@@ -3,13 +3,13 @@
 Table of Contents:
 
 - Files: 28 <!-- section:files -->
-- Authoring-to-execution pipeline: 62 <!-- section:authoring-execution-pipeline -->
-- The one idea: the boundary is the closed value-domain: 122 <!-- section:closed-value-domain -->
-- Top-level shape (the two tiers): 139 <!-- section:top-level-shape -->
-- Mapping table — every construct → its LangGraph primitive: 160 <!-- section:mapping-table -->
-- Rationale (1 page): 220 <!-- section:rationale -->
-    - Rejected alternatives: 237 <!-- section:rationale-rejected-alternatives -->
-- How this was produced: 253 <!-- section:production-method -->
+- Authoring-to-execution pipeline: 80 <!-- section:authoring-execution-pipeline -->
+- The one idea: the boundary is the closed value-domain: 149 <!-- section:closed-value-domain -->
+- Top-level shape (the two tiers): 166 <!-- section:top-level-shape -->
+- Mapping table — every construct → its LangGraph primitive: 187 <!-- section:mapping-table -->
+- Rationale (1 page): 247 <!-- section:rationale -->
+    - Rejected alternatives: 264 <!-- section:rationale-rejected-alternatives -->
+- How this was produced: 280 <!-- section:production-method -->
 
 <!-- /section:toc -->
 
@@ -36,6 +36,19 @@ that graph as a callable tool.
 | [`../src/flowspec2/checker.py`](../src/flowspec2/checker.py) | Aggregate structural, semantic, profile, and compilation checks. |
 | [`../src/flowspec2/cli.py`](../src/flowspec2/cli.py) | Command handlers, I/O boundaries, and error reporting. |
 | [`../src/flowspec2/cli_parser.py`](../src/flowspec2/cli_parser.py) | Declarative argument grammar with injected handlers. |
+| [`../src/flowspec2/compiler.py`](../src/flowspec2/compiler.py) | Executable node assembly, ordering, and StateGraph wiring. |
+| [`../src/flowspec2/compiler_contracts.py`](../src/flowspec2/compiler_contracts.py) | Stable facade for compiler-contract validation entry points. |
+| [`../src/flowspec2/compiler_schema_relations.py`](../src/flowspec2/compiler_schema_relations.py) | JSON Schema subset, property, path, and required-presence proofs. |
+| [`../src/flowspec2/compiler_value_contracts.py`](../src/flowspec2/compiler_value_contracts.py) | Entry, slot, derive, exposed-state, and terminal value contracts. |
+| [`../src/flowspec2/compiler_tool_contracts.py`](../src/flowspec2/compiler_tool_contracts.py) | Tool inputs, outputs, effects, and terminal lifecycle contracts. |
+| [`../src/flowspec2/compiler_resume_contracts.py`](../src/flowspec2/compiler_resume_contracts.py) | External suspension, resume-token, enrichment, and recovery contracts. |
+| [`../src/flowspec2/semantics.py`](../src/flowspec2/semantics.py) | Semantic orchestration and runtime-profile linking. |
+| [`../src/flowspec2/semantic_source_contracts.py`](../src/flowspec2/semantic_source_contracts.py) | Stable facade for source-owned semantic contract groups. |
+| [`../src/flowspec2/semantic_schema_contracts.py`](../src/flowspec2/semantic_schema_contracts.py) | Shared semantic JSON Schema type, value, and property relations. |
+| [`../src/flowspec2/semantic_path_contracts.py`](../src/flowspec2/semantic_path_contracts.py) | Path identity, domain, normalization, slot, and dependency contracts. |
+| [`../src/flowspec2/semantic_derive_contracts.py`](../src/flowspec2/semantic_derive_contracts.py) | Derived-value, placement, totality, and execution-order contracts. |
+| [`../src/flowspec2/semantic_predicate_contracts.py`](../src/flowspec2/semantic_predicate_contracts.py) | Predicate namespace, reference, literal, and type contracts. |
+| [`../src/flowspec2/semantic_state_contracts.py`](../src/flowspec2/semantic_state_contracts.py) | Entry schema, state-writer ownership, and rail-reference contracts. |
 | [`../src/flowspec2/ir.py`](../src/flowspec2/ir.py) | Canonical normalization and immutable compiler contracts. |
 | [`../src/flowspec2/profiles.py`](../src/flowspec2/profiles.py) | Named executable tool, subflow, domain, and capability catalogs. |
 | [`../src/flowspec2/schema_contracts.py`](../src/flowspec2/schema_contracts.py) | Closed local-reference and external-resume JSON Schema contracts. |
@@ -44,11 +57,16 @@ that graph as a callable tool.
 | [`../src/flowspec2/authoring/gemini.py`](../src/flowspec2/authoring/gemini.py) | Explicit-network Gemini source transport over the closed projection. |
 | [`../src/flowspec2/authoring/evidence.py`](../src/flowspec2/authoring/evidence.py) | Exact captures and content-addressed real-model evidence. |
 | [`../src/flowspec2/authoring/evidence_verification.py`](../src/flowspec2/authoring/evidence_verification.py) | Closed-schema verification and deterministic offline replay. |
+| [`../src/flowspec2/authoring/evidence_signature.py`](../src/flowspec2/authoring/evidence_signature.py) | Detached Ed25519 signing and authentication over verified evidence. |
 | [`../src/flowspec2/authoring/authoring-evidence.schema.json`](../src/flowspec2/authoring/authoring-evidence.schema.json) | Authoritative evidence-envelope schema. |
+| [`../src/flowspec2/authoring/authoring-evidence-signature.schema.json`](../src/flowspec2/authoring/authoring-evidence-signature.schema.json) | Authoritative detached-signature schema. |
+| [`../src/flowspec2/compat/rasa_export.py`](../src/flowspec2/compat/rasa_export.py) | FlowSpec2-to-Rasa conversion and loss diagnostics. |
+| [`../src/flowspec2/compat/rasa_import.py`](../src/flowspec2/compat/rasa_import.py) | Rasa-to-FlowSpec2 conversion and loss diagnostics. |
 | [`AUTHORING_BENCHMARK.md`](AUTHORING_BENCHMARK.md) | Evaluation protocol and real-model evidence requirements. |
 | [`FLOWSPEC3_DRAFT.md`](FLOWSPEC3_DRAFT.md) | Non-executable source preview, migration, and loss accounting. |
 | [`adr/0002-format-authoring-execution-boundary.md`](adr/0002-format-authoring-execution-boundary.md) | Decision record for the source/link/profile/IR boundary. |
 | [`adr/0003-benchmark-author-trust-boundary.md`](adr/0003-benchmark-author-trust-boundary.md) | Decision record for evaluator-private oracles and effective model identity. |
+| [`adr/0004-evidence-authenticity.md`](adr/0004-evidence-authenticity.md) | Decision record for detached evidence signatures and external trust roots. |
 
 The project test suite checks the schema itself, validates both example
 documents, and rejects adversarial mutations such as unknown keys, ambiguous
@@ -76,6 +94,13 @@ domains, slots, gates, predicates, dependencies, derive anchors, corrections,
 entry schemas, terminal bindings, subflow declarations, and host capabilities.
 It emits stable codes and JSON Pointer locations for every deterministic issue
 it can prove in one pass.
+
+Semantic orchestration consumes explicit source-contract groups for path and
+slot linking, derived values, state ownership, rail references, and predicates.
+Compilation separately composes schema relations, FlowSpec value contracts,
+tool lifecycle contracts, and external-resume contracts before graph assembly.
+The facade modules preserve stable internal entry points while preventing
+directional modules from reaching across private implementation details.
 
 The runtime profile makes “valid” deployment-specific. Its tool definitions
 carry version, input/output JSON Schemas, and effect metadata. Its subflow
@@ -114,7 +139,9 @@ operation at the edge while making later comparison and offline review
 independently verifiable. Offline verification matches the installed package,
 corpus, profile, adapter, and correction protocol before replaying every exact
 capture and requiring complete report equality. Its content digest proves
-integrity rather than author identity; signatures remain an external concern.
+integrity rather than author identity. Optional detached signing authenticates
+that verified digest against a caller-managed Ed25519 trust root without
+coupling evidence identity to key rotation.
 
 <!-- /section:authoring-execution-pipeline -->
 <!-- section:closed-value-domain -->
