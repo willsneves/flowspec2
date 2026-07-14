@@ -91,6 +91,7 @@ def test_prompt_is_canonical_whitelisted_and_contains_exact_profile_contract() -
     assert first_prompt == second_prompt
     prompt_document = json.loads(first_prompt)
     assert tuple(sorted(prompt_document)) == (
+        "acceptance_contract",
         "case_identifier",
         "correction_round",
         "format",
@@ -103,10 +104,11 @@ def test_prompt_is_canonical_whitelisted_and_contains_exact_profile_contract() -
         "task",
     )
     assert prompt_document["profile_contract"] == json.loads(initial_request.profile_contract_json)
+    assert prompt_document["acceptance_contract"] == initial_request.task.acceptance.to_dict()
     expected_flow_json = load_reference_authoring_corpus().cases[0].expected_flow_json
     assert expected_flow_json not in first_prompt
-    assert "required_constructs" not in first_prompt
-    assert "forbidden_constructs" not in first_prompt
+    assert prompt_document["acceptance_contract"]["required_constructs"]
+    assert prompt_document["acceptance_contract"]["forbidden_constructs"]
 
     correction_prompt = json.loads(_authoring_prompt(_request(correction=True)))
     assert correction_prompt["previous_source"] == '{"invalid":true}'

@@ -16,6 +16,7 @@ from importlib.metadata import version as package_version
 from .backends import BackendConfig, make_registry
 from .checker import check_flow, check_json, structural_diagnostics
 from .clock import UtcClock
+from .codex_agent import CodexAgent, CodexAgentError
 from .compiler import CompiledFlow, compile_flow
 from .diagnostics import DiagnosticLocation, FlowCheckReport, FlowDiagnostic
 from .ir import (
@@ -59,6 +60,8 @@ __all__ = [
     "FlowDiagnostic",
     "DiagnosticLocation",
     "CompiledFlow",
+    "CodexAgent",
+    "CodexAgentError",
     "check_flow",
     "check_json",
     "structural_diagnostics",

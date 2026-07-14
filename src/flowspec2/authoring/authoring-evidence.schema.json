@@ -19,7 +19,7 @@
   ],
   "properties": {
     "format": {
-      "const": "flowspec2/authoring-benchmark-evidence@2"
+      "const": "flowspec2/authoring-benchmark-evidence@3"
     },
     "package_version": {
       "type": "string",
@@ -96,10 +96,10 @@
       ],
       "properties": {
         "format": {
-          "const": "flowspec2/authoring-corpus@1"
+          "const": "flowspec2/authoring-corpus@2"
         },
         "case_format": {
-          "const": "flowspec2/authoring-case@1"
+          "const": "flowspec2/authoring-case@2"
         },
         "identifier": {
           "$ref": "#/$defs/identifier"

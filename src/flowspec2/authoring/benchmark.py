@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Final, Protocol, cast
 
 from flowspec2.checker import check_flow
@@ -24,6 +24,13 @@ from flowspec2.profiles import FlowProfile, reference_profile
 _IDENTIFIER_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 TOKEN_PROXY_METHOD: Final[str] = "utf8_byte_quartets"
 TOKEN_PROXY_BYTES_PER_UNIT: Final[int] = 4
+AUTHORING_ACCEPTANCE_FORMAT: Final[str] = "flowspec2/authoring-acceptance@1"
+DEFAULT_VARIABLE_POINTER_PATTERNS: Final[tuple[str, ...]] = (
+    "/flow",
+    "/route/description",
+    "/version",
+)
+_VARIABLE_PATH_PROMPT_PATTERN: Final[re.Pattern[str]] = re.compile(r"^/path/[0-9]+/prompt/text$")
 
 
 def _require_identifier(identifier: str, contract_name: str) -> None:
@@ -44,9 +51,24 @@ def _compact_json(json_document: object) -> str:
     )
 
 
+def _validate_variable_pointer_patterns(pointer_patterns: tuple[str, ...]) -> None:
+    if len(set(pointer_patterns)) != len(pointer_patterns):
+        raise ValueError("authoring variable pointer patterns must be unique")
+    if any(not pointer_pattern.startswith("/") for pointer_pattern in pointer_patterns):
+        raise ValueError("authoring variable pointer patterns must start with '/'")
+    if any(
+        pointer_pattern not in DEFAULT_VARIABLE_POINTER_PATTERNS
+        and not _VARIABLE_PATH_PROMPT_PATTERN.fullmatch(pointer_pattern)
+        for pointer_pattern in pointer_patterns
+    ):
+        raise ValueError(
+            "authoring variable pointers are restricted to versioned presentation paths"
+        )
+
+
 def _normalized_flow_json(flow_document: object) -> str:
     if not isinstance(flow_document, dict):
-        raise ValueError("a benchmark reference flow must be a JSON object")
+        raise ValueError("an authoring flow must be a JSON object")
     return _compact_json(normalize_flow(cast(dict[str, Any], flow_document)))
 
 
@@ -233,6 +255,101 @@ class RequiredFlowConstruct:
             expected_json=_compact_json(expected_value),
         )
 
+    def to_dict(self) -> dict[str, object]:
+        """Return the public exact-value requirement."""
+
+        return {
+            "identifier": self.identifier,
+            "pointer_pattern": self.pointer_pattern,
+            "expected": (
+                None if self.expected_json is None else strict_json_loads(self.expected_json)
+            ),
+        }
+
+
+@dataclass(frozen=True)
+class AcceptanceExpectation:
+    """One public semantic observation required from an executable flow."""
+
+    path: str
+    expected_json: str
+
+    def __post_init__(self) -> None:
+        if not self.path.startswith("/"):
+            raise ValueError("acceptance expectation path must start with '/'")
+        expected_value = strict_json_loads(self.expected_json)
+        if _compact_json(expected_value) != self.expected_json:
+            raise ValueError("acceptance expectation value must be canonical JSON")
+
+    @classmethod
+    def expecting(cls, path: str, expected_value: object) -> AcceptanceExpectation:
+        """Create an expectation from a JSON-compatible value."""
+
+        return cls(path=path, expected_json=_compact_json(expected_value))
+
+    def to_dict(self) -> dict[str, object]:
+        """Return the public expectation contract."""
+
+        return {
+            "path": self.path,
+            "expected": strict_json_loads(self.expected_json),
+        }
+
+
+@dataclass(frozen=True)
+class AuthoringAcceptanceContract:
+    """Complete public grading contract without a reference source document."""
+
+    expectations: tuple[AcceptanceExpectation, ...]
+    required_constructs: tuple[RequiredFlowConstruct, ...] = ()
+    forbidden_constructs: tuple[ForbiddenConstruct, ...] = field(
+        default_factory=lambda: DEFAULT_FORBIDDEN_CONSTRUCTS
+    )
+    variable_pointer_patterns: tuple[str, ...] = DEFAULT_VARIABLE_POINTER_PATTERNS
+    format_identifier: str = AUTHORING_ACCEPTANCE_FORMAT
+
+    def __post_init__(self) -> None:
+        if self.format_identifier != AUTHORING_ACCEPTANCE_FORMAT:
+            raise ValueError("unknown authoring acceptance format")
+        expectations = tuple(sorted(self.expectations, key=lambda expectation: expectation.path))
+        if not expectations:
+            raise ValueError("authoring acceptance contract requires expectations")
+        expectation_paths = tuple(expectation.path for expectation in expectations)
+        if len(set(expectation_paths)) != len(expectation_paths):
+            raise ValueError("authoring acceptance expectation paths must be unique")
+        required_constructs = tuple(
+            sorted(self.required_constructs, key=lambda construct: construct.identifier)
+        )
+        forbidden_constructs = tuple(
+            sorted(self.forbidden_constructs, key=lambda construct: construct.identifier)
+        )
+        variable_pointer_patterns = tuple(sorted(self.variable_pointer_patterns))
+        _validate_variable_pointer_patterns(variable_pointer_patterns)
+        object.__setattr__(self, "expectations", expectations)
+        object.__setattr__(self, "required_constructs", required_constructs)
+        object.__setattr__(self, "forbidden_constructs", forbidden_constructs)
+        object.__setattr__(self, "variable_pointer_patterns", variable_pointer_patterns)
+
+    def to_dict(self) -> dict[str, object]:
+        """Return the closed author-visible acceptance contract."""
+
+        return {
+            "format": self.format_identifier,
+            "expectations": [expectation.to_dict() for expectation in self.expectations],
+            "required_constructs": [
+                required_construct.to_dict() for required_construct in self.required_constructs
+            ],
+            "forbidden_constructs": [
+                {
+                    "identifier": forbidden_construct.identifier,
+                    "pointer_pattern": forbidden_construct.pointer_pattern,
+                    "message": forbidden_construct.message,
+                }
+                for forbidden_construct in self.forbidden_constructs
+            ],
+            "variable_pointer_patterns": list(self.variable_pointer_patterns),
+        }
+
 
 def _forbidden_construct(
     identifier: str,
@@ -273,10 +390,11 @@ DEFAULT_FORBIDDEN_CONSTRUCTS: Final[tuple[ForbiddenConstruct, ...]] = (
 
 @dataclass(frozen=True)
 class AuthoringTask:
-    """The closed oracle-free task delivered to an injected author."""
+    """The source-answer-free task and complete public grading contract."""
 
     identifier: str
     prompt: str
+    acceptance: AuthoringAcceptanceContract
 
     def __post_init__(self) -> None:
         _require_identifier(self.identifier, "authoring task identifier")
@@ -287,7 +405,7 @@ class AuthoringTask:
 
 @dataclass(frozen=True)
 class AuthoringBenchmarkCase:
-    """One evaluator-private task, reference answer, and oracle set."""
+    """One private fixture projected into a public semantic task contract."""
 
     identifier: str
     prompt: str
@@ -339,7 +457,7 @@ class AuthoringBenchmarkCase:
         required_constructs: tuple[RequiredFlowConstruct, ...] = (),
         forbidden_constructs: tuple[ForbiddenConstruct, ...] = DEFAULT_FORBIDDEN_CONSTRUCTS,
     ) -> AuthoringBenchmarkCase:
-        """Create a closed case from its complete reference executable flow."""
+        """Create a closed case from a reviewed private fixture flow."""
 
         return cls(
             identifier=identifier,
@@ -353,7 +471,15 @@ class AuthoringBenchmarkCase:
     def authoring_task(self) -> AuthoringTask:
         """Project the evaluator-private case into its author-facing contract."""
 
-        return AuthoringTask(identifier=self.identifier, prompt=self.prompt)
+        return AuthoringTask(
+            identifier=self.identifier,
+            prompt=self.prompt,
+            acceptance=authoring_acceptance_for_flow(
+                strict_json_loads(self.expected_flow_json),
+                required_constructs=self.required_constructs,
+                forbidden_constructs=self.forbidden_constructs,
+            ),
+        )
 
 
 @dataclass(frozen=True)
@@ -640,6 +766,230 @@ def _matches_pointer_pattern(
     )
 
 
+def _semantic_observation_items(
+    json_document: object,
+    path_segments: tuple[str | int, ...] = (),
+) -> Iterable[tuple[str, object]]:
+    if isinstance(json_document, Mapping):
+        if not json_document and path_segments:
+            yield _json_pointer(path_segments), {}
+        for property_name in sorted(json_document, key=str):
+            property_path = (*path_segments, str(property_name))
+            yield from _semantic_observation_items(
+                json_document[property_name],
+                property_path,
+            )
+        return
+    if isinstance(json_document, list):
+        if not json_document and path_segments:
+            yield _json_pointer(path_segments), []
+        for element_index, element_value in enumerate(json_document):
+            yield from _semantic_observation_items(
+                element_value,
+                (*path_segments, element_index),
+            )
+        return
+    if not path_segments:
+        raise ValueError("an authoring semantic observation requires a JSON object")
+    yield _json_pointer(path_segments), json_document
+
+
+def _referenced_domain_names(json_document: object) -> frozenset[str]:
+    referenced_names: set[str] = set()
+    if isinstance(json_document, Mapping):
+        for property_name, property_value in json_document.items():
+            if property_name in {"domain", "from_domain"} and isinstance(property_value, str):
+                referenced_names.add(property_value)
+            referenced_names.update(_referenced_domain_names(property_value))
+    elif isinstance(json_document, list):
+        for element_value in json_document:
+            referenced_names.update(_referenced_domain_names(element_value))
+    return frozenset(referenced_names)
+
+
+def _step_references(normalized_flow: Mapping[str, object]) -> dict[str, str]:
+    step_references: dict[str, str] = {}
+    normalized_path = normalized_flow.get("path")
+    if isinstance(normalized_path, list):
+        for path_index, path_step in enumerate(normalized_path):
+            if isinstance(path_step, Mapping) and isinstance(path_step.get("step"), str):
+                step_references[cast(str, path_step["step"])] = f"path[{path_index}]"
+    for contract_name in ("confirm", "terminal"):
+        contract = normalized_flow.get(contract_name)
+        if isinstance(contract, Mapping) and isinstance(contract.get("step"), str):
+            step_references[cast(str, contract["step"])] = contract_name
+    return step_references
+
+
+def _semantic_prompt(
+    prompt_contract: Mapping[str, object],
+    domains: Mapping[str, object],
+    step_references: Mapping[str, str],
+    path_segments: tuple[str | int, ...],
+) -> dict[str, object]:
+    verbatim = prompt_contract.get("verbatim") is True
+    semantic_prompt: dict[str, object] = {
+        "present": True,
+        "verbatim": verbatim,
+    }
+    if verbatim:
+        semantic_prompt["text"] = prompt_contract.get("text")
+    for property_name, property_value in prompt_contract.items():
+        if property_name in {"extract_hint", "text", "verbatim"}:
+            continue
+        semantic_prompt[property_name] = _semantic_flow_value(
+            property_value,
+            domains,
+            step_references,
+            (*path_segments, property_name),
+        )
+    return semantic_prompt
+
+
+def _semantic_flow_value(
+    json_document: object,
+    domains: Mapping[str, object],
+    step_references: Mapping[str, str],
+    path_segments: tuple[str | int, ...] = (),
+) -> object:
+    if isinstance(json_document, Mapping):
+        semantic_mapping: dict[str, object] = {}
+        for property_name, property_value in json_document.items():
+            property_path = (*path_segments, property_name)
+            if not path_segments and property_name in {"domains", "flow", "version"}:
+                continue
+            if path_segments == ("route",) and property_name == "description":
+                continue
+            if property_name == "prompt" and isinstance(property_value, Mapping):
+                semantic_mapping[property_name] = _semantic_prompt(
+                    property_value,
+                    domains,
+                    step_references,
+                    property_path,
+                )
+                continue
+            if property_name in {"domain", "from_domain"} and isinstance(property_value, str):
+                semantic_mapping[f"{property_name}_contract"] = _semantic_flow_value(
+                    domains[property_value],
+                    domains,
+                    step_references,
+                    property_path,
+                )
+                continue
+            is_step_declaration = property_name == "step" and (
+                (len(path_segments) == 2 and path_segments[0] == "path")
+                or path_segments in {("confirm",), ("terminal",)}
+            )
+            if is_step_declaration:
+                continue
+            if property_name in {"goto", "next_step", "on_confirm", "step"} and isinstance(
+                property_value, str
+            ):
+                semantic_mapping[property_name] = step_references.get(
+                    property_value,
+                    property_value,
+                )
+                continue
+            semantic_mapping[property_name] = _semantic_flow_value(
+                property_value,
+                domains,
+                step_references,
+                property_path,
+            )
+        return semantic_mapping
+    if isinstance(json_document, list):
+        return [
+            _semantic_flow_value(
+                element_value,
+                domains,
+                step_references,
+                (*path_segments, element_index),
+            )
+            for element_index, element_value in enumerate(json_document)
+        ]
+    return json_document
+
+
+def _semantic_flow_document(normalized_flow: Mapping[str, object]) -> dict[str, object]:
+    raw_domains = normalized_flow.get("domains")
+    if not isinstance(raw_domains, Mapping):
+        raise ValueError("a normalized authoring flow requires domain contracts")
+    domains = cast(Mapping[str, object], raw_domains)
+    semantic_flow = cast(
+        dict[str, object],
+        _semantic_flow_value(
+            normalized_flow,
+            domains,
+            _step_references(normalized_flow),
+        ),
+    )
+    referenced_domains = _referenced_domain_names(normalized_flow)
+    semantic_flow["unused_domain_contracts"] = sorted(
+        (
+            _semantic_flow_value(domain_contract, domains, {}, ("unused_domain_contracts",))
+            for domain_name, domain_contract in domains.items()
+            if domain_name not in referenced_domains
+        ),
+        key=_compact_json,
+    )
+    return semantic_flow
+
+
+def observe_authoring_flow(
+    executable_flow: object,
+    *,
+    variable_pointer_patterns: tuple[str, ...] = DEFAULT_VARIABLE_POINTER_PATTERNS,
+) -> dict[str, object]:
+    """Project one flow into complete, source-syntax-free semantic observations."""
+
+    normalized_flow = strict_json_loads(_normalized_flow_json(executable_flow))
+    if not isinstance(normalized_flow, dict):
+        raise AssertionError("normalized authoring flows must be JSON objects")
+    _validate_variable_pointer_patterns(tuple(sorted(variable_pointer_patterns)))
+    return dict(_semantic_observation_items(_semantic_flow_document(normalized_flow)))
+
+
+def authoring_acceptance_for_flow(
+    executable_flow: object,
+    *,
+    required_constructs: tuple[RequiredFlowConstruct, ...] = (),
+    forbidden_constructs: tuple[ForbiddenConstruct, ...] = DEFAULT_FORBIDDEN_CONSTRUCTS,
+    variable_pointer_patterns: tuple[str, ...] | None = None,
+) -> AuthoringAcceptanceContract:
+    """Build the public semantic contract for one private fixture source."""
+
+    normalized_flow = strict_json_loads(_normalized_flow_json(executable_flow))
+    if not isinstance(normalized_flow, dict):
+        raise AssertionError("normalized authoring flows must be JSON objects")
+    resolved_variable_pointer_patterns = list(
+        DEFAULT_VARIABLE_POINTER_PATTERNS
+        if variable_pointer_patterns is None
+        else variable_pointer_patterns
+    )
+    normalized_path = normalized_flow.get("path")
+    if variable_pointer_patterns is None and isinstance(normalized_path, list):
+        for path_index, path_step in enumerate(normalized_path):
+            if not isinstance(path_step, dict):
+                continue
+            prompt_contract = path_step.get("prompt")
+            if isinstance(prompt_contract, dict) and prompt_contract.get("verbatim") is not True:
+                resolved_variable_pointer_patterns.append(f"/path/{path_index}/prompt/text")
+    resolved_patterns = tuple(sorted(resolved_variable_pointer_patterns))
+    observations = observe_authoring_flow(
+        normalized_flow,
+        variable_pointer_patterns=resolved_patterns,
+    )
+    return AuthoringAcceptanceContract(
+        expectations=tuple(
+            AcceptanceExpectation.expecting(path, expected_value)
+            for path, expected_value in observations.items()
+        ),
+        required_constructs=required_constructs,
+        forbidden_constructs=forbidden_constructs,
+        variable_pointer_patterns=resolved_patterns,
+    )
+
+
 def _forbidden_diagnostics(
     authored_document: object,
     forbidden_constructs: tuple[ForbiddenConstruct, ...],
@@ -737,96 +1087,69 @@ def _required_construct_diagnostics(
     return _deterministic_diagnostics(flow_diagnostics)
 
 
-def _first_json_difference(
-    expected_document: object,
-    observed_document: object,
-    path_segments: tuple[str | int, ...] = (),
-) -> tuple[tuple[str | int, ...], str] | None:
-    if isinstance(expected_document, Mapping) and isinstance(observed_document, Mapping):
-        expected_mapping = cast(Mapping[str, object], expected_document)
-        observed_mapping = cast(Mapping[str, object], observed_document)
-        for property_name in sorted(
-            set(expected_mapping) | set(observed_mapping),
-        ):
-            property_path = (*path_segments, property_name)
-            if property_name not in expected_mapping:
-                return property_path, "the executable flow contains an unexpected property"
-            if property_name not in observed_mapping:
-                return property_path, "the executable flow omits a required property"
-            if nested_difference := _first_json_difference(
-                expected_mapping[property_name],
-                observed_mapping[property_name],
-                property_path,
-            ):
-                return nested_difference
-        return None
-    if isinstance(expected_document, list) and isinstance(observed_document, list):
-        for element_index, (expected_element, observed_element) in enumerate(
-            zip(expected_document, observed_document, strict=False)
-        ):
-            if nested_difference := _first_json_difference(
-                expected_element,
-                observed_element,
-                (*path_segments, element_index),
-            ):
-                return nested_difference
-        if len(expected_document) < len(observed_document):
-            return (
-                (*path_segments, len(expected_document)),
-                "the executable flow contains an unexpected list element",
-            )
-        if len(expected_document) > len(observed_document):
-            return (
-                (*path_segments, len(observed_document)),
-                "the executable flow omits a required list element",
-            )
-        return None
-    if expected_document != observed_document:
-        return (
-            path_segments,
-            (
-                f"expected {_compact_json(expected_document)}, but observed "
-                f"{_compact_json(observed_document)}"
-            ),
-        )
-    return None
-
-
-def _closed_flow_diagnostics(
+def acceptance_diagnostics(
     executable_flow: object,
-    expected_flow_json: str,
+    acceptance_contract: AuthoringAcceptanceContract,
+    *,
+    covered_paths: frozenset[str] = frozenset(),
 ) -> tuple[FlowDiagnostic, ...]:
-    observed_flow_json = _normalized_flow_json(executable_flow)
-    if observed_flow_json == expected_flow_json:
-        return ()
-    expected_flow = strict_json_loads(expected_flow_json)
-    observed_flow = strict_json_loads(observed_flow_json)
-    first_difference = _first_json_difference(expected_flow, observed_flow)
-    if first_difference is None:
-        raise AssertionError("different canonical flows must have a JSON difference")
-    difference_path, difference_message = first_difference
-    return (
+    """Return every deterministic mismatch against the public task contract."""
+
+    expected_observations = {
+        expectation.path: strict_json_loads(expectation.expected_json)
+        for expectation in acceptance_contract.expectations
+    }
+    observed_observations = observe_authoring_flow(
+        executable_flow,
+        variable_pointer_patterns=acceptance_contract.variable_pointer_patterns,
+    )
+    diagnostic_paths = sorted(set(expected_observations) | set(observed_observations))
+    return _deterministic_diagnostics(
         FlowDiagnostic(
-            code="AUTHORING_CLOSED_FLOW_MISMATCH",
+            code=(
+                "AUTHORING_ACCEPTANCE_UNEXPECTED"
+                if diagnostic_path not in expected_observations
+                else (
+                    "AUTHORING_ACCEPTANCE_MISSING"
+                    if diagnostic_path not in observed_observations
+                    else "AUTHORING_ACCEPTANCE_MISMATCH"
+                )
+            ),
             severity="error",
-            path=_json_pointer(difference_path),
+            path=diagnostic_path,
             message=(
-                "The executable flow does not match the benchmark's complete closed "
-                f"semantic contract: {difference_message}."
+                f"Unexpected semantic observation {_compact_json(observed_observations[diagnostic_path])}."
+                if diagnostic_path not in expected_observations
+                else (
+                    f"Missing required semantic observation {_compact_json(expected_observations[diagnostic_path])}."
+                    if diagnostic_path not in observed_observations
+                    else (
+                        "Semantic observation must equal "
+                        f"{_compact_json(expected_observations[diagnostic_path])}, but observed "
+                        f"{_compact_json(observed_observations[diagnostic_path])}."
+                    )
+                )
             ),
             suggested_fix=(
-                "Remove unrelated behavior and restore the complete reference flow semantics."
+                f"Remove the behavior at {diagnostic_path!r}."
+                if diagnostic_path not in expected_observations
+                else f"Set the semantic observation at {diagnostic_path!r} to the public expected value."
             ),
-        ),
+        )
+        for diagnostic_path in diagnostic_paths
+        if (
+            diagnostic_path not in expected_observations
+            or diagnostic_path not in observed_observations
+            or expected_observations[diagnostic_path] != observed_observations[diagnostic_path]
+        )
+        if diagnostic_path not in covered_paths
     )
 
 
 def _evaluate_source(
     authored_source: str,
     source_adapter: AuthoringSourceAdapter,
-    expected_flow_json: str,
-    required_constructs: tuple[RequiredFlowConstruct, ...],
-    forbidden_constructs: tuple[ForbiddenConstruct, ...],
+    acceptance_contract: AuthoringAcceptanceContract,
     correction_round: int,
     flow_profile: FlowProfile,
 ) -> AuthoringAttempt:
@@ -890,19 +1213,33 @@ def _evaluate_source(
         token_proxy_units = (
             canonical_source_bytes + TOKEN_PROXY_BYTES_PER_UNIT - 1
         ) // TOKEN_PROXY_BYTES_PER_UNIT
-        flow_diagnostics.extend(_forbidden_diagnostics(authored_document, forbidden_constructs))
+        flow_diagnostics.extend(
+            _forbidden_diagnostics(
+                authored_document,
+                acceptance_contract.forbidden_constructs,
+            )
+        )
 
     compilation: CompilationStatus = "skipped"
     executable_flow_available = source_adaptation.executable_flow_json is not None
     if executable_flow_available:
         executable_flow = strict_json_loads(cast(str, source_adaptation.executable_flow_json))
-        required_diagnostics = _required_construct_diagnostics(executable_flow, required_constructs)
+        required_diagnostics = _required_construct_diagnostics(
+            executable_flow,
+            acceptance_contract.required_constructs,
+        )
         flow_diagnostics.extend(required_diagnostics)
         flow_check_report = check_flow(executable_flow, profile=flow_profile)
         compilation = flow_check_report.compilation
         flow_diagnostics.extend(flow_check_report.diagnostics)
-        if compilation == "succeeded" and not required_diagnostics:
-            flow_diagnostics.extend(_closed_flow_diagnostics(executable_flow, expected_flow_json))
+        if compilation == "succeeded":
+            flow_diagnostics.extend(
+                acceptance_diagnostics(
+                    executable_flow,
+                    acceptance_contract,
+                    covered_paths=frozenset(diagnostic.path for diagnostic in required_diagnostics),
+                )
+            )
 
     deterministic_diagnostics = _deterministic_diagnostics(flow_diagnostics)
     succeeded = (
@@ -934,9 +1271,10 @@ def _run_benchmark_case(
     authoring_attempts: list[AuthoringAttempt] = []
     previous_source: str | None = None
     previous_diagnostics: tuple[FlowDiagnostic, ...] = ()
+    authoring_task = benchmark_case.authoring_task()
     for correction_round in range(benchmark_limits.max_correction_rounds + 1):
         authoring_request = AuthoringRequest(
-            task=benchmark_case.authoring_task(),
+            task=authoring_task,
             format_identifier=source_adapter.format_identifier,
             profile_identifier=flow_profile.identifier,
             profile_contract_json=flow_profile.canonical_json(),
@@ -950,9 +1288,7 @@ def _run_benchmark_case(
         authoring_attempt = _evaluate_source(
             authored_response.source,
             source_adapter,
-            benchmark_case.expected_flow_json,
-            benchmark_case.required_constructs,
-            benchmark_case.forbidden_constructs,
+            authoring_task.acceptance,
             correction_round,
             flow_profile,
         )
@@ -1038,6 +1374,7 @@ def replay_authoring_benchmark(
             raise ValueError(
                 f"captured source case {benchmark_case.identifier!r} requires an attempt"
             )
+        acceptance_contract = benchmark_case.authoring_task().acceptance
         case_results.append(
             AuthoringBenchmarkResult(
                 case_identifier=benchmark_case.identifier,
@@ -1047,9 +1384,7 @@ def replay_authoring_benchmark(
                     _evaluate_source(
                         authored_source,
                         resolved_source_adapter,
-                        benchmark_case.expected_flow_json,
-                        benchmark_case.required_constructs,
-                        benchmark_case.forbidden_constructs,
+                        acceptance_contract,
                         correction_round,
                         resolved_profile,
                     )

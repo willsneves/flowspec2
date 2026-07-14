@@ -44,10 +44,20 @@ class CliHandlers:
     rasa_import: CommandHandler
     open_workflow_export: CommandHandler
     open_workflow_import: CommandHandler
+    authoring_benchmark_codex: CommandHandler
     authoring_benchmark_gemini: CommandHandler
     authoring_evidence_verify: CommandHandler
     authoring_evidence_sign: CommandHandler
     authoring_evidence_signature_verify: CommandHandler
+    authoring_presentation_review_init: CommandHandler
+    authoring_presentation_review_finalize: CommandHandler
+    authoring_presentation_review_verify: CommandHandler
+    authoring_presentation_review_sign: CommandHandler
+    authoring_presentation_review_signature_verify: CommandHandler
+    authoring_promotion_verify: CommandHandler
+    default_codex_effort: str
+    default_codex_model: str
+    default_codex_timeout_seconds: float
     default_gemini_model: str
 
 
@@ -168,6 +178,39 @@ def build_parser(cli_handlers: CliHandlers) -> argparse.ArgumentParser:
     authoring_benchmark_parser.add_argument("--output", required=True)
     authoring_benchmark_parser.set_defaults(handler=cli_handlers.authoring_benchmark_gemini)
 
+    codex_benchmark_parser = subparsers.add_parser(
+        "authoring-benchmark-codex",
+        help="run the packaged AI-authoring corpus through subscription-authenticated Codex",
+    )
+    codex_benchmark_parser.add_argument(
+        "--allow-network",
+        action="store_true",
+        required=True,
+        help="explicitly permit Codex model requests for this invocation",
+    )
+    codex_benchmark_parser.add_argument(
+        "--benchmark-identifier",
+        default="codex_reference",
+    )
+    codex_benchmark_parser.add_argument(
+        "--model",
+        default=cli_handlers.default_codex_model,
+    )
+    codex_benchmark_parser.add_argument(
+        "--effort",
+        choices=("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+        default=cli_handlers.default_codex_effort,
+    )
+    codex_benchmark_parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=cli_handlers.default_codex_timeout_seconds,
+    )
+    codex_benchmark_parser.add_argument("--repository-revision", required=True)
+    codex_benchmark_parser.add_argument("--max-correction-rounds", type=int, default=2)
+    codex_benchmark_parser.add_argument("--output", required=True)
+    codex_benchmark_parser.set_defaults(handler=cli_handlers.authoring_benchmark_codex)
+
     evidence_verify_parser = subparsers.add_parser(
         "authoring-evidence-verify",
         help="verify and deterministically replay an authoring evidence artifact",
@@ -210,5 +253,94 @@ def build_parser(cli_handlers: CliHandlers) -> argparse.ArgumentParser:
         help="emit a deterministic machine-readable authentication summary",
     )
     signature_verify_parser.set_defaults(handler=cli_handlers.authoring_evidence_signature_verify)
+
+    presentation_review_init_parser = subparsers.add_parser(
+        "authoring-presentation-review-init",
+        help="create a source-bound human-review packet from verified authoring evidence",
+    )
+    presentation_review_init_parser.add_argument("path")
+    presentation_review_init_parser.add_argument("--repository-revision")
+    presentation_review_init_parser.add_argument("--output", required=True)
+    presentation_review_init_parser.set_defaults(
+        handler=cli_handlers.authoring_presentation_review_init
+    )
+
+    presentation_review_finalize_parser = subparsers.add_parser(
+        "authoring-presentation-review-finalize",
+        help="finalize human decisions into a canonical presentation review",
+    )
+    presentation_review_finalize_parser.add_argument("path")
+    presentation_review_finalize_parser.add_argument("--draft", required=True)
+    presentation_review_finalize_parser.add_argument("--repository-revision")
+    presentation_review_finalize_parser.add_argument("--output", required=True)
+    presentation_review_finalize_parser.set_defaults(
+        handler=cli_handlers.authoring_presentation_review_finalize
+    )
+
+    presentation_review_verify_parser = subparsers.add_parser(
+        "authoring-presentation-review-verify",
+        help="verify a presentation review against exact authoring evidence",
+    )
+    presentation_review_verify_parser.add_argument("path")
+    presentation_review_verify_parser.add_argument("--review", required=True)
+    presentation_review_verify_parser.add_argument("--repository-revision")
+    presentation_review_verify_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="emit a deterministic machine-readable verification summary",
+    )
+    presentation_review_verify_parser.set_defaults(
+        handler=cli_handlers.authoring_presentation_review_verify
+    )
+
+    presentation_review_sign_parser = subparsers.add_parser(
+        "authoring-presentation-review-sign",
+        help="authenticate a verified presentation review with Ed25519",
+    )
+    presentation_review_sign_parser.add_argument("path")
+    presentation_review_sign_parser.add_argument("--review", required=True)
+    presentation_review_sign_parser.add_argument("--private-key", required=True)
+    presentation_review_sign_parser.add_argument("--repository-revision")
+    presentation_review_sign_parser.add_argument("--output", required=True)
+    presentation_review_sign_parser.set_defaults(
+        handler=cli_handlers.authoring_presentation_review_sign
+    )
+
+    presentation_signature_verify_parser = subparsers.add_parser(
+        "authoring-presentation-review-signature-verify",
+        help="authenticate a presentation review with a trusted Ed25519 public key",
+    )
+    presentation_signature_verify_parser.add_argument("path")
+    presentation_signature_verify_parser.add_argument("--review", required=True)
+    presentation_signature_verify_parser.add_argument("--signature", required=True)
+    presentation_signature_verify_parser.add_argument("--public-key", required=True)
+    presentation_signature_verify_parser.add_argument("--repository-revision")
+    presentation_signature_verify_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="emit a deterministic machine-readable authentication summary",
+    )
+    presentation_signature_verify_parser.set_defaults(
+        handler=cli_handlers.authoring_presentation_review_signature_verify
+    )
+
+    promotion_verify_parser = subparsers.add_parser(
+        "authoring-promotion-verify",
+        help="evaluate promotion eligibility from authenticated authoring artifacts",
+    )
+    promotion_verify_parser.add_argument("path")
+    promotion_verify_parser.add_argument("--review", required=True)
+    promotion_verify_parser.add_argument("--signature", required=True)
+    promotion_verify_parser.add_argument("--public-key", required=True)
+    promotion_verify_parser.add_argument("--repository-revision")
+    promotion_verify_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="emit a deterministic machine-readable promotion summary",
+    )
+    promotion_verify_parser.set_defaults(handler=cli_handlers.authoring_promotion_verify)
 
     return parser

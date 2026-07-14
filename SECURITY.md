@@ -2,10 +2,11 @@
 
 Table of Contents:
 
-- Supported versions: 16 <!-- section:supported-versions -->
-- Reporting a vulnerability: 28 <!-- section:reporting -->
-- Evidence signing keys: 42 <!-- section:evidence-signing-keys -->
-- Scope and handling: 59 <!-- section:scope-handling -->
+- Supported versions: 17 <!-- section:supported-versions -->
+- Reporting a vulnerability: 29 <!-- section:reporting -->
+- Artifact signing keys: 43 <!-- section:evidence-signing-keys -->
+- Model execution: 66 <!-- section:model-execution -->
+- Scope and handling: 80 <!-- section:scope-handling -->
 
 <!-- /section:toc -->
 
@@ -39,7 +40,7 @@ platform rather than attaching it to the report.
 <!-- /section:reporting -->
 <!-- section:evidence-signing-keys -->
 
-## Evidence signing keys
+## Artifact signing keys
 
 Treat authoring-evidence private keys as deployment secrets. Provision them
 through the owning platform or secret store, expose them to the signing process
@@ -53,7 +54,27 @@ identity remains an external operational responsibility. Rotate a compromised
 key, remove it from trust stores, and re-authenticate retained evidence only
 when policy requires a currently trusted signer.
 
+Presentation-review signatures use the same key-handling rules but authenticate
+the reviewer artifact rather than model-run evidence. The review's
+`reviewer_identifier` is a claim until an independently distributed trusted key
+authenticates it; an embedded key identifier alone never establishes reviewer
+identity.
+
 <!-- /section:evidence-signing-keys -->
+<!-- section:model-execution -->
+
+## Model execution
+
+Live-model commands require an explicit invocation flag; configured credentials
+alone are not consent. Gemini keys remain within its SDK boundary. The Codex
+transport does not inherit API keys or the parent environment, requires ChatGPT
+subscription authentication, ignores user/project rules, disables built-in
+tools, and executes ephemeral turns in a read-only isolated workspace.
+
+Use the known `~/Code/public-provider` sibling for Codex execution. The package with the
+same name on PyPI is unrelated and must not be substituted.
+
+<!-- /section:model-execution -->
 <!-- section:scope-handling -->
 
 ## Scope and handling

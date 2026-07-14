@@ -17,6 +17,7 @@ from flowspec2.authoring import (
     AuthoredSource,
     AuthoringRequest,
     load_reference_authoring_corpus,
+    observe_authoring_flow,
     run_authoring_benchmark,
 )
 from flowspec2.authoring.corpus import _load_authoring_corpus
@@ -85,6 +86,24 @@ def test_reference_corpus_runs_as_the_fixture_integrity_baseline() -> None:
     report = run_authoring_benchmark("packaged_reference", corpus.cases, fixture_author)
 
     assert report.successful_cases == report.total_cases
+
+
+def test_every_graded_semantic_dimension_is_publicly_derivable() -> None:
+    corpus = load_reference_authoring_corpus()
+
+    for benchmark_case in corpus.cases:
+        expected_flow = json.loads(benchmark_case.expected_flow_json)
+        acceptance_contract = benchmark_case.authoring_task().acceptance
+        public_expectations = {
+            expectation.path: json.loads(expectation.expected_json)
+            for expectation in acceptance_contract.expectations
+        }
+
+        assert public_expectations == observe_authoring_flow(
+            expected_flow,
+            variable_pointer_patterns=acceptance_contract.variable_pointer_patterns,
+        )
+        assert "expected_flow_json" not in acceptance_contract.to_dict()
 
 
 def test_corpus_rejects_unknown_manifest_properties(tmp_path: Path) -> None:

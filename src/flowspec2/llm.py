@@ -176,14 +176,8 @@ def _extraction_response_schema(agent_response: AgentResponse) -> dict[str, Any]
     return response_schema
 
 
-class GeminiAgent:
-    """Engine-side driver backed by Google Gemini structured (JSON) output."""
-
-    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None) -> None:
-        from google import genai
-
-        self.model = model
-        self.client = genai.Client(api_key=api_key or os.environ["GEMINI_API_KEY"])
+class StructuredOutputAgent:
+    """Provider-neutral routing and extraction over one closed JSON completion."""
 
     def _json(
         self,
@@ -191,25 +185,7 @@ class GeminiAgent:
         prompt: str,
         response_schema: dict[str, Any],
     ) -> dict[str, Any]:
-        from google.genai import types
-
-        resp = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system,
-                response_mime_type="application/json",
-                response_json_schema=response_schema,
-                temperature=0.0,
-            ),
-        )
-        try:
-            data = strict_json_loads(resp.text or "{}")
-            if isinstance(data, dict) and Draft202012Validator(response_schema).is_valid(data):
-                return data
-            return {}
-        except (ValueError, TypeError):
-            return {}
+        raise NotImplementedError
 
     def route(self, text: str, flows: list[dict[str, Any]]) -> Optional[str]:
         catalog = "\n".join(f"- {f['flow']}: {f['route']['description']}" for f in flows)
@@ -264,3 +240,41 @@ class GeminiAgent:
             "- Devolva apenas o JSON com os campos pedidos."
         )
         return self._json(EXTRACT_SYS, prompt, _extraction_response_schema(ar))
+
+
+class GeminiAgent(StructuredOutputAgent):
+    """Engine-side driver backed by Google Gemini structured output."""
+
+    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None) -> None:
+        from google import genai
+
+        self.model = model
+        self.client = genai.Client(api_key=api_key or os.environ["GEMINI_API_KEY"])
+
+    def _json(
+        self,
+        system: str,
+        prompt: str,
+        response_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        from google.genai import types
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system,
+                response_mime_type="application/json",
+                response_json_schema=response_schema,
+                temperature=0.0,
+            ),
+        )
+        try:
+            response_document = strict_json_loads(response.text or "{}")
+            if isinstance(response_document, dict) and Draft202012Validator(
+                response_schema
+            ).is_valid(response_document):
+                return response_document
+            return {}
+        except (ValueError, TypeError):
+            return {}

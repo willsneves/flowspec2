@@ -19,17 +19,31 @@ from .authoring import (
     DEFAULT_GEMINI_AUTHOR_MODEL,
     AuthoringBenchmarkEvidence,
     AuthoringBenchmarkLimits,
+    AuthoringEvidenceVerification,
+    CodexAuthor,
+    CodexAuthorError,
     GeminiAuthor,
     GeminiAuthorError,
     RecordingAuthor,
+    finalize_presentation_review_draft,
     load_reference_authoring_corpus,
+    presentation_review_draft,
     run_authoring_benchmark,
     sign_authoring_evidence,
+    sign_presentation_review,
     verify_authoring_evidence,
     verify_authoring_evidence_signature,
+    verify_authoring_promotion,
+    verify_presentation_review,
+    verify_presentation_review_signature,
 )
 from .checker import check_flow, check_json
 from .cli_parser import CliHandlers, CommandHandler, build_parser
+from .codex_transport import (
+    DEFAULT_CODEX_EFFORT,
+    DEFAULT_CODEX_MODEL,
+    DEFAULT_CODEX_TIMEOUT_SECONDS,
+)
 from .compat.models import CompatibilityError, CompatibilityReport
 from .compat.open_workflow import export_open_workflow, import_open_workflow
 from .compat.rasa import RasaBundle, export_rasa, import_rasa
@@ -343,7 +357,14 @@ def _create_gemini_author(model: str) -> GeminiAuthor:
     return GeminiAuthor(model=model)
 
 
-def _authoring_benchmark_gemini(arguments: argparse.Namespace) -> int:
+def _create_codex_author(model: str, effort: str, timeout_seconds: float) -> CodexAuthor:
+    return CodexAuthor(model=model, effort=effort, timeout_seconds=timeout_seconds)
+
+
+def _write_authoring_benchmark_evidence(
+    arguments: argparse.Namespace,
+    model_author: GeminiAuthor | CodexAuthor,
+) -> int:
     output_path = Path(arguments.output)
     if output_path.exists():
         raise FileExistsError(f"output already exists: {output_path}")
@@ -354,8 +375,8 @@ def _authoring_benchmark_gemini(arguments: argparse.Namespace) -> int:
     )
     corpus = load_reference_authoring_corpus()
     flow_profile = reference_profile()
-    with _create_gemini_author(arguments.model) as gemini_author:
-        recording_author = RecordingAuthor(gemini_author)
+    with model_author:
+        recording_author = RecordingAuthor(model_author)
         benchmark_report = run_authoring_benchmark(
             arguments.benchmark_identifier,
             corpus.cases,
@@ -370,7 +391,7 @@ def _authoring_benchmark_gemini(arguments: argparse.Namespace) -> int:
             corpus=corpus,
             profile_identifier=flow_profile.identifier,
             profile_digest=flow_profile.digest,
-            provider=gemini_author.provenance(),
+            provider=model_author.provenance(),
             report=benchmark_report,
             captures=recording_author.captures,
         )
@@ -382,6 +403,26 @@ def _authoring_benchmark_gemini(arguments: argparse.Namespace) -> int:
         f"total_cases={benchmark_report.total_cases}]"
     )
     return 0 if benchmark_report.successful_cases == benchmark_report.total_cases else 1
+
+
+def _authoring_benchmark_gemini(arguments: argparse.Namespace) -> int:
+    output_path = Path(arguments.output)
+    if output_path.exists():
+        raise FileExistsError(f"output already exists: {output_path}")
+    return _write_authoring_benchmark_evidence(
+        arguments,
+        _create_gemini_author(arguments.model),
+    )
+
+
+def _authoring_benchmark_codex(arguments: argparse.Namespace) -> int:
+    output_path = Path(arguments.output)
+    if output_path.exists():
+        raise FileExistsError(f"output already exists: {output_path}")
+    return _write_authoring_benchmark_evidence(
+        arguments,
+        _create_codex_author(arguments.model, arguments.effort, arguments.timeout_seconds),
+    )
 
 
 def _authoring_evidence_verify(arguments: argparse.Namespace) -> int:
@@ -452,6 +493,164 @@ def _authoring_evidence_signature_verify(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _verified_authoring_evidence(
+    evidence_path: str | Path,
+    expected_repository_revision: str | None,
+) -> tuple[str, AuthoringEvidenceVerification]:
+    serialized_evidence = Path(evidence_path).read_text(encoding="utf-8")
+    evidence_verification = verify_authoring_evidence(
+        serialized_evidence,
+        expected_repository_revision=expected_repository_revision,
+    )
+    return serialized_evidence, evidence_verification
+
+
+def _authoring_presentation_review_init(arguments: argparse.Namespace) -> int:
+    output_path = Path(arguments.output)
+    if output_path.exists():
+        raise FileExistsError(f"output already exists: {output_path}")
+    serialized_evidence, evidence_verification = _verified_authoring_evidence(
+        arguments.path,
+        arguments.repository_revision,
+    )
+    review_draft = presentation_review_draft(
+        serialized_evidence,
+        evidence_verification,
+    )
+    _write_text_exclusive(output_path, _dump_json_mapping(review_draft.to_dict()))
+    print(
+        f"Wrote authoring presentation review draft to {output_path} "
+        f"[evidence_digest={review_draft.benchmark_evidence_digest}, "
+        f"subjects={len(review_draft.subjects)}]"
+    )
+    return 0
+
+
+def _authoring_presentation_review_finalize(arguments: argparse.Namespace) -> int:
+    output_path = Path(arguments.output)
+    if output_path.exists():
+        raise FileExistsError(f"output already exists: {output_path}")
+    serialized_evidence, evidence_verification = _verified_authoring_evidence(
+        arguments.path,
+        arguments.repository_revision,
+    )
+    presentation_review = finalize_presentation_review_draft(
+        Path(arguments.draft).read_text(encoding="utf-8"),
+        serialized_evidence,
+        evidence_verification,
+    )
+    _write_text_exclusive(output_path, f"{presentation_review.to_json()}\n")
+    print(
+        f"Wrote authoring presentation review to {output_path} "
+        f"[digest={presentation_review.digest}, passed={str(presentation_review.passed).lower()}]"
+    )
+    return 0
+
+
+def _authoring_presentation_review_verify(arguments: argparse.Namespace) -> int:
+    serialized_evidence, evidence_verification = _verified_authoring_evidence(
+        arguments.path,
+        arguments.repository_revision,
+    )
+    review_verification = verify_presentation_review(
+        Path(arguments.review).read_text(encoding="utf-8"),
+        serialized_evidence,
+        evidence_verification,
+    )
+    if arguments.json_output:
+        print(
+            json.dumps(
+                review_verification.to_dict(),
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+    else:
+        print(
+            f"OK: {arguments.review} is a valid authoring presentation review "
+            f"[digest={review_verification.digest}, "
+            f"passed={str(review_verification.passed).lower()}]"
+        )
+    return 0
+
+
+def _authoring_presentation_review_sign(arguments: argparse.Namespace) -> int:
+    output_path = Path(arguments.output)
+    if output_path.exists():
+        raise FileExistsError(f"output already exists: {output_path}")
+    review_signature = sign_presentation_review(
+        Path(arguments.review).read_text(encoding="utf-8"),
+        Path(arguments.path).read_text(encoding="utf-8"),
+        _read_key_material(arguments.private_key),
+        expected_repository_revision=arguments.repository_revision,
+    )
+    _write_text_exclusive(output_path, f"{review_signature.to_json()}\n")
+    print(
+        f"Wrote authoring presentation review signature to {output_path} "
+        f"[review_digest={review_signature.presentation_review_digest}, "
+        f"key_id={review_signature.key_id}]"
+    )
+    return 0
+
+
+def _authoring_presentation_review_signature_verify(arguments: argparse.Namespace) -> int:
+    authentication = verify_presentation_review_signature(
+        Path(arguments.review).read_text(encoding="utf-8"),
+        Path(arguments.path).read_text(encoding="utf-8"),
+        Path(arguments.signature).read_text(encoding="utf-8"),
+        _read_key_material(arguments.public_key),
+        expected_repository_revision=arguments.repository_revision,
+    )
+    if arguments.json_output:
+        print(
+            json.dumps(
+                authentication.to_dict(),
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+    else:
+        print(
+            f"OK: {arguments.review} is an authenticated authoring presentation review "
+            f"[digest={authentication.presentation_review.digest}, "
+            f"key_id={authentication.key_id}]"
+        )
+    return 0
+
+
+def _authoring_promotion_verify(arguments: argparse.Namespace) -> int:
+    promotion_verification = verify_authoring_promotion(
+        Path(arguments.path).read_text(encoding="utf-8"),
+        Path(arguments.review).read_text(encoding="utf-8"),
+        Path(arguments.signature).read_text(encoding="utf-8"),
+        _read_key_material(arguments.public_key),
+        expected_repository_revision=arguments.repository_revision,
+    )
+    if arguments.json_output:
+        print(
+            json.dumps(
+                promotion_verification.to_dict(),
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+    else:
+        print(
+            "Authoring promotion eligibility: "
+            f"{str(promotion_verification.eligible).lower()} "
+            f"[evidence_digest={promotion_verification.authentication.evidence.digest}, "
+            "presentation_review_digest="
+            f"{promotion_verification.authentication.presentation_review.digest}]"
+        )
+    return 0 if promotion_verification.eligible else 1
+
+
 def _parser() -> argparse.ArgumentParser:
     return build_parser(
         CliHandlers(
@@ -465,10 +664,22 @@ def _parser() -> argparse.ArgumentParser:
             rasa_import=_rasa_import,
             open_workflow_export=_open_workflow_export,
             open_workflow_import=_open_workflow_import,
+            authoring_benchmark_codex=_authoring_benchmark_codex,
             authoring_benchmark_gemini=_authoring_benchmark_gemini,
             authoring_evidence_verify=_authoring_evidence_verify,
             authoring_evidence_sign=_authoring_evidence_sign,
             authoring_evidence_signature_verify=_authoring_evidence_signature_verify,
+            authoring_presentation_review_init=_authoring_presentation_review_init,
+            authoring_presentation_review_finalize=_authoring_presentation_review_finalize,
+            authoring_presentation_review_verify=_authoring_presentation_review_verify,
+            authoring_presentation_review_sign=_authoring_presentation_review_sign,
+            authoring_presentation_review_signature_verify=(
+                _authoring_presentation_review_signature_verify
+            ),
+            authoring_promotion_verify=_authoring_promotion_verify,
+            default_codex_effort=DEFAULT_CODEX_EFFORT,
+            default_codex_model=DEFAULT_CODEX_MODEL,
+            default_codex_timeout_seconds=DEFAULT_CODEX_TIMEOUT_SECONDS,
             default_gemini_model=DEFAULT_GEMINI_AUTHOR_MODEL,
         )
     )
@@ -489,14 +700,19 @@ def main(argv: list[str] | None = None) -> int:
     except CompatibilityError as compatibility_error:
         _print_report(compatibility_error.report)
         return 1
-    except GeminiAuthorError as provider_error:
+    except (CodexAuthorError, GeminiAuthorError) as provider_error:
+        provider_identifier = (
+            "openai_codex"
+            if str(getattr(arguments, "command", "")).endswith("codex")
+            else "google_gemini"
+        )
         log_id = log_event(
             logger,
             logging.ERROR,
             "Authoring provider failed",
             operation=str(getattr(arguments, "command", "unknown")),
             context={
-                "provider": "google_gemini",
+                "provider": provider_identifier,
                 "model": str(getattr(arguments, "model", "unknown")),
             },
         )

@@ -463,6 +463,261 @@
           }
         }
       ]
+    },
+    {
+      "identifier": "gated_derivation_gate_true_runtime",
+      "source": {
+        "path": "gated_derive.case.json",
+        "pointer": "/source"
+      },
+      "expected": {
+        "compilation": "succeeded",
+        "diagnostics": [],
+        "ir": {
+          "ir_format": "flowspec2/ir@1",
+          "flow": "gated_issue_classification",
+          "version": "1.0.0",
+          "source_digest": "bef43034d203f38584eff3548e3773f5b5bb4604a2706a61ce5334ba3d67de34",
+          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "dependency_digest": "a5c83f35e8179f308288eea31dcc88d17e4ac772bbaad5ddea5cc74d150e56bb",
+          "digest": "6a547da9a5f979988ed9c1f6110c8396020e39bbb091e9f65fbd1c457e563f45",
+          "canonical_document_digest": "3f4aeaf54a2d3e5069384d8d12905322f85599de19e3ea2116f4d60daa7a480b",
+          "canonical_execution_ir_digest": "a05696459b4c46e24d681b6b48f53ef69b974166771beaec174e3b300cc134b7",
+          "canonical_ir_digest": "fe0ec808005bae7b3141c5fe59cbcca4a537219e927b7e6b9dc406db9ff7f382"
+        }
+      },
+      "turns": [
+        {
+          "payload": {},
+          "expected_trace": {
+            "status": "progress",
+            "data": {},
+            "agent_response": {
+              "description": "Which type of issue are you reporting?",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_issue_category",
+                "properties": {
+                  "issue_category": {
+                    "type": "string",
+                    "title": "Issue Category",
+                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Pothole, Obstruction.",
+                    "enum": ["Pothole", "Obstruction"]
+                  }
+                },
+                "required": ["issue_category"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "issue_category": "Pothole"
+          },
+          "expected_trace": {
+            "status": "progress",
+            "data": {
+              "issue_category": "Pothole"
+            },
+            "agent_response": {
+              "description": "How large is the pothole?",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_issue_detail",
+                "properties": {
+                  "issue_detail": {
+                    "type": "string",
+                    "title": "Issue Detail",
+                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Small, Large.",
+                    "enum": ["Small", "Large"]
+                  }
+                },
+                "required": ["issue_detail"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "issue_detail": "Small"
+          },
+          "expected_trace": {
+            "status": "completed",
+            "data": {
+              "issue_category": "Pothole",
+              "issue_detail": "Small",
+              "backend_classification": "POTHOLE_SMALL"
+            },
+            "agent_response": {
+              "description": "Serviço concluído com sucesso."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "gated_derivation_gate_false_runtime",
+      "source": {
+        "path": "gated_derive.case.json",
+        "pointer": "/source"
+      },
+      "expected": {
+        "compilation": "succeeded",
+        "diagnostics": [],
+        "ir": {
+          "ir_format": "flowspec2/ir@1",
+          "flow": "gated_issue_classification",
+          "version": "1.0.0",
+          "source_digest": "bef43034d203f38584eff3548e3773f5b5bb4604a2706a61ce5334ba3d67de34",
+          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "dependency_digest": "a5c83f35e8179f308288eea31dcc88d17e4ac772bbaad5ddea5cc74d150e56bb",
+          "digest": "6a547da9a5f979988ed9c1f6110c8396020e39bbb091e9f65fbd1c457e563f45",
+          "canonical_document_digest": "3f4aeaf54a2d3e5069384d8d12905322f85599de19e3ea2116f4d60daa7a480b",
+          "canonical_execution_ir_digest": "a05696459b4c46e24d681b6b48f53ef69b974166771beaec174e3b300cc134b7",
+          "canonical_ir_digest": "fe0ec808005bae7b3141c5fe59cbcca4a537219e927b7e6b9dc406db9ff7f382"
+        }
+      },
+      "turns": [
+        {
+          "payload": {},
+          "expected_trace": {
+            "status": "progress",
+            "data": {},
+            "agent_response": {
+              "description": "Which type of issue are you reporting?",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_issue_category",
+                "properties": {
+                  "issue_category": {
+                    "type": "string",
+                    "title": "Issue Category",
+                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Pothole, Obstruction.",
+                    "enum": ["Pothole", "Obstruction"]
+                  }
+                },
+                "required": ["issue_category"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "issue_category": "Obstruction",
+            "issue_detail": "Large"
+          },
+          "expected_trace": {
+            "status": "completed",
+            "data": {
+              "issue_category": "Obstruction",
+              "backend_classification": "STREET_OBSTRUCTION"
+            },
+            "agent_response": {
+              "description": "Serviço concluído com sucesso."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "identifier": "gated_derivation_default_runtime",
+      "source": {
+        "path": "gated_derive.case.json",
+        "pointer": "/source",
+        "mutations": [
+          {
+            "path": "/derive/0/lookup",
+            "replacement": {
+              "Pothole|Small": "POTHOLE_SMALL",
+              "Obstruction|null": "STREET_OBSTRUCTION"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "compilation": "succeeded",
+        "diagnostics": [],
+        "ir": {
+          "ir_format": "flowspec2/ir@1",
+          "flow": "gated_issue_classification",
+          "version": "1.0.0",
+          "source_digest": "6bf8f544a993d5f06651ef4b4190fe2b384969a831866d7bb3b172a0f8ae8cae",
+          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "dependency_digest": "a5c83f35e8179f308288eea31dcc88d17e4ac772bbaad5ddea5cc74d150e56bb",
+          "digest": "91ceb9abc69411c8be54e56440bf7bee7550d9bafc1dcdd16bb17c0df2442ee6",
+          "canonical_document_digest": "9d5a899c4f5f3a972e9be0da27bb766c7e2c10d5736c0a91930f926521379528",
+          "canonical_execution_ir_digest": "615efc119955760b7659361600c855f7909cf07e764222e14845c583d48c3f64",
+          "canonical_ir_digest": "20825f53c0ec31f3efb6be8dd996c78aaed12f988d0ae5c127db8a5fefe41956"
+        }
+      },
+      "turns": [
+        {
+          "payload": {},
+          "expected_trace": {
+            "status": "progress",
+            "data": {},
+            "agent_response": {
+              "description": "Which type of issue are you reporting?",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_issue_category",
+                "properties": {
+                  "issue_category": {
+                    "type": "string",
+                    "title": "Issue Category",
+                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Pothole, Obstruction.",
+                    "enum": ["Pothole", "Obstruction"]
+                  }
+                },
+                "required": ["issue_category"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "issue_category": "Pothole"
+          },
+          "expected_trace": {
+            "status": "progress",
+            "data": {
+              "issue_category": "Pothole"
+            },
+            "agent_response": {
+              "description": "How large is the pothole?",
+              "payload_schema": {
+                "type": "object",
+                "title": "Slot_issue_detail",
+                "properties": {
+                  "issue_detail": {
+                    "type": "string",
+                    "title": "Issue Detail",
+                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Small, Large.",
+                    "enum": ["Small", "Large"]
+                  }
+                },
+                "required": ["issue_detail"]
+              }
+            }
+          }
+        },
+        {
+          "payload": {
+            "issue_detail": "Large"
+          },
+          "expected_trace": {
+            "status": "completed",
+            "data": {
+              "issue_category": "Pothole",
+              "issue_detail": "Large",
+              "backend_classification": "Pothole"
+            },
+            "agent_response": {
+              "description": "Serviço concluído com sucesso."
+            }
+          }
+        }
+      ]
     }
   ]
 }

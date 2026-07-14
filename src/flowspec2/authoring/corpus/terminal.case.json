@@ -1,7 +1,7 @@
 {
-  "format": "flowspec2/authoring-case@1",
+  "format": "flowspec2/authoring-case@2",
   "identifier": "terminal_fulfillment",
-  "prompt": "Author a flow that collects problem_description, passes it to sgrc_open_ticket as problema, enables terminal idempotency, and stores result.protocolo as protocol_id.",
+  "prompt": "Author an ordered flow that collects required problem_description through the free-text ProblemDescription domain in collect_problem_description, then executes the open_ticket terminal. Call sgrc_open_ticket idempotently with problem_description as problema and store result.protocolo as protocol_id. On success and fatal reset next; on retryable preserve state. Add no other semantic behavior. Flow identity, version, route prose, and non-verbatim prompt wording may vary.",
   "feature_tags": ["terminal", "tool_contract", "idempotency"],
   "required_constructs": [
     {

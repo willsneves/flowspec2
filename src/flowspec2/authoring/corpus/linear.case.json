@@ -1,7 +1,7 @@
 {
-  "format": "flowspec2/authoring-case@1",
+  "format": "flowspec2/authoring-case@2",
   "identifier": "linear_collection",
-  "prompt": "Author a flow that asks a citizen for a short description of a maintenance request.",
+  "prompt": "Author a flow with the single ordered step collect_request_description. It collects the required request_description slot through the free-text RequestDescription domain and asks the citizen for a short maintenance-request description. Add no other domain, slot, path step, derive, subflow, confirmation, capability, or terminal behavior. Flow identity, version, route prose, and non-verbatim prompt wording may vary.",
   "feature_tags": ["linear", "collection"],
   "required_constructs": [
     {

@@ -4,12 +4,12 @@ Table of Contents:
 
 - Unreleased: 23 <!-- section:unreleased -->
     - Added: 27 <!-- section:unreleased-added -->
-    - Changed: 35 <!-- section:unreleased-changed -->
-    - Security: 46 <!-- section:unreleased-security -->
-- Version 0.2.0 — 2026-07-13: 57 <!-- section:version-0-2-0 -->
-    - Added: 61 <!-- section:version-0-2-0-added -->
-    - Changed: 78 <!-- section:version-0-2-0-changed -->
-    - Security: 93 <!-- section:version-0-2-0-security -->
+    - Changed: 40 <!-- section:unreleased-changed -->
+    - Security: 59 <!-- section:unreleased-security -->
+- Version 0.2.0 — 2026-07-13: 73 <!-- section:version-0-2-0 -->
+    - Added: 77 <!-- section:version-0-2-0-added -->
+    - Changed: 94 <!-- section:version-0-2-0-changed -->
+    - Security: 109 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -28,6 +28,11 @@ All notable project changes are recorded here. Versioning follows
 
 - Canonical detached Ed25519 authentication for fully replayed authoring
   evidence, with Python and CLI signing and verification interfaces.
+- Content-addressed human presentation review for candidate route and prompt
+  prose, with a fixed public rubric, source-bound subjects, offline
+  verification, and detached reviewer authentication.
+- Subscription-authenticated Codex authoring, routing, and extraction through
+  an isolated local `public-provider` transport with opt-in live tests.
 
 <!-- /section:unreleased-added -->
 <!-- section:unreleased-changed -->
@@ -39,6 +44,14 @@ All notable project changes are recorded here. Versioning follows
 - Separated semantic orchestration from path, derive, predicate, state, and
   schema contract groups while preserving diagnostic identity.
 - Separated Rasa import from export conversion.
+- Shared closed prompt and structured-output contracts across Gemini and Codex
+  while preserving the existing Gemini interfaces.
+- Replaced hidden complete-source authoring equality with a versioned public
+  semantic acceptance contract, aggregate missing/mismatch/unexpected feedback,
+  and explicit variable presentation paths. Authoring case, corpus, Gemini
+  prompt, Codex prompt, and evidence-envelope identities advanced together.
+- Expanded the conformance kit with gated-derivation traces for open and closed
+  guards, ignored gated input, ordered lookup, and declared fallback behavior.
 
 <!-- /section:unreleased-changed -->
 <!-- section:unreleased-security -->
@@ -48,6 +61,9 @@ All notable project changes are recorded here. Versioning follows
 - Pinned the maintained `cryptography` implementation for Ed25519 operations;
   private keys remain outside evidence and cannot be loaded from environment
   files.
+- Codex model execution requires ChatGPT authentication, excludes API-key and
+  ambient-environment inheritance, disables built-in tools, and uses ephemeral
+  read-only isolation.
 
 <!-- /section:unreleased-security -->
 
