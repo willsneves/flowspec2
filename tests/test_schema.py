@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import copy
+from importlib import import_module
+from typing import Any, cast
+from unittest.mock import Mock
 
 import jsonschema
 import pytest
+from jsonschema.exceptions import best_match
 
 from flowspec2 import schema, validate_flow
 
@@ -24,6 +28,52 @@ def test_schema_returns_an_owned_copy() -> None:
 def test_examples_validate(luminaria_doc, buraco_doc):
     validate_flow(luminaria_doc)
     validate_flow(buraco_doc)
+
+
+def test_validate_flow_preserves_best_match_validation_error(luminaria_doc) -> None:
+    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow["flow"] = "Invalid Flow"
+    invalid_flow["version"] = "2"
+    invalid_flow["unknown"] = True
+    expected_error = best_match(
+        jsonschema.Draft202012Validator(schema()).iter_errors(cast(Any, invalid_flow))
+    )
+    assert expected_error is not None
+
+    with pytest.raises(jsonschema.ValidationError) as raised_error:
+        validate_flow(invalid_flow)
+
+    actual_error = raised_error.value
+    assert actual_error.validator == expected_error.validator
+    assert actual_error.message == expected_error.message
+    assert tuple(actual_error.absolute_path) == tuple(expected_error.absolute_path)
+    assert tuple(actual_error.absolute_schema_path) == tuple(expected_error.absolute_schema_path)
+    assert tuple(
+        (context_error.validator, context_error.message, tuple(context_error.absolute_path))
+        for context_error in actual_error.context
+    ) == tuple(
+        (context_error.validator, context_error.message, tuple(context_error.absolute_path))
+        for context_error in expected_error.context
+    )
+
+
+def test_validate_flow_reuses_the_compiled_validator(
+    luminaria_doc,
+    buraco_doc,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    schema_module = import_module("flowspec2.schema")
+    cached_schema = schema_module._cached_schema()
+    validator_factory = Mock(wraps=jsonschema.Draft202012Validator)
+    monkeypatch.setattr(schema_module, "_schema_cache", cached_schema)
+    monkeypatch.setattr(schema_module, "_validator_cache", None)
+    monkeypatch.setattr(schema_module.jsonschema, "Draft202012Validator", validator_factory)
+
+    schema_module.validate_flow(luminaria_doc)
+    schema_module.validate_flow(buraco_doc)
+    schema_module.validate_flow(luminaria_doc)
+
+    validator_factory.assert_called_once_with(cached_schema)
 
 
 def test_implicit_categorical_domain_requires_its_closed_values(luminaria_doc):
