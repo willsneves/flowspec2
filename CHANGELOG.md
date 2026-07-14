@@ -2,11 +2,14 @@
 
 Table of Contents:
 
-- Unreleased: 20 <!-- section:unreleased -->
-- Version 0.2.0 — 2026-07-13: 27 <!-- section:version-0-2-0 -->
-    - Added: 31 <!-- section:version-0-2-0-added -->
-    - Changed: 48 <!-- section:version-0-2-0-changed -->
-    - Security: 63 <!-- section:version-0-2-0-security -->
+- Unreleased: 23 <!-- section:unreleased -->
+    - Added: 27 <!-- section:unreleased-added -->
+    - Changed: 35 <!-- section:unreleased-changed -->
+    - Security: 46 <!-- section:unreleased-security -->
+- Version 0.2.0 — 2026-07-13: 57 <!-- section:version-0-2-0 -->
+    - Added: 61 <!-- section:version-0-2-0-added -->
+    - Changed: 78 <!-- section:version-0-2-0-changed -->
+    - Security: 93 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -19,7 +22,34 @@ All notable project changes are recorded here. Versioning follows
 
 ## Unreleased
 
-No changes yet.
+<!-- section:unreleased-added -->
+
+### Added
+
+- Canonical detached Ed25519 authentication for fully replayed authoring
+  evidence, with Python and CLI signing and verification interfaces.
+
+<!-- /section:unreleased-added -->
+<!-- section:unreleased-changed -->
+
+### Changed
+
+- Separated graph assembly from schema relations, FlowSpec value contracts,
+  tool lifecycle validation, and external-resume validation.
+- Separated semantic orchestration from path, derive, predicate, state, and
+  schema contract groups while preserving diagnostic identity.
+- Separated Rasa import from export conversion.
+
+<!-- /section:unreleased-changed -->
+<!-- section:unreleased-security -->
+
+### Security
+
+- Pinned the maintained `cryptography` implementation for Ed25519 operations;
+  private keys remain outside evidence and cannot be loaded from environment
+  files.
+
+<!-- /section:unreleased-security -->
 
 <!-- /section:unreleased -->
 <!-- section:version-0-2-0 -->

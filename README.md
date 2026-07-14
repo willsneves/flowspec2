@@ -2,18 +2,18 @@
 
 Table of Contents:
 
-- Install: 45 <!-- section:install -->
-- LLM-driven (the engine side): 72 <!-- section:llm-driven -->
-- Quickstart: 122 <!-- section:quickstart -->
-- Real backends: 146 <!-- section:real-backends -->
-- Error correlation: 163 <!-- section:error-correlation -->
-- CLI: 186 <!-- section:cli -->
-- What it compiles: 218 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 244 <!-- section:example -->
-    - The flowspec/2 document: 251 <!-- section:example-document -->
-    - Compiled LangGraph: 889 <!-- section:example-compiled-langgraph -->
-- Layout: 1005 <!-- section:layout -->
-- Status: 1042 <!-- section:status -->
+- Install: 47 <!-- section:install -->
+- LLM-driven (the engine side): 74 <!-- section:llm-driven -->
+- Quickstart: 130 <!-- section:quickstart -->
+- Real backends: 154 <!-- section:real-backends -->
+- Error correlation: 171 <!-- section:error-correlation -->
+- CLI: 194 <!-- section:cli -->
+- What it compiles: 228 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 254 <!-- section:example -->
+    - The flowspec/2 document: 261 <!-- section:example-document -->
+    - Compiled LangGraph: 899 <!-- section:example-compiled-langgraph -->
+- Layout: 1015 <!-- section:layout -->
+- Status: 1064 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -33,6 +33,8 @@ workflow language. See the [prior-art comparison](docs/PRIOR_ART.md), the
 records why concise source is linked through a runtime profile and canonical IR
 before graph construction. The [AI authoring benchmark](docs/AUTHORING_BENCHMARK.md)
 defines the evidence protocol and executable conformance kit. The
+[evidence-authenticity decision](docs/adr/0004-evidence-authenticity.md)
+defines optional detached signatures and their external trust root. The
 [FlowSpec3 preview](docs/FLOWSPEC3_DRAFT.md) documents the isolated source
 experiment and its loss accounting.
 
@@ -106,6 +108,8 @@ from the model transport:
 ```bash
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output authoring-evidence.json
 flowspec2 authoring-evidence-verify authoring-evidence.json --repository-revision <revision>
+flowspec2 authoring-evidence-sign authoring-evidence.json --private-key authoring-private-key.pem --repository-revision <revision> --output authoring-evidence.signature.json
+flowspec2 authoring-evidence-signature-verify authoring-evidence.json --signature authoring-evidence.signature.json --public-key authoring-public-key.pem --repository-revision <revision>
 ```
 
 The command never records or prints the API key, refuses to overwrite an
@@ -114,7 +118,11 @@ existing artifact, and writes nothing when the provider fails. The presence of
 offline: it checks the closed envelope, content digest, package/corpus/profile
 identity, correction limit, exact capture hashes, and deterministic report
 replay. The digest proves integrity, not who created the artifact; authenticity
-requires an external signature or trusted distribution channel.
+is optional and uses a canonical detached Ed25519 signature. The verifier takes
+the trusted public key explicitly, checks its derived key identifier, and never
+treats a key embedded beside the artifact as a trust root. Signing keys are read
+only from explicit PEM paths, are never serialized, and cannot be loaded from
+environment files.
 
 <!-- /section:llm-driven -->
 <!-- section:quickstart -->
@@ -198,6 +206,8 @@ flowspec2 open-workflow-export examples/reparo_luminaria.flow.json --output buil
 flowspec2 open-workflow-import build/reparo_luminaria.workflow.yaml --output build/reparo_luminaria.flow.json
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output build/authoring-evidence.json
 flowspec2 authoring-evidence-verify build/authoring-evidence.json --repository-revision <revision>
+flowspec2 authoring-evidence-sign build/authoring-evidence.json --private-key authoring-private-key.pem --repository-revision <revision> --output build/authoring-evidence.signature.json
+flowspec2 authoring-evidence-signature-verify build/authoring-evidence.json --signature build/authoring-evidence.signature.json --public-key authoring-public-key.pem --repository-revision <revision> --json
 ```
 
 The Rasa adapter is a strict, versioned subset; `--allow-lossy` acknowledges its
@@ -1011,10 +1021,22 @@ src/flowspec2/
   domains.py       domain → Pydantic validator + normalize strategies
   predicates.py    the frozen predicate grammar evaluator
   nodes.py         collect / confirm / derive / terminal node templates
-  compiler.py      flowspec doc → StateGraph[ServiceState]
+  compiler.py      graph assembly · node ordering · StateGraph wiring
+  compiler_contracts.py stable compiler-contract facade
+  compiler_schema_relations.py JSON Schema subset · path · presence proofs
+  compiler_value_contracts.py entry · slot · derive · terminal value contracts
+  compiler_tool_contracts.py tool inputs · outputs · effects · terminal protocol
+  compiler_resume_contracts.py suspension · resume token · recovery contracts
   checker.py       aggregate structural · semantic · profile · compilation diagnostics
   diagnostics.py   immutable machine-readable findings and reports
-  semantics.py     reference linking · dependency · profile checks
+  semantics.py     semantic orchestration · runtime-profile linking
+  semantic_source_contracts.py stable source-contract facade
+  semantic_schema_contracts.py reusable semantic JSON Schema relations
+  semantic_path_contracts.py path · domain · slot contracts
+  semantic_derive_contracts.py derive values · placement · execution order
+  semantic_predicate_contracts.py predicate references · literal compatibility
+  semantic_state_contracts.py entry · state writers · rail references
+  semantic_support.py shared semantic diagnostics · JSON projections
   profiles.py      named runtime capability catalogs
   ir.py            canonical normalization · contracts · state schema · digests
   state_migration.py declarative active-state migration · loss report · schema proofs
@@ -1024,8 +1046,8 @@ src/flowspec2/
   observability.py Snowflake log IDs · structured event helper
   schema.py        load + JSON-Schema validation
   schema_contracts.py closed local references · external-resume schema contract
-  compat/          Rasa CALM adapter · Open Workflow profile + vendored official schema
-  authoring/       packaged corpus · benchmark · Gemini transport · evidence · projection · CTK
+  compat/          directional Rasa import/export · Open Workflow profile + vendored schema
+  authoring/       corpus · benchmark · Gemini · evidence verification/signing · projection · CTK
   experimental/    non-runtime flowspec/3-draft source preview
   interactive.py   buttons / list / flow envelope builders (Meta limits)
   tools.py         ToolRegistry + injectable fake backends + idempotency replay
@@ -1033,7 +1055,7 @@ src/flowspec2/
   subflows/        address@1 · identification@2 (reusable, versioned)
   flowspec-2.schema.json
 examples/          reparo_luminaria.flow.json · reparo_buraco.flow.json
-tests/             schema · linker · IR · authoring · compatibility · observability · runtime E2E
+tests/             schema · boundaries · linker · IR · authoring · compatibility · runtime E2E
 ```
 
 <!-- /section:layout -->
