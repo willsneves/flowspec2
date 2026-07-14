@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prefeitura.rio/flowspec2/authoring-evidence-signature-1.json",
+  "title": "FlowSpec2 authoring evidence signature",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "algorithm",
+    "evidence_digest",
+    "key_id",
+    "signature"
+  ],
+  "properties": {
+    "format": {
+      "const": "flowspec2/authoring-evidence-signature@1"
+    },
+    "algorithm": {
+      "const": "ed25519"
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "key_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{86}==$"
+    }
+  }
+}

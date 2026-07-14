@@ -22,6 +22,7 @@ dependencies = [
     "pydantic>=2.7",
     "jsonschema>=4.20",
     "pyyaml==6.0.3",
+    "cryptography==49.0.0",
 ]
 
 [project.urls]
@@ -64,6 +65,7 @@ packages = ["src/flowspec2"]
 "src/flowspec2/flowspec-2.schema.json" = "flowspec2/flowspec-2.schema.json"
 "src/flowspec2/py.typed" = "flowspec2/py.typed"
 "src/flowspec2/authoring/authoring-evidence.schema.json" = "flowspec2/authoring/authoring-evidence.schema.json"
+"src/flowspec2/authoring/authoring-evidence-signature.schema.json" = "flowspec2/authoring/authoring-evidence-signature.schema.json"
 "src/flowspec2/experimental/flowspec-3-draft.schema.json" = "flowspec2/experimental/flowspec-3-draft.schema.json"
 "src/flowspec2/compat/schemas/open-workflow-conversation-1.schema.json" = "flowspec2/compat/schemas/open-workflow-conversation-1.schema.json"
 "src/flowspec2/compat/schemas/vendor/open-workflow-1.0.3.workflow.yaml" = "flowspec2/compat/schemas/vendor/open-workflow-1.0.3.workflow.yaml"
