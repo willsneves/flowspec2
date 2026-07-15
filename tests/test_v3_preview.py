@@ -2,19 +2,25 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import jsonschema
 import pytest
 
+import flowspec2.experimental.v3_preview as v3_preview_module
 from flowspec2 import load_flow
 from flowspec2.experimental import (
+    V3PreviewDocumentMode,
+    V3PreviewLossCategory,
+    V3PreviewLossDisposition,
+    V3PreviewLossHandling,
     V3PreviewMigrationError,
     V3PreviewValidationError,
     check_v3_preview,
     compact_json_bytes,
     migrate_v2_to_v3_preview,
     migrate_v2_to_v3_preview_report,
+    preview_loss_policy,
     preview_schema,
     validate_v3_preview,
 )
@@ -28,6 +34,13 @@ def _step_with_kind(preview_document: dict[str, Any], step_kind: str) -> dict[st
     )
 
 
+def _loss_entries_by_path(preview_document: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
+        loss_entry["source_path"]: loss_entry
+        for loss_entry in preview_document.get("v2_passthrough", {}).get("entries", [])
+    }
+
+
 @pytest.mark.parametrize(
     "example_filename",
     ["reparo_buraco.flow.json", "reparo_luminaria.flow.json"],
@@ -37,7 +50,7 @@ def test_real_v2_examples_migrate_to_schema_valid_previews(example_filename: str
 
     preview_document = migrate_v2_to_v3_preview(source_document)
 
-    validate_v3_preview(preview_document)
+    validate_v3_preview(preview_document, mode=V3PreviewDocumentMode.V2_MIGRATION)
     assert preview_document["schema"] == "flowspec/3-draft"
     assert "domains" not in preview_document
     assert "slots" not in preview_document
@@ -57,6 +70,10 @@ def test_migration_is_pure_deterministic_and_report_is_immutable(
     mutable_preview = first_report.preview_document
     mutable_preview["flow"] = "changed_by_caller"
     assert first_report.preview_document["flow"] == "reparo_luminaria"
+    mutable_fragment = first_report.loss_entries[0].source_fragment
+    assert isinstance(mutable_fragment, dict)
+    mutable_fragment["changed_by_caller"] = True
+    assert "changed_by_caller" not in first_report.loss_entries[0].source_fragment
 
 
 def test_migration_inlines_stable_options_and_typed_references(
@@ -128,17 +145,29 @@ def test_non_native_v2_fragments_are_preserved_and_reported(
 ) -> None:
     migration_report = migrate_v2_to_v3_preview_report(luminaria_doc)
     preview_document = migration_report.preview_document
-    unmapped_fragments = preview_document["v2_passthrough"]["unmapped"]
+    loss_entries = _loss_entries_by_path(preview_document)
+    report_entries = {
+        loss_entry.source_path: loss_entry for loss_entry in migration_report.loss_entries
+    }
 
-    assert "/entry" in migration_report.passthrough_paths
-    assert "/auto_flow" in migration_report.passthrough_paths
-    assert "/capabilities/await_external" in migration_report.passthrough_paths
-    assert unmapped_fragments["/entry"] == luminaria_doc["entry"]
-    assert unmapped_fragments["/auto_flow"] == luminaria_doc["auto_flow"]
+    assert report_entries["/entry"].category is V3PreviewLossCategory.ENTRY_CONTRACT
+    assert report_entries["/auto_flow"].category is V3PreviewLossCategory.AUTOMATIC_FLOW_CONTRACT
     assert (
-        unmapped_fragments["/capabilities/await_external"]
+        report_entries["/capabilities/await_external"].category
+        is V3PreviewLossCategory.IMPLICIT_AWAIT_CAPABILITY
+    )
+    assert loss_entries["/entry"]["source_fragment"] == luminaria_doc["entry"]
+    assert loss_entries["/auto_flow"]["source_fragment"] == luminaria_doc["auto_flow"]
+    assert (
+        loss_entries["/capabilities/await_external"]["source_fragment"]
         == (luminaria_doc["capabilities"]["await_external"])
     )
+    for capability_name, capability_definition in luminaria_doc["capabilities"].items():
+        capability_path = f"/capabilities/{capability_name}"
+        if capability_name == "await_external":
+            continue
+        assert report_entries[capability_path].category is V3PreviewLossCategory.AGENT_CAPABILITY
+        assert loss_entries[capability_path]["source_fragment"] == capability_definition
     native_v2_prefixes = (
         "/domains",
         "/slots",
@@ -150,8 +179,8 @@ def test_non_native_v2_fragments_are_preserved_and_reported(
         "/overrides",
     )
     assert not any(
-        source_path.startswith(native_v2_prefixes)
-        for source_path in migration_report.passthrough_paths
+        loss_entry.source_path.startswith(native_v2_prefixes)
+        for loss_entry in migration_report.loss_entries
     )
 
 
@@ -187,7 +216,120 @@ def test_explicit_external_wait_becomes_a_local_typed_step() -> None:
     assert await_step["on_resume"]["enrich"]["input"]["payment_id"] == {"$token": "payment.id"}
     assert await_step["on_resume"]["enrich"]["set"]["receipt_code"] == {"$result": "receipt.code"}
     assert await_step["timeout"]["goto"] == {"$step": "wait_payment"}
-    assert "/capabilities/await_external" not in preview_document["v2_passthrough"]["unmapped"]
+    loss_entries = _loss_entries_by_path(preview_document)
+    assert "/capabilities/await_external" not in loss_entries
+    assert loss_entries["/capabilities/await_external/resume"] == {
+        "source_path": "/capabilities/await_external/resume",
+        "category": "await_resume_contract",
+        "disposition": "compatibility_only",
+        "source_fragment": source_document["capabilities"]["await_external"]["resume"],
+    }
+    assert loss_entries["/capabilities/await_external/timeout_seconds"] == {
+        "source_path": "/capabilities/await_external/timeout_seconds",
+        "category": "await_timeout_duration",
+        "disposition": "compatibility_only",
+        "source_fragment": 300,
+    }
+    assert loss_entries["/domains/Placeholder"]["category"] == "unused_domain_declaration"
+
+
+def test_shadowed_await_presentation_is_classified_for_rehydration() -> None:
+    source_document = _external_wait_source()
+    source_document["path"][0]["prompt"] = {
+        "text": "Path-owned payment instructions.",
+        "verbatim": True,
+    }
+
+    migration_report = migrate_v2_to_v3_preview_report(source_document)
+    loss_entries = {
+        loss_entry.source_path: loss_entry for loss_entry in migration_report.loss_entries
+    }
+    prompt_entry = loss_entries["/capabilities/await_external/prompt"]
+
+    assert prompt_entry.category is V3PreviewLossCategory.SHADOWED_AWAIT_PRESENTATION
+    assert prompt_entry.handling is V3PreviewLossHandling.REHYDRATE
+    assert (
+        prompt_entry.source_fragment == source_document["capabilities"]["await_external"]["prompt"]
+    )
+
+
+def test_mismatched_interactive_domain_is_classified_as_excluded(
+    luminaria_doc: dict[str, Any],
+) -> None:
+    luminaria_doc["path"][1]["interactive"]["from_domain"] = "SimNao"
+
+    migration_report = migrate_v2_to_v3_preview_report(luminaria_doc)
+    mismatch_entry = next(
+        loss_entry
+        for loss_entry in migration_report.loss_entries
+        if loss_entry.source_path == "/path/1/interactive/from_domain"
+    )
+
+    assert mismatch_entry.category is V3PreviewLossCategory.MISMATCHED_INTERACTIVE_DOMAIN
+    assert mismatch_entry.disposition is V3PreviewLossDisposition.EXCLUDED
+    assert mismatch_entry.handling is V3PreviewLossHandling.REJECT
+
+
+def test_unused_v2_declarations_receive_specific_loss_categories() -> None:
+    source_document = _external_wait_source()
+    source_document["slots"] = {"unused_answer": {"domain": "Placeholder"}}
+
+    migration_report = migrate_v2_to_v3_preview_report(source_document)
+    categories_by_path = {
+        loss_entry.source_path: loss_entry.category for loss_entry in migration_report.loss_entries
+    }
+
+    assert categories_by_path["/domains/Placeholder"] is (
+        V3PreviewLossCategory.UNUSED_DOMAIN_DECLARATION
+    )
+    assert categories_by_path["/slots/unused_answer"] is (
+        V3PreviewLossCategory.UNUSED_SLOT_DECLARATION
+    )
+
+
+def test_duplicate_terminal_parameter_is_classified_as_excluded() -> None:
+    source_document = _external_wait_source()
+    source_document["slots"] = {"payment_reference": {"domain": "Placeholder"}}
+    source_document["path"].insert(
+        0,
+        {
+            "step": "collect_payment_reference",
+            "slot": "payment_reference",
+            "prompt": {"text": "Provide the payment reference."},
+        },
+    )
+    source_document["terminal"]["input"] = [
+        {"param": "paymentReference", "slot": "payment_reference"},
+        {"param": "paymentReference", "slot": "payment_reference"},
+    ]
+
+    migration_report = migrate_v2_to_v3_preview_report(source_document)
+    duplicate_entry = next(
+        loss_entry
+        for loss_entry in migration_report.loss_entries
+        if loss_entry.source_path == "/terminal/input/0"
+    )
+
+    assert duplicate_entry.category is V3PreviewLossCategory.DUPLICATE_TERMINAL_INPUT_PARAMETER
+    assert duplicate_entry.handling is V3PreviewLossHandling.REJECT
+
+
+def test_loss_registration_rejects_a_repeated_source_path() -> None:
+    migration_context = v3_preview_module._new_migration_context(_external_wait_source())
+    v3_preview_module._record_loss(
+        migration_context,
+        V3PreviewLossCategory.ENTRY_CONTRACT,
+        "/entry",
+        {"slot": "answer"},
+    )
+
+    with pytest.raises(V3PreviewMigrationError, match="classified more than once"):
+        v3_preview_module._record_loss(
+            migration_context,
+            V3PreviewLossCategory.ENTRY_CONTRACT,
+            "/entry",
+            {"slot": "answer"},
+        )
 
 
 def test_legacy_await_enrichment_is_accounted_instead_of_kept_ambiguous() -> None:
@@ -200,8 +342,17 @@ def test_legacy_await_enrichment_is_accounted_instead_of_kept_ambiguous() -> Non
     enrichment_pointer = "/capabilities/await_external/on_resume/enrich"
 
     assert "enrich" not in await_step["on_resume"]
-    assert enrichment_pointer in migration_report.passthrough_paths
-    assert preview_document["v2_passthrough"]["unmapped"][enrichment_pointer] == "lookup_receipt"
+    report_entries = {
+        loss_entry.source_path: loss_entry for loss_entry in migration_report.loss_entries
+    }
+    assert (
+        report_entries[enrichment_pointer].category is V3PreviewLossCategory.LEGACY_AWAIT_ENRICHMENT
+    )
+    assert report_entries[enrichment_pointer].handling is V3PreviewLossHandling.REJECT
+    assert report_entries[enrichment_pointer].disposition is V3PreviewLossDisposition.EXCLUDED
+    assert _loss_entries_by_path(preview_document)[enrichment_pointer]["source_fragment"] == (
+        "lookup_receipt"
+    )
 
 
 def test_legacy_interactive_gate_is_loss_accounted_not_promoted() -> None:
@@ -214,8 +365,15 @@ def test_legacy_interactive_gate_is_loss_accounted_not_promoted() -> None:
     gate_pointer = "/capabilities/await_external/interactive/gate"
 
     assert "gate" not in await_step["ui"]
-    assert gate_pointer in migration_report.passthrough_paths
-    assert preview_document["v2_passthrough"]["unmapped"][gate_pointer] == "payment_cta_enabled"
+    report_entries = {
+        loss_entry.source_path: loss_entry for loss_entry in migration_report.loss_entries
+    }
+    assert report_entries[gate_pointer].category is V3PreviewLossCategory.LEGACY_INTERACTIVE_GATE
+    assert report_entries[gate_pointer].handling is V3PreviewLossHandling.REJECT
+    assert report_entries[gate_pointer].disposition is V3PreviewLossDisposition.EXCLUDED
+    assert _loss_entries_by_path(preview_document)[gate_pointer]["source_fragment"] == (
+        "payment_cta_enabled"
+    )
 
 
 def test_preview_schema_is_closed_and_references_are_single_key(
@@ -259,6 +417,91 @@ def test_schema_asset_is_valid_draft_2020_12() -> None:
     jsonschema.Draft202012Validator.check_schema(experimental_schema)
     assert experimental_schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert experimental_schema["properties"]["schema"]["const"] == "flowspec/3-draft"
+
+
+def test_loss_policy_is_closed_and_matches_public_enums() -> None:
+    policy_document = preview_loss_policy()
+    category_documents = policy_document["categories"]
+
+    assert set(category_documents) == {category.value for category in V3PreviewLossCategory}
+    assert {
+        category_document["disposition"] for category_document in category_documents.values()
+    } == {disposition.value for disposition in V3PreviewLossDisposition}
+    assert {category_document["handling"] for category_document in category_documents.values()} == {
+        handling.value for handling in V3PreviewLossHandling
+    }
+    assert all(
+        category_document["source_path_pattern"]
+        for category_document in category_documents.values()
+    )
+
+
+def test_authored_preview_rejects_migration_loss_accounting(
+    luminaria_doc: dict[str, Any],
+) -> None:
+    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+
+    with pytest.raises(V3PreviewValidationError) as validation_error:
+        validate_v3_preview(preview_document)
+
+    assert validation_error.value.diagnostics[0].code == "FLOWSPEC3_AUTHORED_LOSS_ACCOUNTING"
+    validate_v3_preview(preview_document, mode=V3PreviewDocumentMode.V2_MIGRATION)
+
+
+@pytest.mark.parametrize("validation_function", [validate_v3_preview, check_v3_preview])
+def test_preview_validation_rejects_unknown_document_mode(validation_function: Any) -> None:
+    with pytest.raises(ValueError, match="not_a_mode"):
+        validation_function(_minimal_preview(), mode=cast(Any, "not_a_mode"))
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    [
+        ("unknown_category", "FLOWSPEC3_UNKNOWN_LOSS_CATEGORY"),
+        ("disposition_mismatch", "FLOWSPEC3_LOSS_DISPOSITION_MISMATCH"),
+        ("source_path_mismatch", "FLOWSPEC3_LOSS_SOURCE_PATH_MISMATCH"),
+        ("unordered", "FLOWSPEC3_UNORDERED_LOSS_ENTRIES"),
+        ("duplicate_source_path", "FLOWSPEC3_DUPLICATE_LOSS_SOURCE_PATH"),
+    ],
+)
+def test_migration_loss_accounting_enforces_policy_and_canonical_order(
+    luminaria_doc: dict[str, Any], mutation: str, expected_code: str
+) -> None:
+    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    loss_entries = preview_document["v2_passthrough"]["entries"]
+    if mutation == "unknown_category":
+        loss_entries[0]["category"] = "unknown_category"
+    elif mutation == "disposition_mismatch":
+        loss_entries[0]["disposition"] = "excluded"
+    elif mutation == "source_path_mismatch":
+        loss_entries[0]["category"] = "entry_contract"
+    elif mutation == "unordered":
+        loss_entries.reverse()
+    elif mutation == "duplicate_source_path":
+        duplicate_entry = copy.deepcopy(loss_entries[0])
+        duplicate_entry["category"] = "unused_domain_declaration"
+        loss_entries.insert(1, duplicate_entry)
+
+    diagnostic_codes = {
+        diagnostic.code
+        for diagnostic in check_v3_preview(
+            preview_document, mode=V3PreviewDocumentMode.V2_MIGRATION
+        )
+    }
+
+    assert expected_code in diagnostic_codes
+
+
+def test_migration_loss_entries_are_ordered_and_unique(luminaria_doc: dict[str, Any]) -> None:
+    migration_report = migrate_v2_to_v3_preview_report(luminaria_doc)
+    source_paths = [loss_entry.source_path for loss_entry in migration_report.loss_entries]
+
+    assert source_paths == sorted(source_paths)
+    assert len(source_paths) == len(set(source_paths))
+    assert source_paths == [
+        loss_entry["source_path"]
+        for loss_entry in migration_report.preview_document["v2_passthrough"]["entries"]
+    ]
 
 
 def test_migration_rejects_a_non_v2_source(luminaria_doc: dict[str, Any]) -> None:
@@ -510,7 +753,17 @@ def test_preview_schema_closes_local_contradictions(mutation: str) -> None:
         preview_document["steps"].append(_submit_step())
         preview_document["steps"][-1]["outputs"] = {"protocol_id": {"$result": "tickets.0.id"}}
     elif mutation == "invalid_passthrough_pointer":
-        preview_document["v2_passthrough"] = {"unmapped": {"/~2": True}}
+        preview_document["v2_passthrough"] = {
+            "contract": "flowspec2/v3-preview-loss-policy@1",
+            "entries": [
+                {
+                    "source_path": "/~2",
+                    "category": "entry_contract",
+                    "disposition": "compatibility_only",
+                    "source_fragment": True,
+                }
+            ],
+        }
 
     with pytest.raises(jsonschema.ValidationError):
         validate_v3_preview(preview_document)
@@ -859,6 +1112,19 @@ def _external_wait_source() -> dict[str, Any]:
                 "kind": "cta_url",
                 "step": "wait_payment",
                 "resume_on": "payment_token",
+                "resume": {
+                    "version": "1",
+                    "schema": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {"id": {"type": "string", "minLength": 1}},
+                        "required": ["id"],
+                    },
+                    "correlation": "$token.id",
+                    "duplicate": "ignore",
+                    "late": "reject",
+                },
                 "prompt": {"text": "Complete payment to continue.", "verbatim": True},
                 "interactive": {
                     "kind": "cta_url",
@@ -876,6 +1142,7 @@ def _external_wait_source() -> dict[str, Any]:
                     },
                 },
                 "timeout": {"goto": "wait_payment", "set": {"timed_out": True}},
+                "timeout_seconds": 300,
                 "recovery": {
                     "abort": {"goto": "END"},
                     "resend": {"goto": "wait_payment"},

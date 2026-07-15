@@ -2,18 +2,18 @@
 
 Table of Contents:
 
-- Install: 58 <!-- section:install -->
-- LLM-driven (the engine side): 100 <!-- section:llm-driven -->
-- Quickstart: 181 <!-- section:quickstart -->
-- Real backends: 205 <!-- section:real-backends -->
-- Error correlation: 222 <!-- section:error-correlation -->
-- CLI: 245 <!-- section:cli -->
-- What it compiles: 298 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 324 <!-- section:example -->
-    - The flowspec/2 document: 331 <!-- section:example-document -->
-    - Compiled LangGraph: 969 <!-- section:example-compiled-langgraph -->
-- Layout: 1085 <!-- section:layout -->
-- Status: 1136 <!-- section:status -->
+- Install: 61 <!-- section:install -->
+- LLM-driven (the engine side): 103 <!-- section:llm-driven -->
+- Quickstart: 184 <!-- section:quickstart -->
+- Real backends: 208 <!-- section:real-backends -->
+- Error correlation: 225 <!-- section:error-correlation -->
+- CLI: 248 <!-- section:cli -->
+- What it compiles: 301 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 327 <!-- section:example -->
+    - The flowspec/2 document: 334 <!-- section:example-document -->
+    - Compiled LangGraph: 972 <!-- section:example-compiled-langgraph -->
+- Layout: 1088 <!-- section:layout -->
+- Status: 1139 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -47,7 +47,10 @@ replayable without turning stochastic behavior into format conformance. Paired
 authored and counterfactual probes isolate whether trigger examples and
 extraction guidance change the observed model output. The
 [FlowSpec3 preview](docs/FLOWSPEC3_DRAFT.md) documents the isolated source
-experiment and its loss accounting.
+experiment, typed loss accounting, and deterministic analytical lowering back
+to compile-checked v2. The
+[lowering-boundary decision](docs/adr/0009-v3-preview-lowering-boundary.md)
+defines the supported subset and fixed-point guarantee.
 
 Release history and compatibility policy live in [CHANGELOG.md](CHANGELOG.md)
 and [VERSIONING.md](docs/VERSIONING.md). Report vulnerabilities through the
@@ -1120,7 +1123,7 @@ src/flowspec2/
   authoring/       corpus · benchmark · Gemini/Codex · evidence verification/signing · projection · CTK
   codex_agent.py   subscription-authenticated route/extract driver
   codex_transport.py lazy isolated llmgate boundary
-  experimental/    non-runtime flowspec/3-draft source preview
+  experimental/    non-runtime flowspec/3-draft preview · migration · lowering
   interactive.py   buttons / list / flow envelope builders (Meta limits)
   tools.py         ToolRegistry + injectable fake backends + idempotency replay
   backends/        BackendConfig + make_registry + httpx HTTP tools (real integrations)
@@ -1137,7 +1140,9 @@ tests/             schema · boundaries · linker · IR · authoring · compatib
 
 Reference runtime for the stable flowspec/2 format. The isolated
 `flowspec/3-draft` package is an authoring experiment, not an executable or
-stable format; promotion depends on comparative real-model benchmark evidence.
+stable format. Its analytical lowerer accepts only the subset that can produce
+a compile-checked v2 source and migrate back to the exact preview; promotion
+still depends on comparative real-model benchmark evidence.
 The live runner emits the reproducible evidence artifact needed for that
 decision, but does not reinterpret fixture success as model-quality evidence.
 Subflows ship with in-memory fake backends so the suite runs offline; each

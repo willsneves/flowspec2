@@ -822,16 +822,32 @@
       }
     },
     "v2Passthrough": {
-      "description": "Exact source fragments without native preview semantics, keyed by source JSON Pointer.",
+      "description": "Ordered, policy-classified source fragments emitted only by v2 migration.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["unmapped"],
+      "required": ["contract", "entries"],
       "properties": {
-        "unmapped": {
-          "type": "object",
-          "propertyNames": { "$ref": "#/$defs/jsonPointer" },
-          "additionalProperties": { "$ref": "#/$defs/passthroughValue" }
+        "contract": { "const": "flowspec2/v3-preview-loss-policy@1" },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/lossEntry" }
         }
+      }
+    },
+    "lossEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_path", "category", "disposition", "source_fragment"],
+      "properties": {
+        "source_path": { "$ref": "#/$defs/jsonPointer" },
+        "category": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "disposition": { "enum": ["compatibility_only", "excluded"] },
+        "source_fragment": { "$ref": "#/$defs/passthroughValue" }
       }
     },
     "passthroughValue": {

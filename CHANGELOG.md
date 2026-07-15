@@ -4,12 +4,12 @@ Table of Contents:
 
 - Unreleased: 23 <!-- section:unreleased -->
     - Added: 27 <!-- section:unreleased-added -->
-    - Changed: 44 <!-- section:unreleased-changed -->
-    - Security: 71 <!-- section:unreleased-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 85 <!-- section:version-0-2-0 -->
-    - Added: 89 <!-- section:version-0-2-0-added -->
-    - Changed: 106 <!-- section:version-0-2-0-changed -->
-    - Security: 121 <!-- section:version-0-2-0-security -->
+    - Changed: 47 <!-- section:unreleased-changed -->
+    - Security: 79 <!-- section:unreleased-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 93 <!-- section:version-0-2-0 -->
+    - Added: 97 <!-- section:version-0-2-0-added -->
+    - Changed: 114 <!-- section:version-0-2-0-changed -->
+    - Security: 129 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -37,12 +37,20 @@ All notable project changes are recorded here. Versioning follows
   extraction probes, bound to verified final sources, exact request contracts,
   raw responses, and deterministic offline replay. Authored/counterfactual probe
   pairs isolate the influence of trigger examples and extraction guidance.
+- Deterministic analytical lowering for the supported v3 preview subset, with
+  full v2 profile and compilation checks, policy-bound loss rehydration, stable
+  rejection diagnostics, and an exact preview fixed-point proof.
 
 <!-- /section:unreleased-added -->
 <!-- section:unreleased-changed -->
 
 ### Changed
 
+- Replaced the v3 preview's untyped passthrough map with ordered, immutable,
+  policy-classified migration loss entries; authored previews reject the
+  migration-only artifact, and localized awaits now account for resume and
+  timeout lifecycle rails. Loss categories now bind their allowed source paths
+  so category relabeling cannot authorize unrelated rehydration.
 - Separated graph assembly from schema relations, FlowSpec value contracts,
   tool lifecycle validation, and external-resume validation.
 - Separated semantic orchestration from path, derive, predicate, state, and

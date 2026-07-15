@@ -72,6 +72,7 @@ packages = ["src/flowspec2"]
 "src/flowspec2/authoring/authoring-operational-evidence.schema.json" = "flowspec2/authoring/authoring-operational-evidence.schema.json"
 "src/flowspec2/authoring/operational-corpus.json" = "flowspec2/authoring/operational-corpus.json"
 "src/flowspec2/experimental/flowspec-3-draft.schema.json" = "flowspec2/experimental/flowspec-3-draft.schema.json"
+"src/flowspec2/experimental/v3-preview-loss-policy.json" = "flowspec2/experimental/v3-preview-loss-policy.json"
 "src/flowspec2/compat/schemas/open-workflow-conversation-1.schema.json" = "flowspec2/compat/schemas/open-workflow-conversation-1.schema.json"
 "src/flowspec2/compat/schemas/vendor/open-workflow-1.0.3.workflow.yaml" = "flowspec2/compat/schemas/vendor/open-workflow-1.0.3.workflow.yaml"
 "src/flowspec2/compat/schemas/vendor/open-workflow-1.0.3.LICENSE" = "flowspec2/compat/schemas/vendor/open-workflow-1.0.3.LICENSE"

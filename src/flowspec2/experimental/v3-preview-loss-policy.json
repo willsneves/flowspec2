@@ -1,0 +1,161 @@
+{
+  "_sections": {
+    "loss-policy": {
+      "description": "Closed policy for every non-native fragment emitted by the v2-to-v3 preview migrator.",
+      "keys": ["contract", "categories"]
+    }
+  },
+  "contract": "flowspec2/v3-preview-loss-policy@1",
+  "categories": {
+    "agent_capability": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/capabilities/(?:media_in|media_out|tts|location_in|handoff|session_reset)$",
+      "description": "A free-standing agent capability has no local preview owner."
+    },
+    "automatic_flow_contract": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/auto_flow$",
+      "description": "Automatic WhatsApp Flow behavior has no native preview contract."
+    },
+    "await_resume_contract": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/capabilities/await_external/resume$",
+      "description": "Await token, correlation, duplicate, and late-delivery behavior has no native preview contract."
+    },
+    "await_timeout_duration": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/capabilities/await_external/timeout_seconds$",
+      "description": "The await deadline duration has no native preview contract."
+    },
+    "duplicate_domain_row": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/domains/[^/]+/rows/[0-9]+$",
+      "description": "A domain option has shadowed presentation rows."
+    },
+    "duplicate_terminal_input_parameter": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/terminal/input/[0-9]+$",
+      "description": "A terminal parameter has shadowed input bindings."
+    },
+    "entry_contract": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/entry$",
+      "description": "Entry initialization has no native preview contract."
+    },
+    "implicit_await_capability": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/capabilities/await_external$",
+      "description": "An await capability not owned by an explicit path step cannot be localized safely."
+    },
+    "invalid_boolean_domain_field": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/domains/[^/]+/(?:values|rows)$",
+      "description": "A boolean domain contains a field outside its v2 contract."
+    },
+    "invalid_non_choice_domain_field": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/domains/[^/]+/(?:values|rows)$",
+      "description": "A non-choice domain contains canonical option data that has no meaning for its type."
+    },
+    "invalid_non_choice_synonyms": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/domains/[^/]+/normalize/synonyms$",
+      "description": "A non-choice domain contains choice-synonym normalization."
+    },
+    "invalid_synonym_target": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/domains/[^/]+/normalize/synonyms/[^/]+$",
+      "description": "A normalization synonym targets no canonical domain option."
+    },
+    "legacy_await_enrichment": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/capabilities/await_external/on_resume/enrich$",
+      "description": "A bare-name enrichment on an explicit await cannot lower into the executable object-form contract."
+    },
+    "legacy_interactive_gate": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/(?:path/[0-9]+|confirm|capabilities/await_external)/interactive/gate$",
+      "description": "A removed interactive environment gate cannot be restored into a valid current v2 source."
+    },
+    "mismatched_interactive_domain": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/(?:path/[0-9]+|confirm|capabilities/await_external)/interactive/from_domain$",
+      "description": "Interactive source-domain metadata disagrees with the slot domain localized by the preview."
+    },
+    "orphan_domain_row": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/domains/[^/]+/rows/[0-9]+$",
+      "description": "A domain presentation row has no matching canonical option."
+    },
+    "shadowed_await_presentation": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/capabilities/await_external/(?:prompt|interactive)$",
+      "description": "Path and capability presentation differ and the preview selects the path-owned form."
+    },
+    "unknown_derive_anchor": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/derive/[0-9]+/after$",
+      "description": "A derive ordering anchor cannot be resolved to a localized preview step."
+    },
+    "unknown_top_level_fragment": {
+      "disposition": "excluded",
+      "handling": "reject",
+      "source_path_pattern": "^/[^/]+$",
+      "description": "A source top-level field is outside the closed v2 schema."
+    },
+    "unused_confirmation_contract": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/confirm$",
+      "description": "A valid v2 confirmation declaration is not consumed by the authored path."
+    },
+    "unused_domain_declaration": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/domains/[^/]+$",
+      "description": "A valid v2 domain declaration is not consumed by a localized collect step."
+    },
+    "unused_override_gate": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/overrides/gates/[^/]+$",
+      "description": "A valid v2 override gate is not consumed by a localized step."
+    },
+    "unused_slot_declaration": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/slots/[^/]+$",
+      "description": "A valid v2 slot declaration is not consumed by a localized collect step."
+    },
+    "unused_subflow_declaration": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/uses/[0-9]+$",
+      "description": "A valid v2 subflow-use declaration is not consumed by the authored path."
+    },
+    "unused_terminal_contract": {
+      "disposition": "compatibility_only",
+      "handling": "rehydrate",
+      "source_path_pattern": "^/terminal$",
+      "description": "A valid v2 terminal declaration is not consumed by the authored path."
+    }
+  }
+}
