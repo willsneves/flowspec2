@@ -5,11 +5,11 @@ Table of Contents:
 - Unreleased: 23 <!-- section:unreleased -->
     - Added: 27 <!-- section:unreleased-added -->
     - Changed: 44 <!-- section:unreleased-changed -->
-    - Security: 68 <!-- section:unreleased-security -->
-- Version 0.2.0 — 2026-07-13: 82 <!-- section:version-0-2-0 -->
-    - Added: 86 <!-- section:version-0-2-0-added -->
-    - Changed: 103 <!-- section:version-0-2-0-changed -->
-    - Security: 118 <!-- section:version-0-2-0-security -->
+    - Security: 71 <!-- section:unreleased-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 85 <!-- section:version-0-2-0 -->
+    - Added: 89 <!-- section:version-0-2-0-added -->
+    - Changed: 106 <!-- section:version-0-2-0-changed -->
+    - Security: 121 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -61,6 +61,9 @@ All notable project changes are recorded here. Versioning follows
 - Advanced authoring acceptance, case, corpus, and provider-prompt contracts so
   trigger examples and extraction hints are presence-checked but graded only by
   report-only operational evidence.
+- Added manually dispatched CI and build-once release verification that uses a
+  pinned build backend, validates archive safety and installability, and
+  atomically preserves checksummed package artifacts for publication.
 
 <!-- /section:unreleased-changed -->
 <!-- section:unreleased-security -->
@@ -79,7 +82,7 @@ All notable project changes are recorded here. Versioning follows
 <!-- /section:unreleased -->
 <!-- section:version-0-2-0 -->
 
-## Version 0.2.0 — 2026-07-13
+## Version 0.2.0 — prepared 2026-07-13, not published
 
 <!-- section:version-0-2-0-added -->
 
