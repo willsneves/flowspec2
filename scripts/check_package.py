@@ -37,6 +37,7 @@ EXPECTED_WHEEL_MEMBERS: Final[frozenset[str]] = frozenset(
         "flowspec2/authoring/authoring-operational-evidence.schema.json",
         "flowspec2/authoring/operational-corpus.json",
         "flowspec2/experimental/flowspec-3-draft.schema.json",
+        "flowspec2/experimental/v3-preview-loss-policy.json",
         "flowspec2/compat/schemas/open-workflow-conversation-1.schema.json",
         "flowspec2/compat/schemas/vendor/open-workflow-1.0.3.LICENSE",
         "flowspec2/compat/schemas/vendor/open-workflow-1.0.3.provenance.json",
@@ -79,7 +80,12 @@ from flowspec2.authoring import (
     load_reference_operational_corpus,
     presentation_review_schema,
 )
-from flowspec2.experimental import V2_SCHEMA_IDENTIFIER, V3_PREVIEW_SCHEMA_IDENTIFIER, preview_schema
+from flowspec2.experimental import (
+    V2_SCHEMA_IDENTIFIER,
+    V3_PREVIEW_SCHEMA_IDENTIFIER,
+    lower_v3_preview_to_v2,
+    preview_schema,
+)
 from flowspec2.schema import schema
 
 expected_version = sys.argv[1]
@@ -100,6 +106,7 @@ assert presentation_review_schema()["$id"] == "https://wllsena.github.io/flowspe
 assert authoring_presentation_review_signature_schema()["$id"] == "https://wllsena.github.io/flowspec2/schemas/authoring-presentation-review-signature-1.json"
 assert V2_SCHEMA_IDENTIFIER == "flowspec/2"
 assert V3_PREVIEW_SCHEMA_IDENTIFIER == "flowspec/3-draft"
+assert lower_v3_preview_to_v2.__name__ == "lower_v3_preview_to_v2"
 assert schema()["$id"] == "https://wllsena.github.io/flowspec2/schemas/flowspec-2.json"
 assert preview_schema()["$id"] == "https://wllsena.github.io/flowspec2/schemas/flowspec-3-draft.json"
 """

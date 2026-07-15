@@ -11,6 +11,7 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Iterable, Mapping, cast
 
@@ -23,8 +24,10 @@ from ..semantics import semantic_diagnostics
 
 V2_SCHEMA_IDENTIFIER = "flowspec/2"
 V3_PREVIEW_SCHEMA_IDENTIFIER = "flowspec/3-draft"
+V3_PREVIEW_LOSS_POLICY_CONTRACT = "flowspec2/v3-preview-loss-policy@1"
 
 _SCHEMA_PATH = Path(__file__).with_name("flowspec-3-draft.schema.json")
+_LOSS_POLICY_PATH = Path(__file__).with_name("v3-preview-loss-policy.json")
 _PREDICATE_REFERENCE_NAMESPACES = {
     "internal": "$internal",
     "payload": "$payload",
@@ -62,6 +65,66 @@ _TOP_LEVEL_NATIVE_KEYS = {
 }
 
 _schema_cache: dict[str, Any] | None = None
+_loss_policy_cache: dict[V3PreviewLossCategory, _V3PreviewLossRule] | None = None
+
+
+class V3PreviewDocumentMode(StrEnum):
+    """Validation boundary for authored sources and v2 migration artifacts."""
+
+    AUTHORING = "authoring"
+    V2_MIGRATION = "v2_migration"
+
+
+class V3PreviewLossCategory(StrEnum):
+    """Closed reasons why the v2 migrator cannot emit native preview syntax."""
+
+    AGENT_CAPABILITY = "agent_capability"
+    AUTOMATIC_FLOW_CONTRACT = "automatic_flow_contract"
+    AWAIT_RESUME_CONTRACT = "await_resume_contract"
+    AWAIT_TIMEOUT_DURATION = "await_timeout_duration"
+    DUPLICATE_DOMAIN_ROW = "duplicate_domain_row"
+    DUPLICATE_TERMINAL_INPUT_PARAMETER = "duplicate_terminal_input_parameter"
+    ENTRY_CONTRACT = "entry_contract"
+    IMPLICIT_AWAIT_CAPABILITY = "implicit_await_capability"
+    INVALID_BOOLEAN_DOMAIN_FIELD = "invalid_boolean_domain_field"
+    INVALID_NON_CHOICE_DOMAIN_FIELD = "invalid_non_choice_domain_field"
+    INVALID_NON_CHOICE_SYNONYMS = "invalid_non_choice_synonyms"
+    INVALID_SYNONYM_TARGET = "invalid_synonym_target"
+    LEGACY_AWAIT_ENRICHMENT = "legacy_await_enrichment"
+    LEGACY_INTERACTIVE_GATE = "legacy_interactive_gate"
+    MISMATCHED_INTERACTIVE_DOMAIN = "mismatched_interactive_domain"
+    ORPHAN_DOMAIN_ROW = "orphan_domain_row"
+    SHADOWED_AWAIT_PRESENTATION = "shadowed_await_presentation"
+    UNKNOWN_DERIVE_ANCHOR = "unknown_derive_anchor"
+    UNKNOWN_TOP_LEVEL_FRAGMENT = "unknown_top_level_fragment"
+    UNUSED_CONFIRMATION_CONTRACT = "unused_confirmation_contract"
+    UNUSED_DOMAIN_DECLARATION = "unused_domain_declaration"
+    UNUSED_OVERRIDE_GATE = "unused_override_gate"
+    UNUSED_SLOT_DECLARATION = "unused_slot_declaration"
+    UNUSED_SUBFLOW_DECLARATION = "unused_subflow_declaration"
+    UNUSED_TERMINAL_CONTRACT = "unused_terminal_contract"
+
+
+class V3PreviewLossDisposition(StrEnum):
+    """Normative status assigned to a non-native source fragment."""
+
+    COMPATIBILITY_ONLY = "compatibility_only"
+    EXCLUDED = "excluded"
+
+
+class V3PreviewLossHandling(StrEnum):
+    """Required lowerer behavior for a loss-accounting category."""
+
+    REHYDRATE = "rehydrate"
+    REJECT = "reject"
+
+
+@dataclass(frozen=True, slots=True)
+class _V3PreviewLossRule:
+    disposition: V3PreviewLossDisposition
+    handling: V3PreviewLossHandling
+    description: str
+    source_path_pattern: str
 
 
 class V3PreviewMigrationError(ValueError):
@@ -102,11 +165,40 @@ class CompactByteComparison:
 
 
 @dataclass(frozen=True, slots=True)
+class V3PreviewLossEntry:
+    """Immutable classification of one non-native v2 source fragment."""
+
+    source_path: str
+    category: V3PreviewLossCategory
+    disposition: V3PreviewLossDisposition
+    _source_fragment_json: str = field(repr=False)
+
+    @property
+    def source_fragment(self) -> Any:
+        """Return a fresh JSON value so callers cannot mutate the entry."""
+        return json.loads(self._source_fragment_json)
+
+    @property
+    def handling(self) -> V3PreviewLossHandling:
+        """Return the policy-mandated lowerer behavior."""
+        return _loss_policy_rules()[self.category].handling
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return the canonical document representation of this entry."""
+        return {
+            "source_path": self.source_path,
+            "category": self.category.value,
+            "disposition": self.disposition.value,
+            "source_fragment": self.source_fragment,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class V3PreviewMigrationReport:
     """Immutable migration artifact with explicit non-native source locations."""
 
     _preview_json: str = field(repr=False)
-    passthrough_paths: tuple[str, ...]
+    loss_entries: tuple[V3PreviewLossEntry, ...]
     compact_bytes: CompactByteComparison
 
     @property
@@ -134,7 +226,94 @@ class _MigrationContext:
     confirmation_consumed: bool = False
     terminal_consumed: bool = False
     await_capability_consumed: bool = False
-    unmapped_fragments: dict[str, Any] = field(default_factory=dict)
+    loss_entries_by_path: dict[str, V3PreviewLossEntry] = field(default_factory=dict)
+
+
+def preview_loss_policy() -> dict[str, Any]:
+    """Return a private copy of the authoritative preview loss policy."""
+    policy_document = cast(
+        dict[str, Any], json.loads(_LOSS_POLICY_PATH.read_text(encoding="utf-8"))
+    )
+    _validate_loss_policy_document(policy_document)
+    return cast(dict[str, Any], _canonical_clone(policy_document))
+
+
+def _loss_policy_rules() -> dict[V3PreviewLossCategory, _V3PreviewLossRule]:
+    global _loss_policy_cache
+    cached_rules = _loss_policy_cache
+    if cached_rules is not None:
+        return cached_rules
+    policy_document = preview_loss_policy()
+    category_documents = cast(dict[str, dict[str, str]], policy_document["categories"])
+    cached_rules = {
+        V3PreviewLossCategory(category_name): _V3PreviewLossRule(
+            disposition=V3PreviewLossDisposition(category_document["disposition"]),
+            handling=V3PreviewLossHandling(category_document["handling"]),
+            description=category_document["description"],
+            source_path_pattern=category_document["source_path_pattern"],
+        )
+        for category_name, category_document in category_documents.items()
+    }
+    _loss_policy_cache = cached_rules
+    return cached_rules
+
+
+def _validate_loss_policy_document(policy_document: dict[str, Any]) -> None:
+    if set(policy_document) != {"_sections", "contract", "categories"}:
+        raise RuntimeError("preview loss policy has an invalid top-level shape")
+    section_index = policy_document.get("_sections")
+    if not isinstance(section_index, dict) or set(section_index) != {"loss-policy"}:
+        raise RuntimeError("preview loss policy has an invalid section index")
+    if policy_document.get("contract") != V3_PREVIEW_LOSS_POLICY_CONTRACT:
+        raise RuntimeError("preview loss policy has an unsupported contract")
+    category_documents = policy_document.get("categories")
+    if not isinstance(category_documents, dict):
+        raise RuntimeError("preview loss policy categories must be an object")
+    expected_categories = {category.value for category in V3PreviewLossCategory}
+    if set(category_documents) != expected_categories:
+        raise RuntimeError("preview loss policy categories do not match the closed category enum")
+    for category_name, category_document in category_documents.items():
+        if not isinstance(category_document, dict) or set(category_document) != {
+            "description",
+            "disposition",
+            "handling",
+            "source_path_pattern",
+        }:
+            raise RuntimeError(f"preview loss policy category {category_name!r} is malformed")
+        try:
+            disposition = V3PreviewLossDisposition(category_document["disposition"])
+            handling = V3PreviewLossHandling(category_document["handling"])
+        except (TypeError, ValueError) as error:
+            raise RuntimeError(
+                f"preview loss policy category {category_name!r} has an invalid decision"
+            ) from error
+        expected_handling = (
+            V3PreviewLossHandling.REHYDRATE
+            if disposition is V3PreviewLossDisposition.COMPATIBILITY_ONLY
+            else V3PreviewLossHandling.REJECT
+        )
+        if handling is not expected_handling:
+            raise RuntimeError(
+                f"preview loss policy category {category_name!r} has an inconsistent decision"
+            )
+        if (
+            not isinstance(category_document["description"], str)
+            or not category_document["description"].strip()
+        ):
+            raise RuntimeError(
+                f"preview loss policy category {category_name!r} needs a description"
+            )
+        source_path_pattern = category_document["source_path_pattern"]
+        if not isinstance(source_path_pattern, str):
+            raise RuntimeError(
+                f"preview loss policy category {category_name!r} needs a source path pattern"
+            )
+        try:
+            re.compile(source_path_pattern)
+        except re.error as error:
+            raise RuntimeError(
+                f"preview loss policy category {category_name!r} has an invalid source path pattern"
+            ) from error
 
 
 def preview_schema() -> dict[str, Any]:
@@ -148,15 +327,25 @@ def preview_schema() -> dict[str, Any]:
     return cast(dict[str, Any], _canonical_clone(cached_schema))
 
 
-def validate_v3_preview(preview_document: Mapping[str, Any]) -> None:
+def validate_v3_preview(
+    preview_document: Mapping[str, Any],
+    *,
+    mode: V3PreviewDocumentMode = V3PreviewDocumentMode.AUTHORING,
+) -> None:
     """Raise when a document violates structural or semantic preview contracts."""
+    mode = V3PreviewDocumentMode(mode)
     jsonschema.Draft202012Validator(preview_schema()).validate(preview_document)
-    if diagnostics := _semantic_v3_diagnostics(cast(dict[str, Any], preview_document)):
+    if diagnostics := _semantic_v3_diagnostics(cast(dict[str, Any], preview_document), mode):
         raise V3PreviewValidationError(diagnostics)
 
 
-def check_v3_preview(preview_document: object) -> tuple[FlowDiagnostic, ...]:
+def check_v3_preview(
+    preview_document: object,
+    *,
+    mode: V3PreviewDocumentMode = V3PreviewDocumentMode.AUTHORING,
+) -> tuple[FlowDiagnostic, ...]:
     """Return all deterministic structural or semantic preview diagnostics."""
+    mode = V3PreviewDocumentMode(mode)
     validator = jsonschema.Draft202012Validator(preview_schema())
     structural_findings = tuple(
         sorted(
@@ -169,7 +358,7 @@ def check_v3_preview(preview_document: object) -> tuple[FlowDiagnostic, ...]:
     )
     if structural_findings:
         return structural_findings
-    return _semantic_v3_diagnostics(cast(dict[str, Any], preview_document))
+    return _semantic_v3_diagnostics(cast(dict[str, Any], preview_document), mode)
 
 
 def _schema_diagnostic(validation_error: jsonschema.ValidationError) -> FlowDiagnostic:
@@ -231,8 +420,84 @@ def _v3_diagnostic(code: str, path: str, message: str) -> FlowDiagnostic:
     return FlowDiagnostic(code=code, severity="error", path=path, message=message)
 
 
-def _semantic_v3_diagnostics(preview_document: dict[str, Any]) -> tuple[FlowDiagnostic, ...]:
+def _loss_accounting_diagnostics(
+    preview_document: dict[str, Any], mode: V3PreviewDocumentMode
+) -> list[FlowDiagnostic]:
+    passthrough = cast(dict[str, Any] | None, preview_document.get("v2_passthrough"))
+    if passthrough is None:
+        return []
+    if mode == V3PreviewDocumentMode.AUTHORING:
+        return [
+            _v3_diagnostic(
+                "FLOWSPEC3_AUTHORED_LOSS_ACCOUNTING",
+                "/v2_passthrough",
+                "v2 loss accounting is allowed only on v2 migration artifacts",
+            )
+        ]
+
     diagnostics: list[FlowDiagnostic] = []
+    loss_entries = cast(list[dict[str, Any]], passthrough["entries"])
+    source_paths = [cast(str, loss_entry["source_path"]) for loss_entry in loss_entries]
+    if source_paths != sorted(source_paths):
+        diagnostics.append(
+            _v3_diagnostic(
+                "FLOWSPEC3_UNORDERED_LOSS_ENTRIES",
+                "/v2_passthrough/entries",
+                "loss entries must be ordered by source_path",
+            )
+        )
+    first_indexes_by_path: dict[str, int] = {}
+    policy_rules = _loss_policy_rules()
+    for loss_index, loss_entry in enumerate(loss_entries):
+        loss_path = f"/v2_passthrough/entries/{loss_index}"
+        source_path = cast(str, loss_entry["source_path"])
+        if (first_index := first_indexes_by_path.get(source_path)) is not None:
+            diagnostics.append(
+                _v3_diagnostic(
+                    "FLOWSPEC3_DUPLICATE_LOSS_SOURCE_PATH",
+                    f"{loss_path}/source_path",
+                    f"source path {source_path!r} is already accounted at "
+                    f"/v2_passthrough/entries/{first_index}",
+                )
+            )
+        else:
+            first_indexes_by_path[source_path] = loss_index
+        try:
+            category = V3PreviewLossCategory(cast(str, loss_entry["category"]))
+        except ValueError:
+            diagnostics.append(
+                _v3_diagnostic(
+                    "FLOWSPEC3_UNKNOWN_LOSS_CATEGORY",
+                    f"{loss_path}/category",
+                    f"unknown loss category {loss_entry['category']!r}",
+                )
+            )
+            continue
+        expected_disposition = policy_rules[category].disposition
+        if loss_entry["disposition"] != expected_disposition.value:
+            diagnostics.append(
+                _v3_diagnostic(
+                    "FLOWSPEC3_LOSS_DISPOSITION_MISMATCH",
+                    f"{loss_path}/disposition",
+                    f"category {category.value!r} requires disposition "
+                    f"{expected_disposition.value!r}",
+                )
+            )
+        if re.fullmatch(policy_rules[category].source_path_pattern, source_path) is None:
+            diagnostics.append(
+                _v3_diagnostic(
+                    "FLOWSPEC3_LOSS_SOURCE_PATH_MISMATCH",
+                    f"{loss_path}/source_path",
+                    f"source path {source_path!r} is not allowed for category {category.value!r}",
+                )
+            )
+    return diagnostics
+
+
+def _semantic_v3_diagnostics(
+    preview_document: dict[str, Any], mode: V3PreviewDocumentMode
+) -> tuple[FlowDiagnostic, ...]:
+    diagnostics = _loss_accounting_diagnostics(preview_document, mode)
     steps = cast(list[dict[str, Any]], preview_document["steps"])
     identifiers: dict[str, tuple[int, str]] = {}
     slot_positions: dict[str, int] = {}
@@ -1077,7 +1342,7 @@ def migrate_v2_to_v3_preview(source_document: Mapping[str, Any]) -> dict[str, An
 def migrate_v2_to_v3_preview_report(
     source_document: Mapping[str, Any],
 ) -> V3PreviewMigrationReport:
-    """Migrate and report exact passthrough paths plus neutral byte measurements."""
+    """Migrate and report classified source losses plus neutral byte measurements."""
     private_source = _canonical_clone(source_document)
     if not isinstance(private_source, dict):
         raise V3PreviewMigrationError("flowspec/2 source must be a JSON object")
@@ -1098,7 +1363,7 @@ def migrate_v2_to_v3_preview_report(
 
     migration_context = _new_migration_context(private_source)
     preview_document = _migrate_document(migration_context)
-    validate_v3_preview(preview_document)
+    validate_v3_preview(preview_document, mode=V3PreviewDocumentMode.V2_MIGRATION)
     canonical_preview = _canonical_json(preview_document)
     compact_bytes = CompactByteComparison(
         source_bytes=compact_json_bytes(private_source),
@@ -1106,7 +1371,12 @@ def migrate_v2_to_v3_preview_report(
     )
     return V3PreviewMigrationReport(
         _preview_json=canonical_preview,
-        passthrough_paths=tuple(sorted(migration_context.unmapped_fragments)),
+        loss_entries=tuple(
+            sorted(
+                migration_context.loss_entries_by_path.values(),
+                key=lambda loss_entry: loss_entry.source_path,
+            )
+        ),
         compact_bytes=compact_bytes,
     )
 
@@ -1185,10 +1455,15 @@ def _migrate_document(migration_context: _MigrationContext) -> dict[str, Any]:
     ]
     _insert_unanchored_derives(preview_steps, migration_context)
     preview_document["steps"] = preview_steps
-    _collect_unmapped_fragments(migration_context)
-    if migration_context.unmapped_fragments:
+    _collect_loss_entries(migration_context)
+    if migration_context.loss_entries_by_path:
+        ordered_loss_entries = sorted(
+            migration_context.loss_entries_by_path.values(),
+            key=lambda loss_entry: loss_entry.source_path,
+        )
         preview_document["v2_passthrough"] = {
-            "unmapped": _canonical_clone(migration_context.unmapped_fragments)
+            "contract": V3_PREVIEW_LOSS_POLICY_CONTRACT,
+            "entries": [loss_entry.as_dict() for loss_entry in ordered_loss_entries],
         }
     return cast(dict[str, Any], _canonical_clone(preview_document))
 
@@ -1339,22 +1614,25 @@ def _migrate_domain(domain_name: str, migration_context: _MigrationContext) -> d
     if domain_type == "bool":
         for ignored_domain_key in ("values", "rows"):
             if ignored_domain_key in domain_definition:
-                _record_unmapped(
+                _record_loss(
                     migration_context,
+                    V3PreviewLossCategory.INVALID_BOOLEAN_DOMAIN_FIELD,
                     _json_pointer("domains", domain_name, ignored_domain_key),
                     domain_definition[ignored_domain_key],
                 )
     if domain_type not in {"categorical", "bool"}:
         for ignored_domain_key in ("values", "rows"):
             if ignored_domain_key in domain_definition:
-                _record_unmapped(
+                _record_loss(
                     migration_context,
+                    V3PreviewLossCategory.INVALID_NON_CHOICE_DOMAIN_FIELD,
                     _json_pointer("domains", domain_name, ignored_domain_key),
                     domain_definition[ignored_domain_key],
                 )
         if "synonyms" in normalization:
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.INVALID_NON_CHOICE_SYNONYMS,
                 _json_pointer("domains", domain_name, "normalize", "synonyms"),
                 normalization["synonyms"],
             )
@@ -1415,8 +1693,9 @@ def _migrate_options(
             if "description" in selected_domain_row:
                 preview_option["description"] = selected_domain_row["description"]
             for overridden_row_index, domain_row in matching_rows[:-1]:
-                _record_unmapped(
+                _record_loss(
                     migration_context,
+                    V3PreviewLossCategory.DUPLICATE_DOMAIN_ROW,
                     _json_pointer("domains", domain_name, "rows", overridden_row_index),
                     domain_row,
                 )
@@ -1426,8 +1705,9 @@ def _migrate_options(
         if not any(
             _same_json_scalar(domain_row["value"], option_value) for option_value in option_values
         ):
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.ORPHAN_DOMAIN_ROW,
                 _json_pointer("domains", domain_name, "rows", row_index),
                 domain_row,
             )
@@ -1455,8 +1735,9 @@ def _aliases_by_option(
             option_value is None for option_value in option_values
         )
         if matched_option is None and not matched_null:
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.INVALID_SYNONYM_TARGET,
                 _json_pointer("domains", domain_name, "normalize", "synonyms", option_alias),
                 synonym_target,
             )
@@ -1658,8 +1939,9 @@ def _insert_unanchored_derives(
         )
         if anchor_index is None:
             preview_steps.append(preview_derive_step)
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.UNKNOWN_DERIVE_ANCHOR,
                 _json_pointer("derive", derive_index, "after"),
                 after_identifier,
             )
@@ -1691,8 +1973,9 @@ def _migrate_submit_step(path_index: int, migration_context: _MigrationContext) 
         )
     for duplicate_indexes in input_indexes_by_parameter.values():
         for duplicate_index in duplicate_indexes[:-1]:
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.DUPLICATE_TERMINAL_INPUT_PARAMETER,
                 _json_pointer("terminal", "input", duplicate_index),
                 cast(list[dict[str, Any]], terminal_definition["input"])[duplicate_index],
             )
@@ -1773,6 +2056,20 @@ def _migrate_await_step(
         )
         if preview_on_resume:
             preview_step["on_resume"] = preview_on_resume
+    if "resume" in await_capability:
+        _record_loss(
+            migration_context,
+            V3PreviewLossCategory.AWAIT_RESUME_CONTRACT,
+            _json_pointer("capabilities", "await_external", "resume"),
+            await_capability["resume"],
+        )
+    if "timeout_seconds" in await_capability:
+        _record_loss(
+            migration_context,
+            V3PreviewLossCategory.AWAIT_TIMEOUT_DURATION,
+            _json_pointer("capabilities", "await_external", "timeout_seconds"),
+            await_capability["timeout_seconds"],
+        )
     if "timeout" in await_capability:
         preview_step["timeout"] = _migrate_transition(
             cast(dict[str, Any], await_capability["timeout"])
@@ -1807,8 +2104,9 @@ def _merge_await_presentation(
         and capability_presentation is not None
         and capability_presentation != path_presentation
     ):
-        _record_unmapped(
+        _record_loss(
             migration_context,
+            V3PreviewLossCategory.SHADOWED_AWAIT_PRESENTATION,
             _json_pointer("capabilities", "await_external", source_key),
             capability_presentation,
         )
@@ -1834,8 +2132,9 @@ def _migrate_on_resume(
     if "enrich" in on_resume:
         enrichment = on_resume["enrich"]
         if isinstance(enrichment, str):
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.LEGACY_AWAIT_ENRICHMENT,
                 _json_pointer("capabilities", "await_external", "on_resume", "enrich"),
                 enrichment,
             )
@@ -1875,16 +2174,18 @@ def _migrate_ui(
     preview_ui: dict[str, Any] = {}
     for interactive_key, interactive_value in interactive.items():
         if interactive_key == "gate":
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.LEGACY_INTERACTIVE_GATE,
                 f"{source_pointer}/gate",
                 interactive_value,
             )
             continue
         if interactive_key == "from_domain":
             if expected_domain_name != interactive_value:
-                _record_unmapped(
+                _record_loss(
                     migration_context,
+                    V3PreviewLossCategory.MISMATCHED_INTERACTIVE_DOMAIN,
                     f"{source_pointer}/from_domain",
                     interactive_value,
                 )
@@ -1946,6 +2247,8 @@ def _migrate_predicate(
 
 
 def _migrate_predicate_operand(predicate_operand: Any, migration_context: _MigrationContext) -> Any:
+    if isinstance(predicate_operand, dict) and set(predicate_operand) == {"literal"}:
+        return _canonical_clone(predicate_operand["literal"])
     if isinstance(predicate_operand, str):
         namespace, separator, reference_path = predicate_operand.partition(".")
         if separator and namespace == "slots" and reference_path:
@@ -1982,44 +2285,57 @@ def _migrate_binding(binding_source: Any) -> Any:
     return _canonical_clone(binding_source)
 
 
-def _collect_unmapped_fragments(migration_context: _MigrationContext) -> None:
+def _collect_loss_entries(migration_context: _MigrationContext) -> None:
     source_document = migration_context.source_document
-    for unsupported_top_level_key in ("entry", "auto_flow"):
-        if unsupported_top_level_key in source_document:
-            _record_unmapped(
-                migration_context,
-                _json_pointer(unsupported_top_level_key),
-                source_document[unsupported_top_level_key],
-            )
+    if "entry" in source_document:
+        _record_loss(
+            migration_context,
+            V3PreviewLossCategory.ENTRY_CONTRACT,
+            _json_pointer("entry"),
+            source_document["entry"],
+        )
+    if "auto_flow" in source_document:
+        _record_loss(
+            migration_context,
+            V3PreviewLossCategory.AUTOMATIC_FLOW_CONTRACT,
+            _json_pointer("auto_flow"),
+            source_document["auto_flow"],
+        )
 
     capabilities = cast(dict[str, Any], source_document.get("capabilities") or {})
     for capability_name, capability_definition in capabilities.items():
         if capability_name == "await_external" and migration_context.await_capability_consumed:
             continue
-        _record_unmapped(
+        _record_loss(
             migration_context,
+            V3PreviewLossCategory.IMPLICIT_AWAIT_CAPABILITY
+            if capability_name == "await_external"
+            else V3PreviewLossCategory.AGENT_CAPABILITY,
             _json_pointer("capabilities", capability_name),
             capability_definition,
         )
 
     for domain_name, domain_definition in migration_context.domains.items():
         if domain_name not in migration_context.used_domain_names:
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.UNUSED_DOMAIN_DECLARATION,
                 _json_pointer("domains", domain_name),
                 domain_definition,
             )
     for slot_name, slot_definition in migration_context.slots.items():
         if slot_name not in migration_context.placed_slot_names:
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.UNUSED_SLOT_DECLARATION,
                 _json_pointer("slots", slot_name),
                 slot_definition,
             )
     for use_index, use_declaration in enumerate(migration_context.use_declarations):
         if use_index not in migration_context.consumed_use_indexes:
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.UNUSED_SUBFLOW_DECLARATION,
                 _json_pointer("uses", use_index),
                 use_declaration,
             )
@@ -2027,8 +2343,9 @@ def _collect_unmapped_fragments(migration_context: _MigrationContext) -> None:
         migration_context.confirmation_definition is not None
         and not migration_context.confirmation_consumed
     ):
-        _record_unmapped(
+        _record_loss(
             migration_context,
+            V3PreviewLossCategory.UNUSED_CONFIRMATION_CONTRACT,
             _json_pointer("confirm"),
             migration_context.confirmation_definition,
         )
@@ -2036,33 +2353,44 @@ def _collect_unmapped_fragments(migration_context: _MigrationContext) -> None:
         migration_context.terminal_definition is not None
         and not migration_context.terminal_consumed
     ):
-        _record_unmapped(
+        _record_loss(
             migration_context,
+            V3PreviewLossCategory.UNUSED_TERMINAL_CONTRACT,
             _json_pointer("terminal"),
             migration_context.terminal_definition,
         )
     for gate_name, gate_predicate in migration_context.override_gates.items():
         if gate_name not in migration_context.consumed_override_gate_names:
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.UNUSED_OVERRIDE_GATE,
                 _json_pointer("overrides", "gates", gate_name),
                 gate_predicate,
             )
     for top_level_key, top_level_fragment in source_document.items():
         if top_level_key not in _TOP_LEVEL_NATIVE_KEYS:
-            _record_unmapped(
+            _record_loss(
                 migration_context,
+                V3PreviewLossCategory.UNKNOWN_TOP_LEVEL_FRAGMENT,
                 _json_pointer(top_level_key),
                 top_level_fragment,
             )
 
 
-def _record_unmapped(
+def _record_loss(
     migration_context: _MigrationContext,
-    source_pointer: str,
+    category: V3PreviewLossCategory,
+    source_path: str,
     source_fragment: Any,
 ) -> None:
-    migration_context.unmapped_fragments[source_pointer] = _canonical_clone(source_fragment)
+    if source_path in migration_context.loss_entries_by_path:
+        raise V3PreviewMigrationError(f"source path {source_path!r} was classified more than once")
+    migration_context.loss_entries_by_path[source_path] = V3PreviewLossEntry(
+        source_path=source_path,
+        category=category,
+        disposition=_loss_policy_rules()[category].disposition,
+        _source_fragment_json=_canonical_json(source_fragment),
+    )
 
 
 def _preview_step_identifier(preview_step: dict[str, Any]) -> str | None:
