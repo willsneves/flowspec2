@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from typing import Any
 
 import jsonschema
@@ -19,7 +18,6 @@ from flowspec2.authoring import (
     AuthoringBenchmarkLimits,
     AuthoringProviderProvenance,
     AuthoringRequest,
-    CodexOperationalExecutor,
     OperationalModelResponse,
     OperationalProbeRequest,
     RecordingAuthor,
@@ -300,29 +298,3 @@ def test_operational_schema_is_valid_and_returns_owned_copies() -> None:
     first_schema["title"] = "changed"
 
     assert authoring_operational_evidence_schema()["title"] != "changed"
-
-
-@pytest.mark.skipif(
-    os.environ.get("FLOWSPEC2_RUN_CODEX_TESTS") != "1",
-    reason="set FLOWSPEC2_RUN_CODEX_TESTS=1 and provide the local public-provider project",
-)
-def test_codex_operational_evidence_runs_and_replays_live() -> None:
-    authoring_evidence = _authoring_evidence()
-    serialized_authoring_evidence = authoring_evidence.to_json()
-    verified_authoring_evidence = verify_authoring_evidence(serialized_authoring_evidence)
-
-    with CodexOperationalExecutor() as executor:
-        operational_evidence = run_authoring_operational_evidence(
-            serialized_authoring_evidence,
-            verified_authoring_evidence,
-            provider=executor.provenance(),
-            executor=executor,
-        )
-    verification = verify_authoring_operational_evidence(
-        operational_evidence.to_json(),
-        serialized_authoring_evidence,
-        verified_authoring_evidence,
-    )
-
-    assert operational_evidence.all_matched is True
-    assert verification.all_matched is True

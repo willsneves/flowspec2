@@ -21,9 +21,6 @@ from .authoring import (
     AuthoringBenchmarkEvidence,
     AuthoringBenchmarkLimits,
     AuthoringEvidenceVerification,
-    CodexAuthor,
-    CodexAuthorError,
-    CodexOperationalExecutor,
     GeminiAuthor,
     GeminiAuthorError,
     GeminiOperationalExecutor,
@@ -45,11 +42,6 @@ from .authoring import (
 )
 from .checker import check_flow, check_json
 from .cli_parser import CliHandlers, CommandHandler, build_parser
-from .codex_transport import (
-    DEFAULT_CODEX_EFFORT,
-    DEFAULT_CODEX_MODEL,
-    DEFAULT_CODEX_TIMEOUT_SECONDS,
-)
 from .compat.models import CompatibilityError, CompatibilityReport
 from .compat.open_workflow import export_open_workflow, import_open_workflow
 from .compat.rasa import RasaBundle, export_rasa, import_rasa
@@ -363,29 +355,13 @@ def _create_gemini_author(model: str) -> GeminiAuthor:
     return GeminiAuthor(model=model)
 
 
-def _create_codex_author(model: str, effort: str, timeout_seconds: float) -> CodexAuthor:
-    return CodexAuthor(model=model, effort=effort, timeout_seconds=timeout_seconds)
-
-
 def _create_gemini_operational_executor(model: str) -> GeminiOperationalExecutor:
     return GeminiOperationalExecutor(model=model)
 
 
-def _create_codex_operational_executor(
-    model: str,
-    effort: str,
-    timeout_seconds: float,
-) -> CodexOperationalExecutor:
-    return CodexOperationalExecutor(
-        model=model,
-        effort=effort,
-        timeout_seconds=timeout_seconds,
-    )
-
-
 def _write_authoring_benchmark_evidence(
     arguments: argparse.Namespace,
-    model_author: GeminiAuthor | CodexAuthor,
+    model_author: GeminiAuthor,
 ) -> int:
     output_path = Path(arguments.output)
     if output_path.exists():
@@ -437,21 +413,9 @@ def _authoring_benchmark_gemini(arguments: argparse.Namespace) -> int:
     )
 
 
-def _authoring_benchmark_codex(arguments: argparse.Namespace) -> int:
-    output_path = Path(arguments.output)
-    if output_path.exists():
-        raise FileExistsError(f"output already exists: {output_path}")
-    return _write_authoring_benchmark_evidence(
-        arguments,
-        _create_codex_author(arguments.model, arguments.effort, arguments.timeout_seconds),
-    )
-
-
 def _write_operational_evidence(
     arguments: argparse.Namespace,
-    operational_executor_factory: Callable[
-        [], GeminiOperationalExecutor | CodexOperationalExecutor
-    ],
+    operational_executor_factory: Callable[[], GeminiOperationalExecutor],
 ) -> int:
     output_path = Path(arguments.output)
     if output_path.exists():
@@ -483,17 +447,6 @@ def _operational_benchmark_gemini(arguments: argparse.Namespace) -> int:
     return _write_operational_evidence(
         arguments,
         lambda: _create_gemini_operational_executor(arguments.model),
-    )
-
-
-def _operational_benchmark_codex(arguments: argparse.Namespace) -> int:
-    if Path(arguments.output).exists():
-        raise FileExistsError(f"output already exists: {arguments.output}")
-    return _write_operational_evidence(
-        arguments,
-        lambda: _create_codex_operational_executor(
-            arguments.model, arguments.effort, arguments.timeout_seconds
-        ),
     )
 
 
@@ -766,9 +719,7 @@ def _parser() -> argparse.ArgumentParser:
             rasa_import=_rasa_import,
             open_workflow_export=_open_workflow_export,
             open_workflow_import=_open_workflow_import,
-            authoring_benchmark_codex=_authoring_benchmark_codex,
             authoring_benchmark_gemini=_authoring_benchmark_gemini,
-            operational_benchmark_codex=_operational_benchmark_codex,
             operational_benchmark_gemini=_operational_benchmark_gemini,
             operational_evidence_verify=_operational_evidence_verify,
             authoring_evidence_verify=_authoring_evidence_verify,
@@ -782,9 +733,6 @@ def _parser() -> argparse.ArgumentParser:
                 _authoring_presentation_review_signature_verify
             ),
             authoring_promotion_verify=_authoring_promotion_verify,
-            default_codex_effort=DEFAULT_CODEX_EFFORT,
-            default_codex_model=DEFAULT_CODEX_MODEL,
-            default_codex_timeout_seconds=DEFAULT_CODEX_TIMEOUT_SECONDS,
             default_gemini_model=DEFAULT_GEMINI_AUTHOR_MODEL,
         )
     )
@@ -805,19 +753,14 @@ def main(argv: list[str] | None = None) -> int:
     except CompatibilityError as compatibility_error:
         _print_report(compatibility_error.report)
         return 1
-    except (CodexAuthorError, GeminiAuthorError, OperationalProviderError) as provider_error:
-        provider_identifier = (
-            "openai_codex"
-            if str(getattr(arguments, "command", "")).endswith("codex")
-            else "google_gemini"
-        )
+    except (GeminiAuthorError, OperationalProviderError) as provider_error:
         log_id = log_event(
             logger,
             logging.ERROR,
             "Model provider failed",
             operation=str(getattr(arguments, "command", "unknown")),
             context={
-                "provider": provider_identifier,
+                "provider": "google_gemini",
                 "model": str(getattr(arguments, "model", "unknown")),
             },
         )

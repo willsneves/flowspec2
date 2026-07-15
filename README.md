@@ -2,18 +2,18 @@
 
 Table of Contents:
 
-- Install: 61 <!-- section:install -->
-- LLM-driven (the engine side): 103 <!-- section:llm-driven -->
-- Quickstart: 184 <!-- section:quickstart -->
-- Real backends: 208 <!-- section:real-backends -->
-- Error correlation: 225 <!-- section:error-correlation -->
-- CLI: 248 <!-- section:cli -->
-- What it compiles: 301 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 327 <!-- section:example -->
-    - The flowspec/2 document: 334 <!-- section:example-document -->
-    - Compiled LangGraph: 972 <!-- section:example-compiled-langgraph -->
-- Layout: 1088 <!-- section:layout -->
-- Status: 1139 <!-- section:status -->
+- Install: 67 <!-- section:install -->
+- LLM-driven (the engine side): 109 <!-- section:llm-driven -->
+- Quickstart: 178 <!-- section:quickstart -->
+- Real backends: 202 <!-- section:real-backends -->
+- Error correlation: 219 <!-- section:error-correlation -->
+- CLI: 242 <!-- section:cli -->
+- What it compiles: 302 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 328 <!-- section:example -->
+    - The flowspec/2 document: 335 <!-- section:example-document -->
+    - Compiled LangGraph: 973 <!-- section:example-compiled-langgraph -->
+- Layout: 1091 <!-- section:layout -->
+- Status: 1140 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -51,6 +51,12 @@ experiment, typed loss accounting, and deterministic analytical lowering back
 to compile-checked v2. The
 [lowering-boundary decision](docs/adr/0009-v3-preview-lowering-boundary.md)
 defines the supported subset and fixed-point guarantee.
+The [external-wait resend decision](docs/adr/0010-external-wait-resend-policy.md)
+defines the opt-in runtime budget while preserving host-owned limiting for
+existing documents.
+The [public model transport decision](docs/adr/0011-public-model-transport-scope.md)
+keeps the repository self-contained by limiting integrated live-model execution
+to dependencies available through the public package contract.
 
 Release history and compatibility policy live in [CHANGELOG.md](CHANGELOG.md)
 and [VERSIONING.md](docs/VERSIONING.md). Report vulnerabilities through the
@@ -103,22 +109,13 @@ versions.
 ## LLM-driven (the engine side)
 
 The simulations above feed already-extracted tokens. To exercise the
-*non-deterministic execution* side, `GeminiAgent` remains the production-shaped
-driver and `CodexAgent` provides an isolated subscription-authenticated test
-driver through the operator's local `public-provider` checkout:
+*non-deterministic execution* side, `GeminiAgent` provides the
+production-shaped driver:
 
 ```bash
 uv sync --extra llm                       # google-genai
 export GEMINI_API_KEY=...
 uv run python examples/llm_bot.py         # the citizen speaks free text; the LLM routes + extracts
-```
-
-Codex tests require Python 3.12 because the known sibling library does. The
-same package name on PyPI belongs to an unrelated project, so pass the local
-checkout explicitly rather than installing it from the registry:
-
-```bash
-FLOWSPEC2_RUN_CODEX_TESTS=1 uv run --python 3.12 --with ~/Code/public-provider --extra dev pytest tests/test_llm_codex.py
 ```
 
 The LLM does exactly two non-deterministic jobs, the rails hold everything else:
@@ -134,10 +131,10 @@ checked again locally before it reaches the runtime. The transcript shows the
 boundary per turn: `👤 free text → 🧠 LLM extraction → 🤖 the rail's next state`.
 Live-model tests are explicitly opted into; the default suite stays offline.
 
-Authoring evaluation is a separate boundary. `GeminiAuthor` and `CodexAuthor`
-receive the packaged reference corpus, complete runtime-profile contract, and
-repair diagnostics, then return source through the same closed authoring
-projection. A live run requires explicit network consent and writes one
+Authoring evaluation is a separate boundary. `GeminiAuthor` receives the
+packaged reference corpus, complete runtime-profile contract, and repair
+diagnostics, then returns source through the same closed authoring projection.
+A live run requires explicit network consent and writes one
 content-addressed evidence envelope containing exact emitted sources, report,
 corpus/profile digests, requested model configuration, any effective model
 identity exposed by the provider, prompt identity, package version, and the
@@ -149,19 +146,16 @@ the evaluator grades only the public contract:
 
 ```bash
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output authoring-evidence.json
-uv run --python 3.12 --with ~/Code/public-provider flowspec2 authoring-benchmark-codex --allow-network --repository-revision <revision> --output codex-authoring-evidence.json
 flowspec2 authoring-evidence-verify authoring-evidence.json --repository-revision <revision>
 flowspec2 authoring-evidence-sign authoring-evidence.json --private-key authoring-private-key.pem --repository-revision <revision> --output authoring-evidence.signature.json
 flowspec2 authoring-evidence-signature-verify authoring-evidence.json --signature authoring-evidence.signature.json --public-key authoring-public-key.pem --repository-revision <revision>
-uv run --python 3.12 --with ~/Code/public-provider flowspec2 operational-benchmark-codex authoring-evidence.json --allow-network --repository-revision <revision> --output operational-evidence.json
+flowspec2 operational-benchmark-gemini authoring-evidence.json --allow-network --repository-revision <revision> --output operational-evidence.json
 flowspec2 operational-evidence-verify operational-evidence.json --authoring-evidence authoring-evidence.json --repository-revision <revision>
 ```
 
 The commands refuse to overwrite an existing artifact and write nothing when a
-provider fails. Gemini never records or prints its API key. Codex excludes API
-key inheritance, requires ChatGPT authentication, ignores user/project rules,
-disables built-in tools, and runs each request ephemerally in a read-only
-sandbox. Configured credentials alone never enable model execution.
+provider fails. Gemini never records or prints its API key. Configured
+credentials alone never enable model execution.
 Verification is fully offline: it checks the closed envelope, content digest,
 package/corpus/profile identity, correction limit, exact capture hashes, and
 deterministic report replay. The digest proves integrity, not who created the
@@ -251,15 +245,14 @@ tests and hosts can supply a deterministic clock without patching global state.
 flowspec2 validate examples/reparo_luminaria.flow.json   # structural + semantic + profile checks
 flowspec2 check examples/reparo_luminaria.flow.json --json  # checks + compile, aggregate JSON diagnostics
 flowspec2 normalize examples/reparo_luminaria.flow.json  # canonical defaults and stable node ids
-flowspec2 ir examples/reparo_luminaria.flow.json         # canonical compiler contracts and digests
+flowspec2 ir examples/reparo_luminaria.flow.json         # canonical contracts; subflows stay abstracted
 flowspec2 graph    examples/reparo_luminaria.flow.json   # list compiled node ids
-flowspec2 mermaid  examples/reparo_luminaria.flow.json   # export the compiled graph as mermaid
+flowspec2 mermaid  examples/reparo_luminaria.flow.json   # fully expanded compiled graph as Mermaid
 flowspec2 rasa-export path/to/portable.flow.json --output-dir build/rasa --allow-lossy
 flowspec2 rasa-import build/rasa/flows.yml --domain build/rasa/domain.yml --flow collect_contact --output build/collect_contact.flow.json --allow-lossy
 flowspec2 open-workflow-export examples/reparo_luminaria.flow.json --output build/reparo_luminaria.workflow.yaml
 flowspec2 open-workflow-import build/reparo_luminaria.workflow.yaml --output build/reparo_luminaria.flow.json
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output build/authoring-evidence.json
-uv run --python 3.12 --with ~/Code/public-provider flowspec2 authoring-benchmark-codex --allow-network --repository-revision <revision> --output build/codex-authoring-evidence.json
 flowspec2 authoring-evidence-verify build/authoring-evidence.json --repository-revision <revision>
 flowspec2 authoring-evidence-sign build/authoring-evidence.json --private-key authoring-private-key.pem --repository-revision <revision> --output build/authoring-evidence.signature.json
 flowspec2 authoring-evidence-signature-verify build/authoring-evidence.json --signature build/authoring-evidence.signature.json --public-key authoring-public-key.pem --repository-revision <revision> --json
@@ -285,6 +278,14 @@ fix. Structural errors are aggregated first; semantic and runtime-profile
 linking run only when the source shape is safe to traverse; compilation is the
 final check. `normalize` and `ir` write only to standard output and never mutate
 the source document.
+
+`ir` and `mermaid` intentionally answer different topology questions. The
+canonical IR exposes source-linked compiler contracts and keeps registered
+subflows at their logical `use` anchors; it is the stable surface for digests,
+compatibility, and migration. `mermaid` inspects the executable graph after
+subflows and synthesized routers have been expanded, so it is the surface for
+reviewing actual fan-out, back-edges, and internal cycles. `graph` lists the
+node identifiers from that same expanded executable graph.
 
 Presentation-review initialization first verifies and replays the evidence,
 then writes an editable packet containing candidate prose and only public task,
@@ -315,7 +316,7 @@ report-only until the documented promotion signal is satisfied.
 | `confirm.correctable[]` | exact canonical-ID enum and private non-linear back-edge routing; clear-cascade derived from `requires[]` + `derive.from` |
 | `terminal.outcomes` | typed success / retryable / fatal protocol + `_reset_on_next_call`; replay is registry-local unless the host supplies durable storage |
 | `auto_flow` | pre-graph send with a closed pending-event contract, absolute deadline, bounded resend, and compiler-validated cancel/timeout/fallback recovery |
-| `capabilities.await_external` | typed suspend/resume with token schema, correlation, duplicate/late policy, atomic mappings, and abort/resend/switch/timeout recovery; timeout materializes a persisted absolute deadline and an `END` recovery resets on the next call |
+| `capabilities.await_external` | typed suspend/resume with token schema, correlation, duplicate/late policy, atomic mappings, and abort/resend/switch/timeout recovery; optional `max_resends` persists and exposes the remaining runtime-enforced resend budget, timeout materializes a persisted absolute deadline, and an `END` recovery resets on the next call |
 | active state migration | exact source/target IR contracts + declarative partition copies/defaults/drops → target-schema validation and a canonical verifiable loss report; ordinary restore never guesses |
 | `predicate` grammar | pure boolean function over `ServiceState` compiled into routers/early-returns |
 
@@ -1079,7 +1080,9 @@ to `__end__` (one turn = one question), otherwise it advances. The fan-out from
 `confirm_ticket_data` back to `collect_*` is the confirmation hub's non-linear
 back-edges (one per `confirm.correctable[]` slot); `address@1` and
 `identification@2` are the spliced subflows (collect_address/confirm_address and
-select_identification_method/collect_cpf/…).
+select_identification_method/collect_cpf/…). These internal subflow nodes and
+cycles appear here because Mermaid renders the expanded executable graph; the
+canonical IR retains each subflow as its logical `use` anchor.
 
 <!-- /section:example-compiled-langgraph -->
 <!-- /section:example -->
@@ -1120,9 +1123,7 @@ src/flowspec2/
   schema.py        load + JSON-Schema validation
   schema_contracts.py closed local references · external-resume schema contract
   compat/          directional Rasa import/export · Open Workflow profile + vendored schema
-  authoring/       corpus · benchmark · Gemini/Codex · evidence verification/signing · projection · CTK
-  codex_agent.py   subscription-authenticated route/extract driver
-  codex_transport.py lazy isolated public-provider boundary
+  authoring/       corpus · benchmark · Gemini · evidence verification/signing · projection · CTK
   experimental/    non-runtime flowspec/3-draft preview · migration · lowering
   interactive.py   buttons / list / flow envelope builders (Meta limits)
   tools.py         ToolRegistry + injectable fake backends + idempotency replay

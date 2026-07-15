@@ -67,9 +67,8 @@ INSTALLED_PACKAGE_SMOKE: Final[str] = """
 import sys
 from importlib.metadata import version as installed_package_version
 
-from flowspec2 import CodexAgent, __version__
+from flowspec2 import __version__
 from flowspec2.authoring import (
-    CodexAuthor,
     OPERATIONAL_EVIDENCE_CLASSIFICATION,
     PRESENTATION_REVIEW_FORMAT,
     authoring_evidence_schema,
@@ -93,8 +92,6 @@ reference_corpus = load_reference_authoring_corpus()
 operational_corpus = load_reference_operational_corpus()
 assert __version__ == expected_version
 assert installed_package_version("flowspec2") == expected_version
-assert CodexAgent.__name__ == "CodexAgent"
-assert CodexAuthor.__name__ == "CodexAuthor"
 assert reference_corpus.cases
 assert operational_corpus.probes
 assert authoring_evidence_schema()["$id"] == "https://wllsena.github.io/flowspec2/schemas/authoring-benchmark-evidence-2.json"
@@ -312,12 +309,7 @@ def _validated_sdist_members(
             raise RuntimeError(
                 f"source distribution contains an unsafe member: {archive_member.name}"
             )
-        is_documentation_alias = (
-            archive_member.issym()
-            and archive_member.name == f"{expected_root}/PROJECT_RULES.md"
-            and archive_member.linkname == "PROJECT_RULES.md"
-        )
-        if not (archive_member.isdir() or archive_member.isfile() or is_documentation_alias):
+        if not (archive_member.isdir() or archive_member.isfile()):
             raise RuntimeError(
                 f"source distribution contains a non-regular member: {archive_member.name}"
             )

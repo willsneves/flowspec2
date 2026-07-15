@@ -28,12 +28,6 @@ from .benchmark import (
     replay_authoring_benchmark,
     run_authoring_benchmark,
 )
-from .codex import (
-    CODEX_AUTHOR_PROMPT_DIGEST,
-    CODEX_AUTHOR_PROMPT_FORMAT,
-    CodexAuthor,
-    CodexAuthorError,
-)
 from .corpus import (
     AUTHORING_CASE_FORMAT,
     AUTHORING_CORPUS_FORMAT,
@@ -106,7 +100,6 @@ from .operational import (
 from .operational_providers import (
     DEFAULT_GEMINI_OPERATIONAL_MODEL,
     DEFAULT_GEMINI_OPERATIONAL_TIMEOUT_MILLISECONDS,
-    CodexOperationalExecutor,
     GeminiOperationalExecutor,
     OperationalProviderError,
 )
@@ -173,8 +166,6 @@ __all__ = [
     "AUTHORING_EVIDENCE_SIGNATURE_ALGORITHM",
     "AUTHORING_EVIDENCE_SIGNATURE_FORMAT",
     "AUTHORING_OPERATIONAL_EVIDENCE_FORMAT",
-    "CODEX_AUTHOR_PROMPT_DIGEST",
-    "CODEX_AUTHOR_PROMPT_FORMAT",
     "CTK_CORPUS_FORMAT",
     "CTK_REPORT_FORMAT",
     "CTK_VERSION",
@@ -212,9 +203,6 @@ __all__ = [
     "CtkIrOracle",
     "CtkReport",
     "CtkTurn",
-    "CodexAuthor",
-    "CodexAuthorError",
-    "CodexOperationalExecutor",
     "FlowSpec2JsonAdapter",
     "ForbiddenConstruct",
     "RequiredFlowConstruct",

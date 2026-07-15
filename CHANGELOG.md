@@ -4,12 +4,12 @@ Table of Contents:
 
 - Unreleased: 23 <!-- section:unreleased -->
     - Added: 27 <!-- section:unreleased-added -->
-    - Changed: 47 <!-- section:unreleased-changed -->
-    - Security: 79 <!-- section:unreleased-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 93 <!-- section:version-0-2-0 -->
-    - Added: 97 <!-- section:version-0-2-0-added -->
-    - Changed: 114 <!-- section:version-0-2-0-changed -->
-    - Security: 129 <!-- section:version-0-2-0-security -->
+    - Changed: 48 <!-- section:unreleased-changed -->
+    - Security: 84 <!-- section:unreleased-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 97 <!-- section:version-0-2-0 -->
+    - Added: 101 <!-- section:version-0-2-0-added -->
+    - Changed: 118 <!-- section:version-0-2-0-changed -->
+    - Security: 133 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -26,13 +26,14 @@ All notable project changes are recorded here. Versioning follows
 
 ### Added
 
+- Optional persisted `await_external.max_resends` enforcement with a host-facing
+  remaining-budget contract, atomic exhaustion rejection, and backward-compatible
+  host-owned limiting when omitted.
 - Canonical detached Ed25519 authentication for fully replayed authoring
   evidence, with Python and CLI signing and verification interfaces.
 - Content-addressed human presentation review for candidate route and prompt
   prose, with a fixed public rubric, source-bound subjects, offline
   verification, and detached reviewer authentication.
-- Subscription-authenticated Codex authoring, routing, and extraction through
-  an isolated local `public-provider` transport with opt-in live tests.
 - Canonical report-only operational evidence for model-specific routing and
   extraction probes, bound to verified final sources, exact request contracts,
   raw responses, and deterministic offline replay. Authored/counterfactual probe
@@ -46,6 +47,12 @@ All notable project changes are recorded here. Versioning follows
 
 ### Changed
 
+- Removed repository-local harness doctrine and model integrations that depended
+  on non-public sibling tooling; the public package now exposes only its
+  self-contained transport and provider-neutral evidence contracts.
+- Documented the distinction between source-linked canonical IR and fully
+  expanded executable topology, including controlled execution cycles versus
+  forbidden dependency cycles and arbitrary author-defined loops.
 - Replaced the v3 preview's untyped passthrough map with ordered, immutable,
   policy-classified migration loss entries; authored previews reject the
   migration-only artifact, and localized awaits now account for resume and
@@ -56,12 +63,10 @@ All notable project changes are recorded here. Versioning follows
 - Separated semantic orchestration from path, derive, predicate, state, and
   schema contract groups while preserving diagnostic identity.
 - Separated Rasa import from export conversion.
-- Shared closed prompt and structured-output contracts across Gemini and Codex
-  while preserving the existing Gemini interfaces.
 - Replaced hidden complete-source authoring equality with a versioned public
   semantic acceptance contract, aggregate missing/mismatch/unexpected feedback,
-  and explicit variable presentation paths. Authoring case, corpus, Gemini
-  prompt, Codex prompt, and evidence-envelope identities advanced together.
+  and explicit variable presentation paths. Authoring case, corpus, provider
+  prompt, and evidence-envelope identities advanced together.
 - Expanded the conformance kit with gated-derivation traces for open and closed
   guards, ignored gated input, ordered lookup, and declared fallback behavior.
 - Reused a compiled Draft 2020-12 validator while preserving best-match error
@@ -78,12 +83,11 @@ All notable project changes are recorded here. Versioning follows
 
 ### Security
 
+- Removed source, documentation, tests, packaging exceptions, and local harness
+  artifacts that referenced non-public development infrastructure.
 - Pinned the maintained `cryptography` implementation for Ed25519 operations;
   private keys remain outside evidence and cannot be loaded from environment
   files.
-- Codex model execution requires ChatGPT authentication, excludes API-key and
-  ambient-environment inheritance, disables built-in tools, and uses ephemeral
-  read-only isolation.
 
 <!-- /section:unreleased-security -->
 

@@ -44,9 +44,7 @@ class CliHandlers:
     rasa_import: CommandHandler
     open_workflow_export: CommandHandler
     open_workflow_import: CommandHandler
-    authoring_benchmark_codex: CommandHandler
     authoring_benchmark_gemini: CommandHandler
-    operational_benchmark_codex: CommandHandler
     operational_benchmark_gemini: CommandHandler
     operational_evidence_verify: CommandHandler
     authoring_evidence_verify: CommandHandler
@@ -58,9 +56,6 @@ class CliHandlers:
     authoring_presentation_review_sign: CommandHandler
     authoring_presentation_review_signature_verify: CommandHandler
     authoring_promotion_verify: CommandHandler
-    default_codex_effort: str
-    default_codex_model: str
-    default_codex_timeout_seconds: float
     default_gemini_model: str
 
 
@@ -102,7 +97,7 @@ def build_parser(cli_handlers: CliHandlers) -> argparse.ArgumentParser:
 
     intermediate_representation_parser = subparsers.add_parser(
         "ir",
-        help="emit the canonical intermediate representation",
+        help="emit canonical contracts with subflow topology abstracted",
     )
     intermediate_representation_parser.add_argument("path")
     intermediate_representation_parser.set_defaults(
@@ -115,7 +110,7 @@ def build_parser(cli_handlers: CliHandlers) -> argparse.ArgumentParser:
 
     mermaid_parser = subparsers.add_parser(
         "mermaid",
-        help="render the compiled graph as Mermaid",
+        help="render the fully expanded compiled graph as Mermaid",
     )
     mermaid_parser.add_argument("path")
     mermaid_parser.set_defaults(handler=cli_handlers.mermaid)
@@ -181,39 +176,6 @@ def build_parser(cli_handlers: CliHandlers) -> argparse.ArgumentParser:
     authoring_benchmark_parser.add_argument("--output", required=True)
     authoring_benchmark_parser.set_defaults(handler=cli_handlers.authoring_benchmark_gemini)
 
-    codex_benchmark_parser = subparsers.add_parser(
-        "authoring-benchmark-codex",
-        help="run the packaged AI-authoring corpus through subscription-authenticated Codex",
-    )
-    codex_benchmark_parser.add_argument(
-        "--allow-network",
-        action="store_true",
-        required=True,
-        help="explicitly permit Codex model requests for this invocation",
-    )
-    codex_benchmark_parser.add_argument(
-        "--benchmark-identifier",
-        default="codex_reference",
-    )
-    codex_benchmark_parser.add_argument(
-        "--model",
-        default=cli_handlers.default_codex_model,
-    )
-    codex_benchmark_parser.add_argument(
-        "--effort",
-        choices=("none", "minimal", "low", "medium", "high", "xhigh", "max"),
-        default=cli_handlers.default_codex_effort,
-    )
-    codex_benchmark_parser.add_argument(
-        "--timeout-seconds",
-        type=float,
-        default=cli_handlers.default_codex_timeout_seconds,
-    )
-    codex_benchmark_parser.add_argument("--repository-revision", required=True)
-    codex_benchmark_parser.add_argument("--max-correction-rounds", type=int, default=2)
-    codex_benchmark_parser.add_argument("--output", required=True)
-    codex_benchmark_parser.set_defaults(handler=cli_handlers.authoring_benchmark_codex)
-
     operational_gemini_parser = subparsers.add_parser(
         "operational-benchmark-gemini",
         help="probe final authored flows through Gemini routing and extraction",
@@ -232,35 +194,6 @@ def build_parser(cli_handlers: CliHandlers) -> argparse.ArgumentParser:
     operational_gemini_parser.add_argument("--repository-revision", required=True)
     operational_gemini_parser.add_argument("--output", required=True)
     operational_gemini_parser.set_defaults(handler=cli_handlers.operational_benchmark_gemini)
-
-    operational_codex_parser = subparsers.add_parser(
-        "operational-benchmark-codex",
-        help="probe final authored flows through subscription-authenticated Codex",
-    )
-    operational_codex_parser.add_argument("path")
-    operational_codex_parser.add_argument(
-        "--allow-network",
-        action="store_true",
-        required=True,
-        help="explicitly permit Codex model requests for this invocation",
-    )
-    operational_codex_parser.add_argument(
-        "--model",
-        default=cli_handlers.default_codex_model,
-    )
-    operational_codex_parser.add_argument(
-        "--effort",
-        choices=("none", "minimal", "low", "medium", "high", "xhigh", "max"),
-        default=cli_handlers.default_codex_effort,
-    )
-    operational_codex_parser.add_argument(
-        "--timeout-seconds",
-        type=float,
-        default=cli_handlers.default_codex_timeout_seconds,
-    )
-    operational_codex_parser.add_argument("--repository-revision", required=True)
-    operational_codex_parser.add_argument("--output", required=True)
-    operational_codex_parser.set_defaults(handler=cli_handlers.operational_benchmark_codex)
 
     operational_verify_parser = subparsers.add_parser(
         "operational-evidence-verify",

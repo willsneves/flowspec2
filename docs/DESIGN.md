@@ -3,11 +3,11 @@
 Table of Contents:
 
 - Files: 28 <!-- section:files -->
-- Authoring-to-execution pipeline: 83 <!-- section:authoring-execution-pipeline -->
-- The one idea: the boundary is the closed value-domain: 162 <!-- section:closed-value-domain -->
-- Top-level shape (the two tiers): 179 <!-- section:top-level-shape -->
-- Mapping table — every construct → its LangGraph primitive: 200 <!-- section:mapping-table -->
-- Rationale (1 page): 260 <!-- section:rationale -->
+- Authoring-to-execution pipeline: 80 <!-- section:authoring-execution-pipeline -->
+- The one idea: the boundary is the closed value-domain: 159 <!-- section:closed-value-domain -->
+- Top-level shape (the two tiers): 176 <!-- section:top-level-shape -->
+- Mapping table — every construct → its LangGraph primitive: 197 <!-- section:mapping-table -->
+- Rationale (1 page): 257 <!-- section:rationale -->
     - Rejected alternatives: 277 <!-- section:rationale-rejected-alternatives -->
 - How this was produced: 293 <!-- section:production-method -->
 
@@ -55,9 +55,6 @@ that graph as a callable tool.
 | [`../src/flowspec2/authoring/benchmark.py`](../src/flowspec2/authoring/benchmark.py) | Provider-neutral AI-authoring and correction benchmark. |
 | [`../src/flowspec2/authoring/corpus.py`](../src/flowspec2/authoring/corpus.py) | Packaged reference-corpus manifest, integrity checks, and content identity. |
 | [`../src/flowspec2/authoring/gemini.py`](../src/flowspec2/authoring/gemini.py) | Explicit-network Gemini source transport over the closed projection. |
-| [`../src/flowspec2/authoring/codex.py`](../src/flowspec2/authoring/codex.py) | Subscription-authenticated Codex source transport over the closed projection. |
-| [`../src/flowspec2/codex_transport.py`](../src/flowspec2/codex_transport.py) | Lazy isolated `public-provider` boundary shared by Codex authoring and execution. |
-| [`../src/flowspec2/codex_agent.py`](../src/flowspec2/codex_agent.py) | Codex route/extract implementation over the shared closed schemas. |
 | [`../src/flowspec2/authoring/evidence.py`](../src/flowspec2/authoring/evidence.py) | Exact captures and content-addressed real-model evidence. |
 | [`../src/flowspec2/authoring/evidence_verification.py`](../src/flowspec2/authoring/evidence_verification.py) | Closed-schema verification and deterministic offline replay. |
 | [`../src/flowspec2/authoring/evidence_signature.py`](../src/flowspec2/authoring/evidence_signature.py) | Detached Ed25519 signing and authentication over verified evidence. |
@@ -248,9 +245,9 @@ The `domains` registry is the spine: one declaration materializes the Pydantic v
 | `capabilities.location_in` | `message_type==location` → `media.latitude/longitude`; `reverse_geocode_address` | location in. |
 | `capabilities.handoff` | LLM emits Central-1746 fallback / handoff | to human. |
 | `capabilities.session_reset` | `reset_session_state` / `_reset_on_next_call` | session reset. |
-| `capabilities.await_external` | suspend node: emit a typed out-of-band resume contract and absolute timeout deadline, resume on a host-delivered `resume_on` signal, apply bounded token/result mappings atomically, and route host-delivered abort/resend/switch/timeout events | early timeout is rejected; recovery ending at `END` resets on the next call. |
+| `capabilities.await_external` | suspend node: emit a typed out-of-band resume contract and absolute timeout deadline, resume on a host-delivered `resume_on` signal, apply bounded token/result mappings atomically, and route host-delivered abort/resend/switch/timeout events | optional `max_resends` persists and exposes the remaining budget; exhausted resend and early timeout events are rejected atomically; omission preserves host-owned resend limiting; recovery ending at `END` resets on the next call. |
 | `predicate` object grammar | pure boolean fn over `ServiceState` (frozen namespaces) compiled into routers/early-returns | no arbitrary Python; verifiable/diffable. |
-| `GeminiAgent` / `CodexAgent` route/extract call | provider response JSON Schema derived from the active catalog or payload schema, followed by local Draft validation; Codex lowers the correction union to nullable transport fields and restores the exclusive branch before validation | invalid provider JSON never reaches the rail, and the provider's schema subset does not redefine correction semantics. |
+| `GeminiAgent` route/extract call | provider response JSON Schema derived from the active catalog or payload schema, followed by local Draft validation | invalid provider JSON never reaches the rail, and constrained decoding does not replace local validation. |
 
 ---
 
@@ -261,14 +258,17 @@ The `domains` registry is the spine: one declaration materializes the Pydantic v
 
 The design rests on one decision: the deterministic/non-deterministic boundary is positional and falls on the closed value-domain. Everything else follows.
 
-**The boundary, precisely.** The JSON pins the rails: the set of states (`path` steps + spliced `uses` nodes + synthesized derive/terminal nodes), the entry point (`entry` then the first `path` step), the required slots and their closed value-domains (`domains` + `slots`), the normalization rules (`domains.*.normalize`, deterministically enforced even though authored as hints), the allowed transitions and guards (linear fall-through + `ask_when`/`overrides.gates` + `confirm.correctable` back-edges, all over the frozen grammar), which tool each state calls (`entry.tool`, `terminal.tool`, subflow bindings), where the flow pauses (the `agent_response is not None` convention, synthesized per step kind — never authored), and the idempotency/reset/guardrail behavior (`terminal.outcomes` trichotomy, `empty_payload`, `config` booleans, `slots.*.persist/max_attempts/on_exhaust/fill_only_when_asked`). It leaves the LLM free for exactly: which flow to enter, extracting the closed token from free text/voice/photo, phrasing, and choosing/ordering the `capabilities`.
+**The boundary, precisely.** The JSON pins the rails: the set of states (`path` steps + spliced `uses` nodes + synthesized derive/terminal nodes), the entry point (`entry` then the first `path` step), the required slots and their closed value-domains (`domains` + `slots`), the normalization rules (`domains.*.normalize`, deterministically enforced even though authored as hints), the allowed transitions and guards (linear fall-through + `ask_when`/`overrides.gates` + `confirm.correctable` back-edges + registered subflow routes + typed `await_external` recovery, all over closed contracts), which tool each state calls (`entry.tool`, `terminal.tool`, subflow bindings), where the flow pauses (the `agent_response is not None` convention, synthesized per step kind — never authored), and the idempotency/reset/guardrail behavior (`terminal.outcomes` trichotomy, `empty_payload`, `config` booleans, `slots.*.persist/max_attempts/on_exhaust/fill_only_when_asked`). It leaves the LLM free for exactly: which flow to enter, extracting the closed token from free text/voice/photo, phrasing, and choosing/ordering the `capabilities`.
 
 **Why two tiers.** Most service conversations are a linear sequence of slot
 collections; branches, gates, back-edges, and derivations are the exceptional
 part. Forcing explicit `transitions[]` on every node adds graph mechanics without
 adding useful conversational meaning and makes diffs harder to review. The flat
 `path` keeps the common case readable, while derived values, multi-slot gates,
-and non-linear corrections live in bounded escape hatches.
+non-linear corrections, registered subflow routes, and typed external recovery
+live in bounded escape hatches. The compiled graph may therefore be cyclic even
+though the source has no general loop construct; dependency graphs remain
+acyclic and `END` may be a turn boundary rather than conversational completion.
 
 **Why the domain registry is the spine.** Declaring a domain materializes validation, constrained-decoding schema, and interactive presentation from one contract; the recurring "button tap ≠ recognizer token" bug becomes structurally impossible. A slot's `required` flag is the sole requirement source for native fields such as `ponto_referencia`; subflow configuration only governs subflow-owned fields. **Why corrections are derived.** A hand-declared `clears[]` is a second dependency list duplicating `requires[]`/`derive.from`, reintroducing the stale-state footgun. **Why the escape hatches are weak on purpose.** `derive` is a lookup table + one `$from[i]` sigil (exactly `_classifica_defeito`, nothing more); the predicate grammar is a frozen object form over five namespaces (no string sugar → always compilable). Provider plumbing (flow_token base64, sha256 recipe, Mule whitelist, JWT/SCRT, Object Store TTLs) stays in the compiler/library; the author declares `idempotent:true` and `media_out:["location"]` and the compiler cross-checks the whitelist. The luminária instance proves both sufficiency (every grounding feature) and minimality (no field unused by it).
 

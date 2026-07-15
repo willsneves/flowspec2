@@ -2,22 +2,23 @@
 
 Table of Contents:
 
-- Top level: 42 <!-- section:top-level -->
-- Validation, normalization, and runtime profiles: 67 <!-- section:validation-normalization-profile -->
-- `route` (LLM): 106 <!-- section:route -->
-- `domains.<X>` (RAIL — the spine): 116 <!-- section:domains -->
-- `slots.<s>` (RAIL): 144 <!-- section:slots -->
-- `path[]` steps (RAIL): 171 <!-- section:path-steps -->
-- `uses[]` subflows (RAIL): 195 <!-- section:subflows -->
-- `interactive` (RAIL): 245 <!-- section:interactive -->
-- `predicate` grammar (RAIL): 270 <!-- section:predicate-grammar -->
-- `derive[]` (RAIL): 280 <!-- section:derive -->
-- `confirm` (RAIL — correction hub): 299 <!-- section:confirm -->
-- `terminal` (RAIL): 315 <!-- section:terminal -->
-- `auto_flow` (RAIL): 341 <!-- section:auto-flow -->
-- `capabilities` (LLM — fenced): 362 <!-- section:capabilities -->
-- Runtime response contract: 391 <!-- section:runtime-response-contract -->
-- AI authoring benchmark: 428 <!-- section:ai-authoring-benchmark -->
+- Top level: 43 <!-- section:top-level -->
+- Validation, normalization, and runtime profiles: 68 <!-- section:validation-normalization-profile -->
+- `route` (LLM): 107 <!-- section:route -->
+- `domains.<X>` (RAIL — the spine): 117 <!-- section:domains -->
+- `slots.<s>` (RAIL): 145 <!-- section:slots -->
+- `path[]` steps (RAIL): 172 <!-- section:path-steps -->
+- Control-flow topology: 196 <!-- section:control-flow-topology -->
+- `uses[]` subflows (RAIL): 232 <!-- section:subflows -->
+- `interactive` (RAIL): 282 <!-- section:interactive -->
+- `predicate` grammar (RAIL): 307 <!-- section:predicate-grammar -->
+- `derive[]` (RAIL): 317 <!-- section:derive -->
+- `confirm` (RAIL — correction hub): 336 <!-- section:confirm -->
+- `terminal` (RAIL): 352 <!-- section:terminal -->
+- `auto_flow` (RAIL): 378 <!-- section:auto-flow -->
+- `capabilities` (LLM — fenced): 399 <!-- section:capabilities -->
+- Runtime response contract: 433 <!-- section:runtime-response-contract -->
+- AI authoring benchmark: 466 <!-- section:ai-authoring-benchmark -->
 
 <!-- /section:toc -->
 
@@ -190,6 +191,42 @@ structural error rather than ignored metadata:
 **LLM** fields; the surrounding behavior remains RAIL.
 
 <!-- /section:path-steps -->
+<!-- section:control-flow-topology -->
+
+## Control-flow topology
+
+The authored `path` is the ordered happy path; a path step cannot declare a
+generic transition table or arbitrary destination. The compiler synthesizes
+fall-through and pause routing, so different compiled nodes may have different
+fan-out without repeating graph mechanics in source.
+
+The executable graph may contain controlled cycles:
+
+- A correction hub may route only to a previously produced slot named by
+  `confirm.correctable[]`; confirmation routes to its validated forward target.
+- A registered subflow may contain internal rejection, method-switch, or resend
+  routes declared by its immutable runtime-profile manifest.
+- `await_external` may route only host-delivered configured recovery and timeout
+  events. `resend.goto` is constrained to the bound wait step.
+- Re-ask and retryable terminal behavior may re-enter the logical flow on a
+  later runtime invocation.
+
+These execution cycles do not relax dependency rules. Slot `requires[]` and
+derive dependencies must remain acyclic, and arbitrary author-defined loops,
+manual graph edges, scripts, and open routing expressions are not part of
+`flowspec/2`.
+
+`END` means that the current graph invocation stops. It may represent a pause
+that emits a question or external marker rather than completion of the whole
+conversation. The format therefore bounds declared retry mechanisms where a
+budget exists, but does not claim global conversational termination.
+
+Use `flowspec2 ir` for canonical source-linked contracts with subflows retained
+as logical anchors. Use `flowspec2 mermaid` for the fully expanded executable
+topology, including synthesized fan-out, back-edges, and subflow-internal
+cycles.
+
+<!-- /section:control-flow-topology -->
 <!-- section:subflows -->
 
 ## `uses[]` subflows (RAIL)
@@ -365,7 +402,7 @@ Predicate namespaces are literal state partitions: `slots.` addresses public
   `session_reset` remain optional LLM side actions.
 - `await_external` is the deterministic exception inside this fenced block. It
   declares `kind`, optional `step`, `resume_on`, fallback `prompt`/`interactive`,
-  `on_resume`, `timeout`, optional `timeout_seconds`, and
+  `on_resume`, `timeout`, optional `timeout_seconds`, optional `max_resends`, and
   `recovery.{abort,resend,switch}`. Normalization materializes the schema-owned
   timeout default only when a timeout transition exists.
 - `on_resume.set` maps JSON scalar literals or `$token.*` references into state.
@@ -382,8 +419,13 @@ Predicate namespaces are literal state partitions: `slots.` addresses public
   is configured, the out-of-band resume marker and persisted resume provenance
   carry the absolute UTC deadline; a timeout event received before it is
   rejected without applying transition writes.
-- `resend.goto` must be the bound wait step. A recovery or timeout targeting
-  `END` marks the flow completed and resets its state on the next call.
+- `resend.goto` must be the bound wait step. When `max_resends` is present, a
+  resend transition must exist; the accepted count persists across invocations,
+  each emitted marker carries `recovery.remaining_resends`, and an exhausted
+  event is rejected before transition writes or routing. Omission preserves
+  host-owned limiting for existing documents.
+- A recovery or timeout targeting `END` marks the flow completed and resets its
+  state on the next call.
 
 <!-- /section:capabilities -->
 <!-- section:runtime-response-contract -->
@@ -402,7 +444,9 @@ metadata binds the state to the flow version plus IR, dependency, and profile
 digests. Restore rejects any mismatch before a graph node or external effect can
 run. External-wait metadata additionally pins the resume version, schema digest,
 correlation path and accepted value, and timeout deadline. Lifecycle reset
-clears this provenance before a later wait can publish a fresh contract.
+clears this provenance before a later wait can publish a fresh contract. A
+bounded external-wait marker also exposes the configured recovery events and
+remaining resend budget under `interactive.recovery`.
 
 `migrate_service_state()` is the only active-state upgrade boundary. Its
 declarative plan pins exact source and target IR/state-schema contracts and may
@@ -411,16 +455,10 @@ proves supported schema compatibility, validates the target atomically, and
 returns a canonical loss report bound to the plan and both states. Ordinary
 runtime restore never performs or infers migration.
 
-Gemini and Codex requests use provider-native structured output generated from
-the same route and extraction contracts. Provider output is validated locally
-with Draft 2020-12 before any route or slot value is accepted, so constrained
-decoding is an optimization and not the trust boundary. The Codex path requires
-ChatGPT subscription authentication through the known local `public-provider`, disables
-built-in tools, excludes API-key inheritance, and executes ephemeral turns in a
-read-only isolated workspace. The correction hub's root `oneOf` is projected
-for Codex into an all-required nullable transport object. The inactive branch's
-`null` members are removed before the response is validated against the
-original `oneOf`, so provider schema limitations do not weaken the runtime rail.
+Gemini requests use provider-native structured output generated from the route
+and extraction contracts. Provider output is validated locally with Draft
+2020-12 before any route or slot value is accepted, so constrained decoding is
+an optimization and not the trust boundary.
 
 <!-- /section:runtime-response-contract -->
 <!-- section:ai-authoring-benchmark -->
@@ -438,13 +476,14 @@ behind an adapter.
 
 Each case combines exact semantic observations, intentionally variable
 presentation paths, positive required constructs, and forbidden constructs such
-as arbitrary expressions, scripts, manual graph transitions, loops, or parallel
-branches. Missing, mismatched, and unexpected observations are reported
-together, which prevents a trivial valid flow from satisfying a non-trivial
-scenario without forcing repeated discovery of hidden values. Reports include compact UTF-8 source
-size, a declared token proxy, source digest, diagnostic codes, correction
-outcome, and profile identifier. The installed reference corpus has a closed
-manifest with case integrity digests. A live provider run records the report,
+as arbitrary expressions, scripts, manual graph transitions, arbitrary
+author-defined loops, or parallel branches. Missing, mismatched, and unexpected
+observations are reported together, which prevents a trivial valid flow from
+satisfying a non-trivial scenario without forcing repeated discovery of hidden
+values. Reports include compact UTF-8 source size, a declared token proxy,
+source digest, diagnostic codes, correction outcome, and profile identifier.
+The installed reference corpus has a closed manifest with case integrity
+digests. A live provider run records the report,
 exact source captures, corpus/profile identities, provider configuration,
 prompt identity, package version, and repository revision in one canonical
 content-addressed evidence envelope. Every Gemini capture also records the

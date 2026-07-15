@@ -1,23 +1,10 @@
-"""Gemini and subscription-authenticated Codex operational probe executors."""
+"""Gemini operational probe executor."""
 
 from __future__ import annotations
 
 import os
 from importlib.metadata import PackageNotFoundError, version
 from typing import Final, Protocol, cast
-
-from flowspec2.codex_transport import (
-    CODEX_PROVIDER_IDENTIFIER,
-    CODEX_SDK_NAME,
-    DEFAULT_CODEX_EFFORT,
-    DEFAULT_CODEX_MODEL,
-    DEFAULT_CODEX_TIMEOUT_SECONDS,
-    CodexProvider,
-    CodexTransportError,
-    create_codex_provider,
-    run_codex_structured_output,
-    validate_codex_configuration,
-)
 
 from .evidence import AuthoringProviderProvenance
 from .operational import (
@@ -174,98 +161,6 @@ class GeminiOperationalExecutor:
     def __enter__(self) -> GeminiOperationalExecutor:
         if self._closed:
             raise OperationalProviderError("Gemini operational executor is closed")
-        return self
-
-    def __exit__(self, _exception_type: object, _exception: object, _traceback: object) -> None:
-        self.close()
-
-
-class CodexOperationalExecutor:
-    """Execute exact probes through isolated ChatGPT-subscription Codex turns."""
-
-    def __init__(
-        self,
-        model: str = DEFAULT_CODEX_MODEL,
-        *,
-        effort: str = DEFAULT_CODEX_EFFORT,
-        timeout_seconds: float = DEFAULT_CODEX_TIMEOUT_SECONDS,
-        provider: CodexProvider | None = None,
-        sdk_version: str | None = None,
-    ) -> None:
-        validate_codex_configuration(model, effort, timeout_seconds)
-        if provider is None:
-            if sdk_version is not None:
-                raise ValueError("Codex SDK version requires an injected provider")
-            try:
-                resolved_provider, resolved_sdk_version = create_codex_provider(
-                    model=model,
-                    effort=effort,
-                    timeout_seconds=timeout_seconds,
-                )
-            except CodexTransportError as transport_error:
-                raise OperationalProviderError(str(transport_error)) from transport_error
-        else:
-            if provider.model != model:
-                raise ValueError("injected Codex provider model does not match executor model")
-            resolved_provider = provider
-            resolved_sdk_version = sdk_version or "injected-provider"
-        self.model = model
-        self.effort = effort
-        self.timeout_seconds = timeout_seconds
-        self._provider = resolved_provider
-        self._sdk_version = resolved_sdk_version
-        self._closed = False
-
-    @property
-    def generation_configuration(self) -> dict[str, object]:
-        return {
-            "billing_mode": "chatgpt_subscription",
-            "builtin_tools": "disabled",
-            "environment_policy": "allowlisted",
-            "ephemeral": True,
-            "isolation": "safe_mode",
-            "reasoning_effort": self.effort,
-            "sandbox": "read-only",
-            "timeout_seconds": self.timeout_seconds,
-        }
-
-    def provenance(self) -> AuthoringProviderProvenance:
-        return AuthoringProviderProvenance.from_configuration(
-            identifier=CODEX_PROVIDER_IDENTIFIER,
-            model=self.model,
-            sdk=CODEX_SDK_NAME,
-            sdk_version=self._sdk_version,
-            prompt_format=OPERATIONAL_PROMPT_FORMAT,
-            prompt_digest=OPERATIONAL_PROMPT_DIGEST,
-            generation_configuration=self.generation_configuration,
-        )
-
-    def __call__(self, operational_request: OperationalProbeRequest) -> OperationalModelResponse:
-        if self._closed:
-            raise OperationalProviderError("Codex operational executor is closed")
-        try:
-            provider_turn = run_codex_structured_output(
-                self._provider,
-                system=operational_request.system_instruction,
-                prompt=operational_request.prompt,
-                response_schema=operational_request.response_schema(),
-                timeout_seconds=self.timeout_seconds,
-            )
-        except CodexTransportError as transport_error:
-            raise OperationalProviderError(
-                f"Codex operational request failed for {operational_request.probe_identifier!r}"
-            ) from transport_error
-        return OperationalModelResponse(
-            raw_output=provider_turn.text,
-            effective_model_version=None,
-        )
-
-    def close(self) -> None:
-        self._closed = True
-
-    def __enter__(self) -> CodexOperationalExecutor:
-        if self._closed:
-            raise OperationalProviderError("Codex operational executor is closed")
         return self
 
     def __exit__(self, _exception_type: object, _exception: object, _traceback: object) -> None:

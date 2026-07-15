@@ -14,7 +14,6 @@ from flowspec2.authoring import (
     AuthoredSource,
     AuthoringProviderProvenance,
     AuthoringRequest,
-    CodexAuthorError,
     GeminiAuthorError,
     load_reference_authoring_corpus,
 )
@@ -67,23 +66,6 @@ def _arguments(output_path: Path) -> list[str]:
     ]
 
 
-def _codex_arguments(output_path: Path) -> list[str]:
-    return [
-        "authoring-benchmark-codex",
-        "--allow-network",
-        "--model",
-        "test-codex-model",
-        "--effort",
-        "high",
-        "--timeout-seconds",
-        "45",
-        "--repository-revision",
-        "revision-under-test",
-        "--output",
-        str(output_path),
-    ]
-
-
 def _write_ed25519_keys(directory_path: Path) -> tuple[Path, Path]:
     private_key = Ed25519PrivateKey.from_private_bytes(bytes([7]) * 32)
     private_key_path = directory_path / "authoring-private-key.pem"
@@ -123,62 +105,6 @@ def test_cli_requires_explicit_network_opt_in_before_provider_creation(
     assert main(arguments) == 2
     assert provider_created is False
     assert "--allow-network" in capsys.readouterr().err
-
-
-def test_codex_cli_requires_explicit_network_opt_in_before_provider_creation(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    provider_created = False
-
-    def forbidden_factory(_model: str, _effort: str, _timeout_seconds: float) -> FakeCliAuthor:
-        nonlocal provider_created
-        provider_created = True
-        raise AssertionError("provider must not be created")
-
-    monkeypatch.setattr("flowspec2.cli._create_codex_author", forbidden_factory)
-    arguments = _codex_arguments(tmp_path / "evidence.json")
-    arguments.remove("--allow-network")
-
-    assert main(arguments) == 2
-    assert provider_created is False
-    assert "--allow-network" in capsys.readouterr().err
-
-
-def test_codex_cli_writes_replayable_evidence_with_requested_configuration(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured_configuration: list[tuple[str, str, float]] = []
-    fake_author = FakeCliAuthor()
-
-    def provider_factory(model: str, effort: str, timeout_seconds: float) -> FakeCliAuthor:
-        captured_configuration.append((model, effort, timeout_seconds))
-        return fake_author
-
-    monkeypatch.setattr("flowspec2.cli._create_codex_author", provider_factory)
-    output_path = tmp_path / "codex-evidence.json"
-
-    assert main(_codex_arguments(output_path)) == 0
-
-    assert captured_configuration == [("test-codex-model", "high", 45.0)]
-    evidence_document = json.loads(output_path.read_text(encoding="utf-8"))
-    assert (
-        evidence_document["report"]["successful_cases"]
-        == evidence_document["report"]["total_cases"]
-    )
-    assert (
-        main(
-            [
-                "authoring-evidence-verify",
-                str(output_path),
-                "--repository-revision",
-                "revision-under-test",
-            ]
-        )
-        == 0
-    )
 
 
 def test_cli_writes_canonical_evidence_with_exact_captures(
@@ -276,37 +202,6 @@ def test_cli_provider_failure_does_not_leak_cause_or_write_partial_output(
 
     with caplog.at_level(logging.ERROR):
         assert main(_arguments(output_path)) == 1
-
-    captured_output = capsys.readouterr()
-    assert output_path.exists() is False
-    assert sentinel_secret not in captured_output.out
-    assert sentinel_secret not in captured_output.err
-    assert sentinel_secret not in caplog.text
-
-
-def test_codex_cli_provider_failure_does_not_leak_cause_or_write_partial_output(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    sentinel_secret = "sentinel-codex-provider-secret"
-
-    class FailingAuthor(FakeCliAuthor):
-        def __call__(self, _authoring_request: AuthoringRequest) -> AuthoredSource:
-            try:
-                raise RuntimeError(sentinel_secret)
-            except RuntimeError as provider_error:
-                raise CodexAuthorError("Codex provider failed safely") from provider_error
-
-    monkeypatch.setattr(
-        "flowspec2.cli._create_codex_author",
-        lambda _model, _effort, _timeout_seconds: FailingAuthor(),
-    )
-    output_path = tmp_path / "partial-codex-evidence.json"
-
-    with caplog.at_level(logging.ERROR):
-        assert main(_codex_arguments(output_path)) == 1
 
     captured_output = capsys.readouterr()
     assert output_path.exists() is False

@@ -6,7 +6,7 @@ Table of Contents:
 - Reporting a vulnerability: 29 <!-- section:reporting -->
 - Artifact signing keys: 43 <!-- section:evidence-signing-keys -->
 - Model execution: 66 <!-- section:model-execution -->
-- Scope and handling: 80 <!-- section:scope-handling -->
+- Scope and handling: 74 <!-- section:scope-handling -->
 
 <!-- /section:toc -->
 
@@ -66,13 +66,7 @@ identity.
 ## Model execution
 
 Live-model commands require an explicit invocation flag; configured credentials
-alone are not consent. Gemini keys remain within its SDK boundary. The Codex
-transport does not inherit API keys or the parent environment, requires ChatGPT
-subscription authentication, ignores user/project rules, disables built-in
-tools, and executes ephemeral turns in a read-only isolated workspace.
-
-Use the known `~/Code/public-provider` sibling for Codex execution. The package with the
-same name on PyPI is unrelated and must not be substituted.
+alone are not consent. Gemini keys remain within its SDK boundary.
 
 <!-- /section:model-execution -->
 <!-- section:scope-handling -->

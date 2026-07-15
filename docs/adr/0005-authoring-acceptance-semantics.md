@@ -2,11 +2,11 @@
 
 Table of Contents:
 
-- Context: 20 <!-- section:context -->
-- Decision: 45 <!-- section:decision -->
-- Consequences: 80 <!-- section:consequences -->
-    - What becomes easier: 84 <!-- section:consequences-easier -->
-    - What becomes harder: 100 <!-- section:consequences-harder -->
+- Context: 23 <!-- section:context -->
+- Decision: 48 <!-- section:decision -->
+- Consequences: 83 <!-- section:consequences -->
+    - What becomes easier: 87 <!-- section:consequences-easier -->
+    - What becomes harder: 103 <!-- section:consequences-harder -->
 
 <!-- /section:toc -->
 
@@ -14,6 +14,9 @@ Table of Contents:
 
 **Status:** Accepted
 **Date:** 2026-07-14
+
+> Superseded in provider-transport scope by `0011-public-model-transport-scope`
+> (`0011-public-model-transport-scope.md`), 2026-07-15.
 
 <!-- section:context -->
 

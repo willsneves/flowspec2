@@ -4,13 +4,13 @@ Table of Contents:
 
 - Purpose: 26 <!-- section:purpose -->
 - Evaluation contract: 41 <!-- section:evaluation-contract -->
-- Author integration: 104 <!-- section:author-integration -->
-- Operational model evidence: 215 <!-- section:operational-evidence -->
-- Structured-output projection: 252 <!-- section:structured-output-projection -->
-- Conformance kit: 279 <!-- section:conformance-kit -->
-- Interpreting reports: 308 <!-- section:interpreting-reports -->
-- Evidence authenticity: 364 <!-- section:evidence-authenticity -->
-- Format promotion: 399 <!-- section:format-promotion -->
+- Author integration: 105 <!-- section:author-integration -->
+- Operational model evidence: 206 <!-- section:operational-evidence -->
+- Structured-output projection: 242 <!-- section:structured-output-projection -->
+- Conformance kit: 269 <!-- section:conformance-kit -->
+- Interpreting reports: 298 <!-- section:interpreting-reports -->
+- Evidence authenticity: 354 <!-- section:evidence-authenticity -->
+- Format promotion: 389 <!-- section:format-promotion -->
 
 <!-- /section:toc -->
 
@@ -48,7 +48,8 @@ Every candidate format is evaluated through the same sequence:
    `flowspec/2` projection.
 3. Check the authored-document projection for forbidden constructs before
    judging the executable projection, so lowering cannot hide arbitrary code,
-   expressions, loops, parallelism, or manual graph routing.
+   expressions, arbitrary author-defined loops, parallelism, or manual graph
+   routing.
 4. Run aggregate structural, semantic, runtime-profile, and compilation checks.
 5. Verify case-specific required constructs to produce focused repair
    diagnostics.
@@ -166,30 +167,20 @@ than file formatting. Tests, the CTK, and live evaluation consume those same
 resources, so there is no test-only answer corpus that can drift from the
 installed package.
 
-`GeminiAuthor` and `CodexAuthor` are optional model transports. Each receives
-the task, public acceptance contract, normative schema, exact runtime-profile
-contract, prior source, and repair diagnostics. The complete reference source
-remains evaluator-only. Each provider returns the closed authoring projection;
+`GeminiAuthor` is the optional model transport. It receives the task, public
+acceptance contract, normative schema, exact runtime-profile contract, prior
+source, and repair diagnostics. The complete reference source remains
+evaluator-only. The provider returns the closed authoring projection;
 `flow_document_json` is preserved verbatim so malformed model source becomes a
 benchmark attempt and can be repaired rather than silently normalized. Every
-Gemini response must expose its provider-reported effective model version; a
+response must expose its provider-reported effective model version; a
 missing version fails that transport instead of silently substituting the
-requested model alias. Codex does not report a distinct effective version, so
-its capture records `null` while provenance retains the requested model,
-reasoning effort, and exact `public-provider` version.
-
-The Codex transport lazy-loads the operator's `~/Code/public-provider` checkout and
-requires its subscription-authentication contract. It excludes API-key and
-parent-environment inheritance, requires ChatGPT login, disables built-in tools,
-ignores user/project rules, uses safe isolation with a read-only sandbox, and
-runs ephemeral turns. The known library requires Python 3.12. The package with
-the same name on PyPI is unrelated and must not be used for this integration.
+requested model alias.
 
 The CLI requires explicit network consent even when a key is configured:
 
 ```bash
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output authoring-evidence.json
-uv run --python 3.12 --with ~/Code/public-provider flowspec2 authoring-benchmark-codex --allow-network --repository-revision <revision> --output codex-authoring-evidence.json
 flowspec2 authoring-evidence-verify authoring-evidence.json --repository-revision <revision>
 flowspec2 authoring-presentation-review-init authoring-evidence.json --repository-revision <revision> --output presentation-review.draft.json
 flowspec2 authoring-presentation-review-finalize authoring-evidence.json --draft presentation-review.draft.json --repository-revision <revision> --output presentation-review.json
@@ -242,7 +233,6 @@ trust boundary and the conditions for considering a future blocking policy.
 
 ```bash
 flowspec2 operational-benchmark-gemini authoring-evidence.json --allow-network --repository-revision <revision> --output operational-evidence.json
-uv run --python 3.12 --with ~/Code/public-provider flowspec2 operational-benchmark-codex authoring-evidence.json --allow-network --repository-revision <revision> --output codex-operational-evidence.json
 flowspec2 operational-evidence-verify operational-evidence.json --authoring-evidence authoring-evidence.json --repository-revision <revision> --json
 ```
 
