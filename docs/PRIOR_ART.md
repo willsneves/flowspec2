@@ -5,7 +5,7 @@ Table of Contents:
 - Closest projects and formats: 24 <!-- section:closest-projects-and-formats -->
 - Positioning decision: 44 <!-- section:positioning-decision -->
 - Borrowed constraints: 65 <!-- section:borrowed-constraints -->
-- Compatibility strategy: 90 <!-- section:compatibility-strategy -->
+- Compatibility strategy: 91 <!-- section:compatibility-strategy -->
 
 <!-- /section:toc -->
 
@@ -80,9 +80,10 @@ The comparison changes contracts, not the format's specialization:
   FlowSpec2 models cancel/recovery now and defers compensation until multiple
   committed effects make a reverse-order contract necessary.
 - General expression languages, remote references, discretionary planning,
-  loops, parallel task orchestration, and open extension fields remain outside
-  the stable core. They would make generation easier to improvise but harder to
-  link, prove, migrate, and execute reproducibly.
+  arbitrary author-defined loops, parallel task orchestration, and open
+  extension fields remain outside the stable core. They would make generation
+  easier to improvise but harder to link, prove, migrate, and execute
+  reproducibly.
 
 <!-- /section:borrowed-constraints -->
 <!-- section:compatibility-strategy -->

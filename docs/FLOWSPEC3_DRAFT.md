@@ -202,8 +202,8 @@ The preview does not:
 - replace or loosen the stable v2 schema;
 - register a compiler, runtime, CLI execution path, or compatibility profile;
 - infer missing subflow ownership or silently discard source behavior;
-- introduce scripts, arbitrary expressions, loops, parallel branches, or
-  manual graph transitions;
+- introduce scripts, arbitrary expressions, arbitrary author-defined loops,
+  parallel branches, or manual graph transitions;
 - claim improved model performance from fixture migration or byte size.
 
 <!-- /section:non-goals -->

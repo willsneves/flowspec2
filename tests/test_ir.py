@@ -182,6 +182,30 @@ def test_ir_await_writes_follow_declared_slot_partitions(
     )
 
 
+def test_ir_declares_opt_in_await_resend_budget_state(
+    luminaria_doc: dict[str, Any],
+) -> None:
+    flow_document = copy.deepcopy(luminaria_doc)
+    await_definition = flow_document["capabilities"]["await_external"]
+    await_definition["max_resends"] = 2
+
+    flow_ir = build_flow_ir(flow_document)
+    await_node = next(
+        node
+        for node in flow_ir.nodes
+        if node.kind == "subflow" and "data.govbr_authenticated" in node.writes
+    )
+    resend_count_reference = "internal._await_external_resend_count:authenticate_govbr"
+    internal_properties = flow_ir.state_schema()["properties"]["internal"]["properties"]
+
+    assert resend_count_reference in await_node.reads
+    assert resend_count_reference in await_node.writes
+    assert internal_properties[resend_count_reference.removeprefix("internal.")] == {
+        "type": "integer",
+        "minimum": 0,
+    }
+
+
 def test_ir_terminal_node_includes_success_literal_writes(
     buraco_doc: dict[str, Any],
 ) -> None:

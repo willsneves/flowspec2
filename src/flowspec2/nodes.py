@@ -426,10 +426,12 @@ def make_await_external_node(
         if timeout_transition is not None
         else None
     )
+    max_resends = cast(int | None, capability.get("max_resends"))
 
     sent_internal_key = f"_await_external_sent:{node_id}"
     completed_internal_key = f"_await_external_completed:{node_id}"
     route_internal_key = f"_await_external_route:{node_id}"
+    resend_count_internal_key = f"_await_external_resend_count:{node_id}"
 
     transitions = {
         "timeout": capability.get("timeout"),
@@ -458,6 +460,16 @@ def make_await_external_node(
             state.internal.get(sent_internal_key)
             or (legacy_sent_data_key and state.data.get(legacy_sent_data_key))
         )
+
+    def resend_count(state: ServiceState) -> int:
+        persisted_count = state.internal.get(resend_count_internal_key, 0)
+        if (
+            not isinstance(persisted_count, int)
+            or isinstance(persisted_count, bool)
+            or persisted_count < 0
+        ):
+            raise ValueError(f"await_external {node_id!r} has an invalid persisted resend count")
+        return persisted_count
 
     def provenance_for(
         correlation_value: str | int | float | bool | None = None,
@@ -592,6 +604,11 @@ def make_await_external_node(
                         raise ValueError(
                             f"await_external {node_id!r} rejected timeout before its deadline"
                         )
+                accepted_resend_count: int | None = None
+                if external_event == "resend" and max_resends is not None:
+                    accepted_resend_count = resend_count(state)
+                    if accepted_resend_count >= max_resends:
+                        raise ValueError(f"await_external {node_id!r} exhausted its resend budget")
                 validated_transition_writes = _validate_state_writes(
                     ctx,
                     copy.deepcopy(transition.get("set") or {}),
@@ -600,8 +617,11 @@ def make_await_external_node(
                 clear_sent(state)
                 if external_event == "resend":
                     state.internal.pop(completed_internal_key, None)
+                    if accepted_resend_count is not None:
+                        state.internal[resend_count_internal_key] = accepted_resend_count + 1
                 else:
                     state.internal[completed_internal_key] = True
+                    state.internal.pop(resend_count_internal_key, None)
                 _commit_state_writes(state, validated_transition_writes)
                 transition_target = transition["goto"]
                 state.internal[route_internal_key] = transition_target
@@ -655,6 +675,7 @@ def make_await_external_node(
                 _commit_state_writes(state, validated_writes)
                 clear_sent(state)
                 state.internal[completed_internal_key] = True
+                state.internal.pop(resend_count_internal_key, None)
                 prior_provenance = state.metadata.await_resume
                 if (
                     correlation_value is not None
@@ -688,6 +709,16 @@ def make_await_external_node(
             host_marker.setdefault("out_of_band", True)
             host_marker.setdefault("next_step", node_id)
             host_marker["out_of_band_sent"] = True
+            if max_resends is not None:
+                host_marker["recovery"] = {
+                    "event_field": "_external_event",
+                    "events": [
+                        event_name
+                        for event_name, transition in transitions.items()
+                        if transition is not None
+                    ],
+                    "remaining_resends": max(0, max_resends - resend_count(state)),
+                }
             if resume_contract is not None and resume_contract_digest is not None:
                 deadline = (
                     utc_timestamp(ctx.clock) + timedelta(seconds=timeout_seconds)

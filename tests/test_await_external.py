@@ -538,6 +538,75 @@ async def test_timeout_requires_a_host_event_and_resend_reemits_the_marker():
     assert "referência alternativa" in require_agent_response(state).description
 
 
+async def test_declared_resend_budget_is_persisted_exposed_and_enforced_atomically():
+    flow_document = _await_flow()
+    flow_document["capabilities"]["await_external"]["max_resends"] = 1
+    flow_document["capabilities"]["await_external"]["recovery"]["resend"]["set"] = {
+        "payment_confirmed": False
+    }
+    registry, calls = _payment_registry()
+    runtime = FlowRuntime(flow_document, tools=registry)
+    state = await runtime.execute(runtime.new_state("bounded-resend"), {"start": True})
+
+    initial_recovery = (require_agent_response(state).interactive or {})["recovery"]
+    assert initial_recovery == {
+        "event_field": "_external_event",
+        "events": ["timeout", "abort", "resend", "switch"],
+        "remaining_resends": 1,
+    }
+
+    state = await runtime.execute(state, {"_external_event": "resend"})
+    exhausted_recovery = (require_agent_response(state).interactive or {})["recovery"]
+    assert exhausted_recovery["remaining_resends"] == 0
+    state.data["payment_confirmed"] = True
+    accepted_internal = copy.deepcopy(state.internal)
+    accepted_data = copy.deepcopy(state.data)
+
+    state = await runtime.execute(state, {"_external_event": "resend"})
+
+    assert state.status == "error"
+    assert state.internal == accepted_internal
+    assert state.data == accepted_data
+    assert state.data["payment_confirmed"] is True
+    assert calls == []
+    assert "exhausted its resend budget" in (require_agent_response(state).error_message or "")
+    assert require_agent_response(state).interactive is None
+
+    state = await runtime.execute(state, {"payment_token": {"id": "PAY-7"}})
+
+    assert state.status == "progress"
+    assert state.data["payment_id"] == "PAY-7"
+    assert calls == [{"payment_id": "PAY-7", "attempt": 1}]
+
+
+async def test_omitted_resend_budget_preserves_host_owned_limiting():
+    registry, _ = _payment_registry()
+    runtime = FlowRuntime(_await_flow(), tools=registry)
+    state = await runtime.execute(runtime.new_state("host-bounded-resend"), {"start": True})
+
+    assert "max_resends" not in runtime.doc["capabilities"]["await_external"]
+    for _resend_attempt in range(2):
+        state = await runtime.execute(state, {"_external_event": "resend"})
+        assert (require_agent_response(state).interactive or {})["out_of_band_sent"] is True
+
+
+@pytest.mark.parametrize(
+    "capability_update",
+    [
+        {"max_resends": -1},
+        {"max_resends": 1, "recovery": {"abort": {"goto": "END"}}},
+    ],
+)
+def test_schema_rejects_invalid_or_unbound_resend_budgets(
+    capability_update: dict[str, Any],
+) -> None:
+    flow_document = _await_flow()
+    flow_document["capabilities"]["await_external"].update(capability_update)
+
+    with pytest.raises(JsonSchemaValidationError):
+        validate_flow(flow_document)
+
+
 async def test_timeout_before_persisted_deadline_is_rejected_atomically():
     registry, _ = _payment_registry()
     current_time = datetime(2026, 7, 13, 12, tzinfo=timezone.utc)

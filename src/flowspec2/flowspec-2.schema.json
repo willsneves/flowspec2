@@ -272,12 +272,20 @@
             },
             "timeout": { "$ref": "#/$defs/transition" },
             "timeout_seconds": { "type": "integer", "exclusiveMinimum": 0, "description": "Relative duration used to materialize the absolute host deadline." },
+            "max_resends": { "type": "integer", "minimum": 0, "description": "Optional runtime-enforced budget for accepted resend recovery events. Omission leaves resend limiting to the host." },
             "recovery": { "type": "object", "additionalProperties": false, "properties": { "abort": { "$ref": "#/$defs/transition" }, "resend": { "$ref": "#/$defs/transition" }, "switch": { "$ref": "#/$defs/transition" } } }
           },
           "allOf": [
             {
               "if": { "required": ["timeout"] },
               "then": { "properties": { "timeout_seconds": { "default": 900 } } }
+            },
+            {
+              "if": { "required": ["max_resends"] },
+              "then": {
+                "required": ["recovery"],
+                "properties": { "recovery": { "required": ["resend"] } }
+              }
             }
           ]
         }

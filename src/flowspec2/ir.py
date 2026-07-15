@@ -641,6 +641,11 @@ def _await_state_access(document: dict[str, Any]) -> tuple[tuple[str, ...], tupl
                     slots,
                 )
             )
+    if await_definition.get("max_resends") is not None:
+        node_id = cast(str, await_definition["step"])
+        resend_count_reference = f"internal._await_external_resend_count:{node_id}"
+        reads = (*reads, resend_count_reference)
+        writes.append(resend_count_reference)
     return tuple(dict.fromkeys(reads)), tuple(dict.fromkeys(writes))
 
 
@@ -1302,6 +1307,13 @@ def _state_schema(
     )
     if await_definition:
         slots = cast(dict[str, Any], document.get("slots", {}))
+
+        if await_definition.get("max_resends") is not None:
+            await_node_id = cast(str, await_definition["step"])
+            internal_properties.setdefault(
+                f"_await_external_resend_count:{await_node_id}",
+                {"type": "integer", "minimum": 0},
+            )
 
         def set_await_state_schema(state_key: str, state_value_schema: dict[str, Any]) -> None:
             slot_definition = cast(dict[str, Any] | None, slots.get(state_key))
