@@ -6,7 +6,7 @@ Table of Contents:
 - Format and contract versions: 35 <!-- section:contract-versions -->
 - Compatibility promises: 75 <!-- section:compatibility-promises -->
 - Release procedure: 90 <!-- section:release-procedure -->
-- Artifact rollback: 108 <!-- section:artifact-rollback -->
+- Artifact rollback: 125 <!-- section:artifact-rollback -->
 
 <!-- /section:toc -->
 
@@ -90,17 +90,34 @@ their successor in this pre-stable project.
 ## Release procedure
 
 1. Update `CHANGELOG.md`, `pyproject.toml`, and `uv.lock` together.
-2. Run `make ci` and `make package-check` from a clean checkout.
-3. Inspect the built source distribution and wheel for required schemas,
-   corpora, documentation, license, and importable public contracts.
-4. Commit the release preparation with an atomic conventional commit.
-5. Create an immutable `vX.Y.Z` tag only after reviewing the exact commit.
-6. Publish artifacts built from that tag without rebuilding or replacing them.
-7. Verify the installed package version, CLI entry point, and packaged contracts
-   from the published artifacts.
+2. Run `make ci` and `make package-check` from a clean checkout and require the
+   remote CI jobs to execute successfully on the exact release commit.
+3. Commit the release preparation with an atomic conventional commit.
+4. Create an immutable `vX.Y.Z` tag only after reviewing the exact commit.
+5. From a clean checkout of that tag, run `make release-build` with a new
+   persistent artifact directory. The target rejects an untagged, dirty, or
+   version-mismatched checkout; inspects the wheel and source distribution;
+   installs and smoke-tests them independently from the lock embedded in the
+   source distribution; builds through the pinned backend under lock-derived
+   hashed constraints; and atomically exposes the directory only after
+   successful verification with `SHA256SUMS` written.
+6. Run `make release-check` against that directory to verify its checksums and
+   closed file set, versions, installability, and package contracts without
+   rebuilding a publication artifact. Run this checker only from the same clean
+   release-tag checkout so its packaged-contract assertions match the release.
+7. Publish the preserved wheel, source distribution, and checksum manifest in
+   a GitHub Release attached to the immutable tag.
+8. Download the published files, verify their checksums, and confirm the
+   installed package version, CLI entry point, and packaged contracts.
 
 Tagging and publishing are explicit external actions and are never implied by a
-version bump or release-preparation commit.
+version bump or release-preparation commit. PyPI publication is a separate
+process that requires explicit package ownership and trusted-publisher
+configuration; a GitHub Release does not imply it.
+
+`SHA256SUMS` provides byte integrity for the wheel and source distribution. It
+is not a package signature and does not establish authenticity independently of
+the GitHub Release and immutable tag that distribute it.
 
 <!-- /section:release-procedure -->
 <!-- section:artifact-rollback -->

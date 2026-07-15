@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -54,5 +55,5 @@ jobs:
           python-version: "3.11"
           enable-cache: true
           cache-dependency-glob: uv.lock
-      - name: Build and inspect the installed wheel
+      - name: Build and inspect package distributions
         run: make package-check

@@ -3,17 +3,17 @@
 Table of Contents:
 
 - Install: 58 <!-- section:install -->
-- LLM-driven (the engine side): 85 <!-- section:llm-driven -->
-- Quickstart: 166 <!-- section:quickstart -->
-- Real backends: 190 <!-- section:real-backends -->
-- Error correlation: 207 <!-- section:error-correlation -->
-- CLI: 230 <!-- section:cli -->
-- What it compiles: 283 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 309 <!-- section:example -->
-    - The flowspec/2 document: 316 <!-- section:example-document -->
-    - Compiled LangGraph: 954 <!-- section:example-compiled-langgraph -->
-- Layout: 1070 <!-- section:layout -->
-- Status: 1121 <!-- section:status -->
+- LLM-driven (the engine side): 100 <!-- section:llm-driven -->
+- Quickstart: 181 <!-- section:quickstart -->
+- Real backends: 205 <!-- section:real-backends -->
+- Error correlation: 222 <!-- section:error-correlation -->
+- CLI: 245 <!-- section:cli -->
+- What it compiles: 298 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 324 <!-- section:example -->
+    - The flowspec/2 document: 331 <!-- section:example-document -->
+    - Compiled LangGraph: 969 <!-- section:example-compiled-langgraph -->
+- Layout: 1085 <!-- section:layout -->
+- Status: 1136 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -60,8 +60,22 @@ private process in [SECURITY.md](SECURITY.md).
 ```bash
 uv sync                      # install the runtime package
 make ci                      # locked lint, format check, type checks, and offline tests
-make package-check           # build, inspect, and smoke-test the installed wheel
+make package-check           # build, inspect, and smoke-test the wheel and source distribution
 uv run python examples/simulate.py   # 6 real citizen conversations over the HTTP backends
+```
+
+Release preparation preserves the verified wheel and source distribution for
+publication instead of rebuilding them. From a clean checkout of the matching
+`vX.Y.Z` tag, the build target stages the wheel and source distribution,
+verifies their metadata, packaged contracts, locked dependencies, and installed
+behavior independently, then publishes the closed local set only after writing
+`SHA256SUMS`. It refuses an existing destination. The check target verifies the
+exact set and its integrity against the current `pyproject.toml` version without
+rebuilding:
+
+```bash
+make release-build RELEASE_ARTIFACTS=build/release
+make release-check RELEASE_ARTIFACTS=build/release
 ```
 
 Development tooling is pinned in `pyproject.toml` and `uv.lock`. `make lint`,
@@ -74,8 +88,9 @@ capabilities, writable root filesystem, or writable project mount. Docker is
 therefore the only additional prerequisite for `make typecheck` and `make ci`.
 GitHub Actions runs that same gate across every supported Python minor and runs
 `make package-check` separately. The workflow has read-only repository
-permissions, never loads secrets or live-model tests, and pins every Action and
-the uv toolchain to immutable versions.
+permissions, supports explicit manual dispatch, never loads secrets or
+live-model tests, and pins every Action and the uv toolchain to immutable
+versions.
 
 `examples/simulate.py` prints turn-by-turn transcripts of the reparo_luminaria flow as realistic conversations over the real HTTP backends (deterministic geocoder + SGRC via `MockTransport`): the production WhatsApp-Flow path, an address correction, gov.br auth, the praça→quadra branch, an SGRC outage (503 → retryable → recovers), and a duplicate submission replayed without a second backend call in the same registry. Durable cross-process exactly-once behavior remains a host-storage responsibility.
 
