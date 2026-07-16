@@ -6,7 +6,7 @@ Table of Contents:
 - Format and contract versions: 35 <!-- section:contract-versions -->
 - Compatibility promises: 75 <!-- section:compatibility-promises -->
 - Release procedure: 91 <!-- section:release-procedure -->
-- Artifact rollback: 131 <!-- section:artifact-rollback -->
+- Artifact rollback: 133 <!-- section:artifact-rollback -->
 
 <!-- /section:toc -->
 
@@ -90,7 +90,9 @@ compatibility promises until a new decision promotes a versioned successor.
 
 ## Release procedure
 
-1. Update `CHANGELOG.md`, `pyproject.toml`, and `uv.lock` together.
+1. Update `CHANGELOG.md`, `CITATION.cff`, `pyproject.toml`, and `uv.lock`
+   together. The citation release date and changelog heading must identify the
+   actual publication date.
 2. Run `make ci` and `make package-check` from a clean checkout and require the
    remote CI jobs to execute successfully on the exact release commit.
 3. Commit the release preparation with an atomic conventional commit.

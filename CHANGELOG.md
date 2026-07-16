@@ -3,7 +3,7 @@
 Table of Contents:
 
 - Unreleased: 24 <!-- section:unreleased -->
-- Version 1.0.0 — 2026-07-15: 31 <!-- section:version-1-0-0 -->
+- Version 1.0.0 — prepared 2026-07-15, not published: 31 <!-- section:version-1-0-0 -->
     - Added: 35 <!-- section:version-1-0-0-added -->
     - Changed: 58 <!-- section:version-1-0-0-changed -->
     - Security: 102 <!-- section:version-1-0-0-security -->
@@ -28,7 +28,7 @@ No changes yet.
 <!-- /section:unreleased -->
 <!-- section:version-1-0-0 -->
 
-## Version 1.0.0 — 2026-07-15
+## Version 1.0.0 — prepared 2026-07-15, not published
 
 <!-- section:version-1-0-0-added -->
 

@@ -16,10 +16,13 @@ import tarfile
 import tempfile
 import tomllib
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from datetime import date
 from email.parser import Parser
 from pathlib import Path, PurePosixPath
-from typing import Final
+from typing import Final, cast
+
+import yaml
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 CHECKSUM_MANIFEST_NAME: Final[str] = "SHA256SUMS"
@@ -552,6 +555,7 @@ def _build_artifacts(artifact_directory: Path) -> None:
 def _verify_release_source(expected_version: str) -> None:
     if _project_version(PROJECT_ROOT) != expected_version:
         raise RuntimeError("checkout package version does not match the expected release version")
+    _verify_release_metadata(PROJECT_ROOT, expected_version)
     if _run_output(("git", "status", "--porcelain", "--untracked-files=all")):
         raise RuntimeError("release artifacts require a clean Git checkout")
     head_commit = _run_output(("git", "rev-parse", "HEAD"))
@@ -563,6 +567,28 @@ def _verify_release_source(expected_version: str) -> None:
         raise RuntimeError(f"release tag v{expected_version} does not exist") from error
     if head_commit != tagged_commit:
         raise RuntimeError(f"HEAD is not the immutable v{expected_version} release commit")
+
+
+def _verify_release_metadata(project_root: Path, expected_version: str) -> date:
+    citation_object: object = yaml.safe_load(
+        (project_root / "CITATION.cff").read_text(encoding="utf-8")
+    )
+    if not isinstance(citation_object, Mapping) or not all(
+        isinstance(citation_key, str) for citation_key in citation_object
+    ):
+        raise RuntimeError("CITATION.cff must contain a string-keyed mapping")
+    citation = cast(Mapping[str, object], citation_object)
+    if citation.get("version") != expected_version:
+        raise RuntimeError("CITATION.cff version does not match the release version")
+    release_date = citation.get("date-released")
+    if not isinstance(release_date, date):
+        raise RuntimeError("CITATION.cff must declare the release date")
+
+    expected_changelog_heading = f"## Version {expected_version} — {release_date.isoformat()}"
+    changelog_lines = (project_root / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+    if expected_changelog_heading not in changelog_lines:
+        raise RuntimeError("CHANGELOG.md must declare the same release version and date")
+    return release_date
 
 
 def _rename_directory_no_replace(staging_directory: Path, artifact_directory: Path) -> None:

@@ -8,6 +8,7 @@ import stat
 import sys
 import tarfile
 import zipfile
+from datetime import date
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import Mock, call
@@ -360,7 +361,9 @@ def test_release_source_requires_clean_matching_tag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     command_output = Mock(side_effect=["", "release-commit", "release-commit"])
+    release_metadata_verifier = Mock()
     monkeypatch.setattr(package_check, "_project_version", Mock(return_value=EXPECTED_VERSION))
+    monkeypatch.setattr(package_check, "_verify_release_metadata", release_metadata_verifier)
     monkeypatch.setattr(package_check, "_run_output", command_output)
 
     package_check._verify_release_source(EXPECTED_VERSION)
@@ -370,6 +373,33 @@ def test_release_source_requires_clean_matching_tag(
         call(("git", "rev-parse", "HEAD")),
         call(("git", "rev-parse", "--verify", "refs/tags/v1.0.0^{commit}")),
     ]
+    release_metadata_verifier.assert_called_once_with(package_check.PROJECT_ROOT, EXPECTED_VERSION)
+
+
+def test_release_metadata_requires_matching_citation_and_changelog_date(tmp_path: Path) -> None:
+    (tmp_path / "CITATION.cff").write_text(
+        "version: 1.0.0\ndate-released: 2026-07-15\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "CHANGELOG.md").write_text(
+        "## Version 1.0.0 — 2026-07-15\n",
+        encoding="utf-8",
+    )
+
+    release_date = package_check._verify_release_metadata(tmp_path, EXPECTED_VERSION)
+
+    assert release_date == date(2026, 7, 15)
+
+
+def test_release_metadata_rejects_unpublished_citation(tmp_path: Path) -> None:
+    (tmp_path / "CITATION.cff").write_text("version: 1.0.0\n", encoding="utf-8")
+    (tmp_path / "CHANGELOG.md").write_text(
+        "## Version 1.0.0 — prepared, not published\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="release date"):
+        package_check._verify_release_metadata(tmp_path, EXPECTED_VERSION)
 
 
 def test_build_without_artifact_directory_is_a_usage_error(
