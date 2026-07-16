@@ -28,9 +28,9 @@ def _coerce_domain_value(domain_specification: dict[str, Any], raw_value: Any) -
 
 
 def test_runtime_rejects_semantically_unlinked_source(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["path"][0]["slot"] = "missing_slot"
 
     with pytest.raises(FlowLinkError) as error:
@@ -44,44 +44,44 @@ def test_runtime_rejects_semantically_unlinked_source(
 def test_categorical_accent_fold_normalizes_values_aliases_and_input_when_enabled() -> None:
     domain_specification = {
         "type": "categorical",
-        "values": ["Ação"],
+        "values": ["Caf\u00e9"],
         "normalize": {
             "accent_fold": True,
-            "synonyms": {"resolução": "Ação"},
+            "synonyms": {"r\u00e9sum\u00e9": "Caf\u00e9"},
         },
     }
 
-    assert _coerce_domain_value(domain_specification, "acao") == "Ação"
-    assert _coerce_domain_value(domain_specification, "RESOLUCAO") == "Ação"
+    assert _coerce_domain_value(domain_specification, "cafe") == "Caf\u00e9"
+    assert _coerce_domain_value(domain_specification, "RESUME") == "Caf\u00e9"
 
 
 def test_categorical_accent_fold_preserves_accents_when_disabled() -> None:
     domain_specification = {
         "type": "categorical",
-        "values": ["Ação"],
+        "values": ["Caf\u00e9"],
         "normalize": {
             "accent_fold": False,
-            "synonyms": {"resolução": "Ação"},
+            "synonyms": {"r\u00e9sum\u00e9": "Caf\u00e9"},
         },
     }
 
-    assert _coerce_domain_value(domain_specification, " AÇÃO ") == "Ação"
-    assert _coerce_domain_value(domain_specification, "RESOLUÇÃO") == "Ação"
+    assert _coerce_domain_value(domain_specification, " CAF\u00c9 ") == "Caf\u00e9"
+    assert _coerce_domain_value(domain_specification, "R\u00c9SUM\u00c9") == "Caf\u00e9"
     with pytest.raises(ValidationError):
-        _coerce_domain_value(domain_specification, "acao")
+        _coerce_domain_value(domain_specification, "cafe")
     with pytest.raises(ValidationError):
-        _coerce_domain_value(domain_specification, "resolucao")
+        _coerce_domain_value(domain_specification, "resume")
 
 
 def test_categorical_accent_fold_defaults_to_disabled() -> None:
     domain_specification = {
         "type": "categorical",
-        "values": ["Ação"],
+        "values": ["Caf\u00e9"],
         "normalize": {},
     }
 
     with pytest.raises(ValidationError):
-        _coerce_domain_value(domain_specification, "acao")
+        _coerce_domain_value(domain_specification, "cafe")
 
 
 @pytest.mark.parametrize(
@@ -100,11 +100,11 @@ def test_boolean_emoji_veto_controls_mixed_affirmation(
         "normalize": {
             "affirmation": True,
             "emoji_veto": emoji_veto,
-            "synonyms": {"sim 👎": True},
+            "synonyms": {"yes 👎": True},
         },
     }
 
-    assert _coerce_domain_value(domain_specification, "sim 👎") is expected_value
+    assert _coerce_domain_value(domain_specification, "yes 👎") is expected_value
 
 
 @pytest.mark.parametrize(
@@ -114,7 +114,7 @@ def test_boolean_emoji_veto_controls_mixed_affirmation(
         (False, "👍", True),
         (True, "👎", False),
         (False, "👎", False),
-        (False, "não 👍", False),
+        (False, "no 👍", False),
     ],
 )
 def test_boolean_affirmation_remains_deterministic_without_emoji_veto(
@@ -136,7 +136,7 @@ def test_boolean_emoji_veto_defaults_to_disabled() -> None:
         "normalize": {"affirmation": True},
     }
 
-    assert _coerce_domain_value(domain_specification, "sim 👎") is True
+    assert _coerce_domain_value(domain_specification, "yes 👎") is True
 
 
 def _runtime_contract_document(
@@ -329,9 +329,9 @@ async def test_retryable_outcome_resets_before_retry_when_preservation_is_disabl
 
 
 def test_auto_flow_resume_at_rejects_unsatisfied_prior_summary(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     flow_document["path"][0].pop("skip_when")
 
     with pytest.raises(ValueError, match="cannot bypass confirmation"):
@@ -339,10 +339,10 @@ def test_auto_flow_resume_at_rejects_unsatisfied_prior_summary(
 
 
 async def test_auto_flow_submission_accepts_same_name_slot_without_alias(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
-    flow_document["auto_flow"]["resume_at"] = "collect_quantidade"
+    flow_document = copy.deepcopy(streetlight_document)
+    flow_document["auto_flow"]["resume_at"] = "collect_count"
     runtime = FlowRuntime(flow_document)
     state = await runtime.execute(runtime.new_state("auto-flow-identity"), {})
 
@@ -350,22 +350,20 @@ async def test_auto_flow_submission_accepts_same_name_slot_without_alias(
         state,
         {
             "_source": "whatsapp_flow",
-            "luminaria_defeito": "Apagada",
+            "streetlight_issue": "Not working",
         },
     )
 
     assert state.status == "progress"
-    assert state.data["luminaria_defeito"] == "Apagada"
+    assert state.data["streetlight_issue"] == "Not working"
     assert state.agent_response is not None
-    assert "luminaria_quantidade" in (state.agent_response.payload_schema or {}).get(
-        "properties", {}
-    )
+    assert "streetlight_count" in (state.agent_response.payload_schema or {}).get("properties", {})
 
 
 async def test_auto_flow_send_when_reads_the_current_turn_payload(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     flow_document["auto_flow"]["send_when"] = {"eq": ["payload.channel", "whatsapp"]}
     runtime = FlowRuntime(flow_document)
 
@@ -381,15 +379,15 @@ async def test_auto_flow_send_when_reads_the_current_turn_payload(
 
 
 async def test_auto_flow_waits_without_resending_until_submission(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(luminaria_doc)
+    runtime = FlowRuntime(streetlight_document)
     state = await runtime.execute(runtime.new_state("auto-flow-single-send"), {})
     assert state.agent_response is not None
     assert state.agent_response.interactive is not None
     first_flow_token = state.agent_response.interactive["flow_token"]
 
-    waiting_state = await runtime.execute(state, {"message": "ainda estou preenchendo"})
+    waiting_state = await runtime.execute(state, {"message": "I am still filling it out"})
 
     assert waiting_state.status == "progress"
     assert waiting_state.agent_response is not None
@@ -399,9 +397,9 @@ async def test_auto_flow_waits_without_resending_until_submission(
 
 
 async def test_auto_flow_recovery_bounds_resends_and_falls_back(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     flow_document["auto_flow"]["recovery"].update({"max_resends": 1, "timeout_seconds": 60})
     timestamp = datetime(2026, 7, 13, 12, 0, tzinfo=timezone.utc)
     runtime = FlowRuntime(flow_document, clock=lambda: timestamp)
@@ -428,9 +426,9 @@ async def test_auto_flow_recovery_bounds_resends_and_falls_back(
 
 
 async def test_auto_flow_applies_declared_timeout_on_the_next_turn(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     flow_document["auto_flow"]["recovery"]["timeout_seconds"] = 30
     current_timestamp = [datetime(2026, 7, 13, 12, 0, tzinfo=timezone.utc)]
     runtime = FlowRuntime(flow_document, clock=lambda: current_timestamp[0])
@@ -441,7 +439,7 @@ async def test_auto_flow_applies_declared_timeout_on_the_next_turn(
     assert deadline == (current_timestamp[0] + timedelta(seconds=30)).isoformat()
 
     current_timestamp[0] += timedelta(seconds=31)
-    state = await runtime.execute(state, {"message": "ainda preenchendo"})
+    state = await runtime.execute(state, {"message": "still filling it out"})
 
     assert state.status == "progress"
     assert state.agent_response is not None
@@ -449,22 +447,22 @@ async def test_auto_flow_applies_declared_timeout_on_the_next_turn(
 
 
 async def test_auto_flow_cancel_event_uses_declared_end_policy(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(luminaria_doc)
+    runtime = FlowRuntime(streetlight_document)
     state = await runtime.execute(runtime.new_state("auto-flow-cancel"), {})
 
     state = await runtime.execute(state, {"_auto_flow_event": "cancel"})
 
     assert state.status == "completed"
     assert state.agent_response is not None
-    assert "cancelado" in state.agent_response.description
+    assert "canceled" in state.agent_response.description
 
 
 def test_auto_flow_requires_a_closed_recovery_policy(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     del flow_document["auto_flow"]["recovery"]
 
     with pytest.raises(JsonSchemaValidationError):
@@ -472,9 +470,9 @@ def test_auto_flow_requires_a_closed_recovery_policy(
 
 
 def test_auto_flow_resume_at_rejects_an_unknown_native_path_step(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     flow_document["auto_flow"]["resume_at"] = "missing_step"
 
     with pytest.raises(ValueError, match=r"auto_flow\.resume_at"):
@@ -482,11 +480,11 @@ def test_auto_flow_resume_at_rejects_an_unknown_native_path_step(
 
 
 def test_auto_flow_prefill_rejects_internal_slots(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     flow_document["slots"]["private_prefill"] = {
-        "domain": "PontoReferencia",
+        "domain": "ReferencePoint",
         "required": False,
         "persist": "internal",
     }

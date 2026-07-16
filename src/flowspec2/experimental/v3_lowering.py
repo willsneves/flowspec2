@@ -253,7 +253,7 @@ def _validate_lowerable_domain(domain: dict[str, Any], domain_path: str) -> None
     for option_index, option in enumerate(cast(list[dict[str, Any]], domain["options"])):
         option_value = option["value"]
         expected_label = (
-            "Sim" if option_value is True else "Não" if option_value is False else str(option_value)
+            "Yes" if option_value is True else "No" if option_value is False else str(option_value)
         )
         if option["label"] != expected_label:
             _raise_lowering(

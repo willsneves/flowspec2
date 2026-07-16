@@ -352,12 +352,11 @@ def domain_contracts(document: dict[str, Any]) -> list[FlowDiagnostic]:
                     else {
                         "true": True,
                         "1": True,
-                        "sim": True,
-                        "s": True,
+                        "yes": True,
+                        "y": True,
                         "false": False,
                         "0": False,
-                        "nao": False,
-                        "não": False,
+                        "no": False,
                         "n": False,
                     }.get(normalized_synonym)
                 )

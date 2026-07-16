@@ -1,13 +1,13 @@
-"""HTTP implementations of the flow tools (geocode / cpf / gov.br / SGRC).
+"""HTTP implementations of the flow tools (geocode, identity, gov.br, and ticketing).
 
 Each factory returns an async ``(**kwargs) -> dict`` matching the tool protocol.
 The contracts below are what these adapters speak; point the configured URL at a
 real service endpoint (or a thin adapter that conforms to them).
 
-Error handling is the point: the SGRC terminal maps transport/5xx to
+Error handling is the point: the ticketing system terminal maps transport/5xx to
 ``retryable`` (the terminal node preserves state and re-fires next turn) and 4xx
 to ``fatal`` (resets), so the format's outcome trichotomy is driven by real HTTP
-semantics. Geocode/cpf failures are non-fatal (re-ask / best-effort).
+semantics. Geocode/brazilian_tax_id failures are non-fatal (re-ask / best-effort).
 
 ``transport`` is injectable so the suite drives these with ``httpx.MockTransport``
 — no network.
@@ -43,15 +43,9 @@ def _required_url(configured_url: Optional[str], setting_name: str) -> str:
 def _kind_of(street: str, explicit: Optional[str]) -> str:
     if explicit:
         folded = explicit.strip().lower()
-        if folded.startswith("pra"):  # praça / praca
-            return "praca"
         return folded
     s = (street or "").strip().lower()
-    return (
-        "praca"
-        if (s.startswith("praça") or s.startswith("praca") or "praça" in s or "praca" in s)
-        else "rua"
-    )
+    return "square" if "square" in s else "street"
 
 
 def _parse_geocode(data: Any, fallback: str) -> Optional[dict[str, Any]]:
@@ -60,12 +54,12 @@ def _parse_geocode(data: Any, fallback: str) -> Optional[dict[str, Any]]:
         data = data["results"][0] if data["results"] else None
     if not isinstance(data, dict):
         return None
-    street = data.get("logradouro") or data.get("address") or fallback
+    street = data.get("street") or data.get("address") or fallback
     return {
-        "logradouro": street,
-        "kind": _kind_of(street, data.get("kind") or data.get("tipo_logradouro")),
-        "bairro": data.get("bairro", ""),
-        "municipio": data.get("municipio", "Rio de Janeiro"),
+        "street": street,
+        "kind": _kind_of(street, data.get("kind") or data.get("street_type")),
+        "district": data.get("district", ""),
+        "city": data.get("city", "Example City"),
     }
 
 
@@ -80,7 +74,7 @@ def make_geocode(
 
         text = (address or "").strip()
         if not text:
-            return {"status": "not_found", "error": "endereço vazio"}
+            return {"status": "not_found", "error": "empty address"}
         try:
             async with _client(config, transport) as client:
                 resp = await client.post(geocode_url, json={"address": text})
@@ -101,18 +95,22 @@ def make_geocode(
     return geocode
 
 
-def make_cpf_lookup(
+def make_brazilian_tax_id_lookup(
     config: "BackendConfig",
     transport: "Optional[httpx.AsyncBaseTransport]" = None,
 ) -> Tool:
-    cpf_lookup_url = _required_url(config.cpf_lookup_url, "cpf_lookup_url")
+    brazilian_tax_id_lookup_url = _required_url(
+        config.brazilian_tax_id_lookup_url, "brazilian_tax_id_lookup_url"
+    )
 
-    async def cpf_lookup(cpf: str = "", **_: Any) -> dict[str, Any]:
+    async def brazilian_tax_id_lookup(brazilian_tax_id: str = "", **_: Any) -> dict[str, Any]:
         import httpx
 
         try:
             async with _client(config, transport) as client:
-                resp = await client.get(cpf_lookup_url, params={"cpf": cpf})
+                resp = await client.get(
+                    brazilian_tax_id_lookup_url, params={"brazilian_tax_id": brazilian_tax_id}
+                )
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             return {"status": "error", "error": str(exc)}  # best-effort: subflow tolerates
         if resp.status_code >= 400:
@@ -125,7 +123,7 @@ def make_cpf_lookup(
             "phones": body.get("phones", []),
         }
 
-    return cpf_lookup
+    return brazilian_tax_id_lookup
 
 
 def make_govbr_enrich(
@@ -134,12 +132,14 @@ def make_govbr_enrich(
 ) -> Tool:
     govbr_enrich_url = _required_url(config.govbr_enrich_url, "govbr_enrich_url")
 
-    async def get_user_info(cpf: str = "", **_: Any) -> dict[str, Any]:
+    async def get_user_info(brazilian_tax_id: str = "", **_: Any) -> dict[str, Any]:
         import httpx
 
         try:
             async with _client(config, transport) as client:
-                resp = await client.get(govbr_enrich_url, params={"cpf": cpf})
+                resp = await client.get(
+                    govbr_enrich_url, params={"brazilian_tax_id": brazilian_tax_id}
+                )
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             return {"status": "error", "error": str(exc)}
         if resp.status_code >= 400:
@@ -155,32 +155,35 @@ def make_govbr_enrich(
     return get_user_info
 
 
-def make_sgrc_open_ticket(
+def make_open_service_request(
     config: "BackendConfig",
     transport: "Optional[httpx.AsyncBaseTransport]" = None,
 ) -> Tool:
-    sgrc_url = _required_url(config.sgrc_url, "sgrc_url")
+    ticketing_url = _required_url(config.ticketing_url, "ticketing_url")
 
-    async def sgrc_open_ticket(**inputs: Any) -> dict[str, Any]:
+    async def open_service_request(**inputs: Any) -> dict[str, Any]:
         import httpx
 
         try:
             async with _client(config, transport) as client:
-                resp = await client.post(sgrc_url, json=inputs)
+                resp = await client.post(ticketing_url, json=inputs)
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             return {"status": "retryable", "error": str(exc)}  # transient → terminal re-fires
         if resp.status_code in (200, 201):
             body = resp.json()
-            protocol = body.get("protocolo") or body.get("protocol_id")
+            protocol = body.get("protocol_id")
             if not protocol:
-                return {"status": "fatal", "error": "resposta do SGRC sem protocolo"}
+                return {"status": "fatal", "error": "ticketing response has no protocol_id"}
             return {
                 "status": "success",
-                "protocolo": protocol,
-                "message": body.get("message", "Chamado aberto com sucesso."),
+                "protocol_id": protocol,
+                "message": body.get("message", "Service request opened successfully."),
             }
         if resp.status_code >= 500:
-            return {"status": "retryable", "error": f"SGRC {resp.status_code}"}
-        return {"status": "fatal", "error": f"SGRC {resp.status_code}: {resp.text[:200]}"}
+            return {"status": "retryable", "error": f"ticketing system {resp.status_code}"}
+        return {
+            "status": "fatal",
+            "error": f"ticketing system {resp.status_code}: {resp.text[:200]}",
+        }
 
-    return sgrc_open_ticket
+    return open_service_request

@@ -85,7 +85,7 @@ def _export_domain_specification(
         rasa_slot = {"type": "bool"}
     elif domain_type == "free_text":
         rasa_slot = {"type": "text"}
-    elif domain_type in {"cpf", "email", "name"}:
+    elif domain_type in {"brazilian_tax_id", "email", "name"}:
         rasa_slot = {"type": "text"}
         diagnostics.append(
             compatibility_diagnostic(
@@ -460,7 +460,7 @@ def _export_collection_step(
     rasa_step["utter"] = response_key
     response_text_value = prompt.get(
         "text",
-        "Confirma?" if is_confirmation else f"Informe {slot_name}.",
+        "Do you confirm?" if is_confirmation else f"Provide {slot_name}.",
     )
     if not isinstance(response_text_value, str) or not response_text_value:
         diagnostics.append(

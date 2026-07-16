@@ -1,7 +1,7 @@
 """Pluggable backends behind the flow tool protocol.
 
-The runtime calls tools by name (``geocode``, ``cpf_lookup``, ``get_user_info``,
-``sgrc_open_ticket``). By default those are in-memory fakes
+The runtime calls tools by name (``geocode``, ``brazilian_tax_id_lookup``, ``get_user_info``,
+``open_service_request``). By default those are in-memory fakes
 (:func:`flowspec2.tools.default_tool_registry`). :func:`make_registry` overlays
 real HTTP implementations onto that fake base for whichever URLs are configured —
 so a partial configuration still works (fakes fill the gaps), and the terminal's
@@ -28,9 +28,9 @@ if TYPE_CHECKING:
 @dataclass
 class BackendConfig:
     geocode_url: Optional[str] = None
-    cpf_lookup_url: Optional[str] = None
+    brazilian_tax_id_lookup_url: Optional[str] = None
     govbr_enrich_url: Optional[str] = None
-    sgrc_url: Optional[str] = None
+    ticketing_url: Optional[str] = None
     api_key: Optional[str] = None
     timeout: float = 10.0
 
@@ -43,9 +43,9 @@ class BackendConfig:
         timeout = env.get("FLOWSPEC2_HTTP_TIMEOUT")
         return cls(
             geocode_url=env.get("FLOWSPEC2_GEOCODE_URL"),
-            cpf_lookup_url=env.get("FLOWSPEC2_CPF_LOOKUP_URL"),
+            brazilian_tax_id_lookup_url=env.get("FLOWSPEC2_BRAZILIAN_TAX_ID_LOOKUP_URL"),
             govbr_enrich_url=env.get("FLOWSPEC2_GOVBR_ENRICH_URL"),
-            sgrc_url=env.get("FLOWSPEC2_SGRC_URL"),
+            ticketing_url=env.get("FLOWSPEC2_TICKETING_URL"),
             api_key=env.get("FLOWSPEC2_API_KEY"),
             timeout=float(timeout) if timeout else 10.0,
         )
@@ -58,17 +58,24 @@ def make_registry(
     base: Optional[ToolRegistry] = None,
 ) -> ToolRegistry:
     """Overlay HTTP tools onto a (fake-by-default) registry per configured URL."""
-    from .http import make_cpf_lookup, make_geocode, make_govbr_enrich, make_sgrc_open_ticket
+    from .http import (
+        make_brazilian_tax_id_lookup,
+        make_geocode,
+        make_govbr_enrich,
+        make_open_service_request,
+    )
 
     registry = base or default_tool_registry()
     if config.geocode_url:
         registry.register("geocode", make_geocode(config, transport))
-    if config.cpf_lookup_url:
-        registry.register("cpf_lookup", make_cpf_lookup(config, transport))
+    if config.brazilian_tax_id_lookup_url:
+        registry.register(
+            "brazilian_tax_id_lookup", make_brazilian_tax_id_lookup(config, transport)
+        )
     if config.govbr_enrich_url:
         registry.register("get_user_info", make_govbr_enrich(config, transport))
-    if config.sgrc_url:
-        registry.register("sgrc_open_ticket", make_sgrc_open_ticket(config, transport))
+    if config.ticketing_url:
+        registry.register("open_service_request", make_open_service_request(config, transport))
     return registry
 
 

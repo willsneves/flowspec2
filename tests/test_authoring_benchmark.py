@@ -99,7 +99,7 @@ def _fixture_author(
 async def _alternate_ticket_tool(**_ticket_inputs: Any) -> dict[str, Any]:
     return {
         "status": "success",
-        "protocolo": "ALTERNATE-PROTOCOL",
+        "protocol_id": "ALTERNATE-PROTOCOL",
     }
 
 
@@ -335,7 +335,7 @@ def test_terminal_oracle_rejects_an_alternate_compatible_tool() -> None:
     )
     terminal_source = copy.deepcopy(terminal_fixture["source"])
     cast(dict[str, Any], terminal_source["terminal"])["tool"] = "alternate_ticket"
-    sgrc_definition = reference_profile().tools.definition("sgrc_open_ticket")
+    ticketing_definition = reference_profile().tools.definition("open_service_request")
     alternate_registry = ToolRegistry()
 
     alternate_registry.register(
@@ -343,11 +343,11 @@ def test_terminal_oracle_rejects_an_alternate_compatible_tool() -> None:
         _alternate_ticket_tool,
         definition=ToolDefinition(
             name="alternate_ticket",
-            version=sgrc_definition.version,
+            version=ticketing_definition.version,
             description="Compatible alternate ticket tool used by the oracle regression test.",
-            input_schema=sgrc_definition.input_schema,
-            output_schema=sgrc_definition.output_schema,
-            effects=sgrc_definition.effects,
+            input_schema=ticketing_definition.input_schema,
+            output_schema=ticketing_definition.output_schema,
+            effects=ticketing_definition.effects,
         ),
     )
     alternate_profile = replace(reference_profile(), tools=alternate_registry)

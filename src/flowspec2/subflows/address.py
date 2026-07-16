@@ -1,8 +1,8 @@
 """address@1 — geocode + optional confirmation.
 
 Collects a free-text address, geocodes/validates it via the injectable
-``geocode`` tool, optionally confirms it (Sim/Não), and exposes the ``address``
-slot (a dict carrying ``kind`` so the praça gate can read ``address.kind``).
+``geocode`` tool, optionally confirms it (Yes/No), and exposes the ``address``
+slot (a dict carrying ``kind`` so the public-square gate can read ``address.kind``).
 """
 
 from __future__ import annotations
@@ -41,14 +41,14 @@ _AUX = [
     _ADDRESS_DEFAULTED_KEY,
     _ADDRESS_SKIPPED_KEY,
 ]
-_ADDRESS_NOT_RESOLVED_ERROR = "não foi possível localizar o endereço"
-_ADDRESS_REQUIRED_ERROR = "o endereço é obrigatório"
-_ADDRESS_CONFIRMATION_ERROR = "não consegui identificar se a resposta foi sim ou não"
-_ADDRESS_EXHAUSTED_ERROR = "máximo de tentativas — vamos tentar de novo"
-_ADDRESS_HANDOFF_DESCRIPTION = "Vou te encaminhar para um atendente da Central 1746."
-_ADDRESS_END_DESCRIPTION = "Não consegui validar o endereço. Tente novamente mais tarde."
-_ADDRESS_PROMPT = "Qual o endereço completo (rua, número, bairro)?"
-_OPTIONAL_ADDRESS_PROMPT = f"{_ADDRESS_PROMPT} Se preferir não informar, você pode pular."
+_ADDRESS_NOT_RESOLVED_ERROR = "the address could not be located"
+_ADDRESS_REQUIRED_ERROR = "the address is required"
+_ADDRESS_CONFIRMATION_ERROR = "the response could not be interpreted as yes or no"
+_ADDRESS_EXHAUSTED_ERROR = "maximum attempts reached; let us try again"
+_ADDRESS_HANDOFF_DESCRIPTION = "I will transfer you to a support agent."
+_ADDRESS_END_DESCRIPTION = "I could not validate the address. Try again later."
+_ADDRESS_PROMPT = "What is the complete address (street, number, and district)?"
+_OPTIONAL_ADDRESS_PROMPT = f"{_ADDRESS_PROMPT} You may skip it if you prefer not to provide it."
 logger = logging.getLogger(__name__)
 
 
@@ -56,9 +56,9 @@ def _address_payload_schema(required: bool) -> dict[str, Any]:
     """Describe a required address or an optional address with an explicit null skip."""
 
     address_type: str | list[str] = "string" if required else ["string", "null"]
-    address_description = "Endereço completo: rua/avenida, número e bairro."
+    address_description = "Complete address: street, number, and district."
     if not required:
-        address_description += " Use null quando a pessoa optar por não informar."
+        address_description += " Use null when the user chooses not to provide it."
     return {
         "type": "object",
         "properties": {
@@ -121,22 +121,22 @@ class AddressSubflow:
         ) -> AgentResponse:
             resolved_address = state.data.get("address") or {}
             body = (
-                "Confirma o endereço: "
-                f"{resolved_address.get('logradouro', '')}, {resolved_address.get('bairro', '')}?"
+                "Do you confirm the address: "
+                f"{resolved_address.get('street', '')}, {resolved_address.get('district', '')}?"
             )
             interactive_specification = (
                 options_from_domain(
                     {
                         "kind": "buttons",
-                        "field": "confirmacao",
-                        "from_domain": "SimNao",
+                        "field": "confirmation",
+                        "from_domain": "YesNo",
                         "body": body,
                     },
                     ctx.domains,
                     state=state,
                     config=ctx.config,
                 )
-                if "SimNao" in ctx.domains
+                if "YesNo" in ctx.domains
                 else None
             )
             return AgentResponse(
@@ -199,8 +199,8 @@ class AddressSubflow:
         async def collect(state: ServiceState) -> ServiceState:
             state.status = "progress"
             if state.internal.get(CORRECTION_REQUESTED_INTERNAL_KEY) == "address":
-                # clear address + its aux + every requires-dependent (quadra,
-                # ponto_referencia) so a corrected address never submits stale
+                # clear address + its aux + every requires-dependent (sports_court,
+                # reference_point) so a corrected address never submits stale
                 # downstream data.
                 clear_cascade(state, "address", ctx)
                 state.internal.pop(CORRECTION_REQUESTED_INTERNAL_KEY, None)
@@ -223,7 +223,7 @@ class AddressSubflow:
                         resolved_address = geocode_result.get("address")
                         if not isinstance(resolved_address, Mapping):
                             raise ValueError("geocode success did not contain an address object")
-                        street_name = resolved_address.get("logradouro")
+                        street_name = resolved_address.get("street")
                         if not isinstance(street_name, str) or not street_name.strip():
                             raise ValueError("geocode success did not contain a meaningful address")
                 except Exception as exc:  # noqa: BLE001
@@ -235,7 +235,7 @@ class AddressSubflow:
                     )
                     assert error_state.agent_response is not None
                     error_state.agent_response.description = (
-                        "Não consegui consultar o endereço agora. Pode tentar novamente?"
+                        "I could not look up the address. Try again."
                     )
                     error_state.agent_response.payload_schema = payload_schema
                     return error_state
@@ -270,7 +270,9 @@ class AddressSubflow:
                 state.agent_response = None
                 return state
             confirmation_field = (
-                "address_confirmacao" if "address_confirmacao" in state.payload else "confirmacao"
+                "address_confirmation"
+                if "address_confirmation" in state.payload
+                else "confirmation"
             )
             if confirmation_field in state.payload:
                 confirmation = parse_affirmation(state.payload[confirmation_field])

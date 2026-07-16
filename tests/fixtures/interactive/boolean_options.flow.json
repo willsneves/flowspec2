@@ -9,7 +9,7 @@
     "identification_required": false
   },
   "domains": {
-    "SimNao": {
+    "YesNo": {
       "type": "bool",
       "normalize": {
         "affirmation": true
@@ -18,17 +18,17 @@
   },
   "slots": {
     "boolean_choice": {
-      "domain": "SimNao",
+      "domain": "YesNo",
       "required": true
     },
     "summary_confirmed": {
-      "domain": "SimNao"
+      "domain": "YesNo"
     },
     "simple_confirmed": {
-      "domain": "SimNao"
+      "domain": "YesNo"
     },
     "hub_confirmed": {
-      "domain": "SimNao"
+      "domain": "YesNo"
     }
   },
   "path": [
@@ -41,7 +41,7 @@
       "interactive": {
         "kind": "buttons",
         "field": "boolean_choice_button",
-        "from_domain": "SimNao",
+        "from_domain": "YesNo",
         "options_when": [
           {
             "value": false,
@@ -64,7 +64,7 @@
       "interactive": {
         "kind": "buttons",
         "field": "summary_confirmation_button",
-        "from_domain": "SimNao"
+        "from_domain": "YesNo"
       },
       "on_reject": {
         "end": "Summary rejected."
@@ -79,7 +79,7 @@
       "interactive": {
         "kind": "buttons",
         "field": "simple_confirmation_button",
-        "from_domain": "SimNao"
+        "from_domain": "YesNo"
       }
     },
     {
@@ -92,7 +92,7 @@
       "interactive": {
         "kind": "buttons",
         "field": "hub_confirmation_button",
-        "from_domain": "SimNao"
+        "from_domain": "YesNo"
       }
     },
     {
@@ -109,7 +109,7 @@
   },
   "terminal": {
     "step": "finish_boolean_options",
-    "tool": "sgrc_open_ticket",
+    "tool": "open_service_request",
     "idempotent": true,
     "outcomes": {
       "success": {

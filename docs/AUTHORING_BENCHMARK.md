@@ -137,13 +137,13 @@ def evaluate(
     cases = (
         AuthoringBenchmarkCase.expecting_flow(
             identifier="terminal-service",
-            prompt="Author a service flow that submits the request with sgrc_open_ticket.",
+            prompt="Author a service flow that submits the request with open_service_request.",
             expected_flow=reviewed_reference_flow,
             required_constructs=(
                 RequiredFlowConstruct.expecting(
                     identifier="terminal-tool",
                     pointer_pattern="/terminal/tool",
-                    expected_value="sgrc_open_ticket",
+                    expected_value="open_service_request",
                 ),
             ),
         ),

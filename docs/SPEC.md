@@ -47,7 +47,7 @@ layers.
 | `schema` | ✓ | RAIL | const `"flowspec/2"`. |
 | `flow` | ✓ | RAIL | stable id == `service_name`; host/runtime registry key. `^[a-z][a-z0-9_]*$`. |
 | `version` | ✓ | RAIL | semver of this document (`x.y.z`). |
-| `service` | | RAIL | service-identity metadata (SGRC/1746 ids + `slugs`); seeded into state, never a node. `service.slugs` lists the catalog slug(s) this flow serves so a host can auto-expose the flow by scanning JSONs — add a flow by dropping its JSON, no host code change. |
+| `service` | | RAIL | service-identity metadata (ticketing system/1746 ids + `slugs`); seeded into state, never a node. `service.slugs` lists the catalog slug(s) this flow serves so a host can auto-expose the flow by scanning JSONs — add a flow by dropping its JSON, no host code change. |
 | `route` | ✓ | LLM | the entry hook the outer agent uses to pick this flow. |
 | `config` | | RAIL | shared guardrails (`address_required`, `identification_required`, `max_attempts`). Slot-specific requirements belong to `slots.<s>.required`. |
 | `entry` | | RAIL | best-effort, non-blocking init tool (e.g. knowledge load). |
@@ -117,14 +117,14 @@ The stable authoring contract is still `flowspec/2`; authors never edit IR.
 ## `domains.<X>` (RAIL — the spine)
 Declaring a domain materializes its Pydantic before-validator, constrained-decoding
 `payload_schema`, button titles, and list rows from one contract.
-- `type` — `categorical` (default) | `bool` | `free_text` | `cpf` | `email` |
+- `type` — `categorical` (default) | `bool` | `free_text` | `brazilian_tax_id` | `email` |
   `name` | `integer` | `number`.
 - Each type is a closed object branch. Fields that its validator would not
   consume are structural errors rather than ignored annotations.
 - `values` — closed token set (categorical). `null` is an allowed member. Order = elicitation/button order.
 - `rows[]` — `{value, description}` subtitles for two-column lists.
 - A `bool` domain exposes ordered interactive tokens `true` and `false`, with
-  citizen-facing titles “Sim” and “Não”; button/list IDs remain the lowercase
+  citizen-facing titles “Yes” and “No”; button/list IDs remain the lowercase
   canonical tokens accepted by the validator.
 - Categorical `normalize` supports `accent_fold`, positional `number_words`, and
   `synonyms{}` from free text to a canonical token.
@@ -248,15 +248,15 @@ a required address counts the same payload as a failed attempt.
 passes through the confirmation node.
 
 `identification@2` applies the same exhaustion policy to method selection and
-the CPF, e-mail, and name collectors. `reask` resets the current stage's
-attempt budget; `skip` resolves identification/CPF exhaustion to anonymous and
+the Brazilian tax ID, e-mail, and name collectors. `reask` resets the current stage's
+attempt budget; `skip` resolves identification/Brazilian tax ID exhaustion to anonymous and
 omits an exhausted optional contact field; `default` chooses the first eligible
 configured method during method selection, then uses anonymous/no-contact
 fallbacks for value collection; `handoff` pauses for Central 1746; `END`
 completes with a correlated warning. `required` controls voluntary refusal,
 while the explicitly configured exhaustion route remains authoritative.
 
-Requirements for ordinary fields, including `ponto_referencia`, have one
+Requirements for ordinary fields, including `reference_point`, have one
 source of truth: their native `slots.<s>.required` declaration. Subflow
 configuration controls only fields owned by that subflow.
 
@@ -284,7 +284,7 @@ permits legacy contracts.
   steps accept only the domain-backed choice variants; `cta_url` is reserved
   for an external wait and requires `out_of_band:true`.
 - `field` (✓) — the payload key emitted by the UI. The enclosing path `slot` or
-  `confirm` is its state target, so names may differ (e.g. `confirmacao` →
+  `confirm` is its state target, so names may differ (e.g. `confirmation` →
   `ticket_data_confirmed`). Native collectors accept either the interactive
   field or canonical slot key and reject conflicting values when both are
   present. One field cannot bind different state slots in the same document.
@@ -334,7 +334,7 @@ Predicate namespaces are literal state partitions: `slots.` addresses public
 <!-- section:confirm -->
 
 ## `confirm` (RAIL — correction hub)
-- `step`, `slot` (bool), `on_confirm` (target on Sim), `prompt`, `interactive`.
+- `step`, `slot` (bool), `on_confirm` (target on Yes), `prompt`, `interactive`.
 - `correctable[]` (✓) — the directly-correctable canonical slot identifiers.
   The response schema exposes this exact enum; the LLM returns one identifier,
   and fuzzy labels or arbitrary text are rejected. The runtime stores the

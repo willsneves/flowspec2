@@ -30,60 +30,44 @@ from pydantic import BaseModel, Field, create_model, field_validator
 # ── normalization primitives ────────────────────────────────────────────────
 
 _NUMBER_WORDS = {
-    "um": 1,
-    "uma": 1,
-    "dois": 2,
-    "duas": 2,
-    "tres": 3,
-    "quatro": 4,
-    "cinco": 5,
-    "seis": 6,
-    "sete": 7,
-    "oito": 8,
-    "nove": 9,
-    "dez": 10,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
 }
 
 _AFFIRM_POS = {
-    "sim",
-    "s",
     "yes",
     "y",
-    "isso",
     "ok",
     "okay",
-    "claro",
-    "quero",
-    "correto",
-    "certo",
-    "positivo",
-    "pode",
-    "confirmo",
-    "aham",
-    "uhum",
-    "exato",
-    "verdade",
-    "afirmativo",
+    "sure",
+    "correct",
+    "positive",
+    "confirm",
+    "confirmed",
+    "exactly",
+    "affirmative",
     "true",
     "1",
-    "blz",
-    "beleza",
-    "isso mesmo",
-    "com certeza",
+    "of course",
 }
 _AFFIRM_NEG = {
-    "nao",
     "n",
     "no",
-    "errado",
-    "negativo",
-    "incorreto",
-    "discordo",
-    "nunca",
+    "wrong",
+    "negative",
+    "incorrect",
+    "disagree",
+    "never",
     "false",
     "0",
-    "nem",
-    "jamais",
 }
 _POS_EMOJI = ("👍", "✅", "👌", "🙂", "😊", "🆗")
 _NEG_EMOJI = ("👎", "❌", "🚫", "🙅")
@@ -99,8 +83,8 @@ class DomainInteractiveOption:
 
 
 _BOOLEAN_INTERACTIVE_OPTIONS: Final[tuple[DomainInteractiveOption, ...]] = (
-    DomainInteractiveOption(value=True, title="Sim"),
-    DomainInteractiveOption(value=False, title="Não"),
+    DomainInteractiveOption(value=True, title="Yes"),
+    DomainInteractiveOption(value=False, title="No"),
 )
 
 
@@ -134,7 +118,7 @@ def categorical_number_bindings(values: list[Any]) -> dict[str, Any]:
 
 
 def parse_affirmation(value: Any, *, emoji_veto: bool = True) -> Optional[bool]:
-    """sim/yes/isso/👍 -> True, não/no/👎 -> False, ambiguous -> None.
+    """yes/confirm/👍 -> True, no/negative/👎 -> False, ambiguous -> None.
 
     A negative emoji overrides every other signal only when ``emoji_veto`` is
     enabled. Without the veto, recognized words take precedence over emoji so
@@ -218,12 +202,12 @@ def _categorical_validator(spec: dict[str, Any]) -> DomainValidator:
         if raw is None:
             if has_null:
                 return None
-            raise ValueError("valor obrigatório")
+            raise ValueError("value is required")
         key = normalize_text(raw, accent_fold=accent_fold)
         if not key:
             if has_null:
                 return None
-            raise ValueError("valor vazio")
+            raise ValueError("value is empty")
         if use_numbers:
             idx = int(key) if key.isdigit() else _NUMBER_WORDS.get(key)
             if idx is not None and 1 <= idx <= len(values):
@@ -232,7 +216,7 @@ def _categorical_validator(spec: dict[str, Any]) -> DomainValidator:
             return synonyms[key]
         if key in by_norm:
             return by_norm[key]
-        raise ValueError(f"valor fora do domínio: {raw!r}")
+        raise ValueError(f"value outside the domain: {raw!r}")
 
     return validate
 
@@ -263,21 +247,21 @@ def _bool_validator(spec: dict[str, Any]) -> DomainValidator:
         if use_affirm:
             result = parse_affirmation(raw, emoji_veto=emoji_veto)
             if result is None:
-                raise ValueError(f"resposta ambígua: {raw!r}. Use sim/não.")
+                raise ValueError(f"ambiguous response: {raw!r}. Use yes/no.")
             return result
-        if key in {"true", "1", "sim", "s"}:
+        if key in {"true", "1", "yes", "y"}:
             return True
-        if key in {"false", "0", "nao", "não", "n"}:
+        if key in {"false", "0", "no", "n"}:
             return False
-        raise ValueError(f"esperado sim/não: {raw!r}")
+        raise ValueError(f"expected yes/no: {raw!r}")
 
     return validate
 
 
-_CPF_RE = re.compile(r"[^0-9]")
+_BRAZILIAN_TAX_ID_RE = re.compile(r"[^0-9]")
 
 
-def _cpf_valid(digits: str) -> bool:
+def _brazilian_tax_id_valid(digits: str) -> bool:
     if len(digits) != 11 or len(set(digits)) == 1:
         return False
     for length in (9, 10):
@@ -291,11 +275,11 @@ def _cpf_valid(digits: str) -> bool:
     return True
 
 
-def _cpf_validator(_spec: dict[str, Any]) -> DomainValidator:
+def _brazilian_tax_id_validator(_spec: dict[str, Any]) -> DomainValidator:
     def validate(raw: Any) -> str:
-        digits = _CPF_RE.sub("", str(raw or ""))
-        if not _cpf_valid(digits):
-            raise ValueError("CPF inválido")
+        digits = _BRAZILIAN_TAX_ID_RE.sub("", str(raw or ""))
+        if not _brazilian_tax_id_valid(digits):
+            raise ValueError("invalid Brazilian tax ID")
         return digits
 
     return validate
@@ -308,7 +292,7 @@ def _email_validator(_spec: dict[str, Any]) -> DomainValidator:
     def validate(raw: Any) -> str:
         value = str(raw or "").strip().lower()
         if not _EMAIL_RE.match(value):
-            raise ValueError("e-mail inválido")
+            raise ValueError("invalid email address")
         return value
 
     return validate
@@ -318,7 +302,7 @@ def _name_validator(_spec: dict[str, Any]) -> DomainValidator:
     def validate(raw: Any) -> str:
         value = str(raw or "").strip()
         if len(value) < 2:
-            raise ValueError("nome inválido")
+            raise ValueError("invalid name")
         return value
 
     return validate
@@ -332,7 +316,7 @@ def _free_text_validator(spec: dict[str, Any]) -> DomainValidator:
         if not value:
             if optional:  # empty is a valid skip for an optional free-text slot
                 return ""
-            raise ValueError("texto vazio")
+            raise ValueError("text is empty")
         return value
 
     return validate
@@ -340,19 +324,19 @@ def _free_text_validator(spec: dict[str, Any]) -> DomainValidator:
 
 def _bounded_numeric_value(value: Decimal, spec: dict[str, Any]) -> Decimal:
     if "minimum" in spec and value < Decimal(str(spec["minimum"])):
-        raise ValueError(f"valor abaixo do mínimo: {spec['minimum']}")
+        raise ValueError(f"value below minimum: {spec['minimum']}")
     if "maximum" in spec and value > Decimal(str(spec["maximum"])):
-        raise ValueError(f"valor acima do máximo: {spec['maximum']}")
+        raise ValueError(f"value above maximum: {spec['maximum']}")
     return value
 
 
 def _integer_validator(spec: dict[str, Any]) -> DomainValidator:
     def validate(raw: Any) -> int:
         if isinstance(raw, bool):
-            raise ValueError("inteiro inválido")
+            raise ValueError("invalid integer")
         text = str(raw if raw is not None else "").strip()
         if re.fullmatch(r"[+-]?\d+", text) is None:
-            raise ValueError("inteiro inválido")
+            raise ValueError("invalid integer")
         return int(_bounded_numeric_value(Decimal(text), spec))
 
     return validate
@@ -361,17 +345,17 @@ def _integer_validator(spec: dict[str, Any]) -> DomainValidator:
 def _number_validator(spec: dict[str, Any]) -> DomainValidator:
     def validate(raw: Any) -> float:
         if isinstance(raw, bool):
-            raise ValueError("número inválido")
+            raise ValueError("invalid number")
         try:
             value = Decimal(str(raw if raw is not None else "").strip())
         except InvalidOperation as error:
-            raise ValueError("número inválido") from error
+            raise ValueError("invalid number") from error
         if not value.is_finite():
-            raise ValueError("número deve ser finito")
+            raise ValueError("number must be finite")
         bounded_value = _bounded_numeric_value(value, spec)
         floating_value = float(bounded_value)
         if not math.isfinite(floating_value):
-            raise ValueError("número fora do intervalo representável")
+            raise ValueError("number outside the representable range")
         return floating_value
 
     return validate
@@ -380,7 +364,7 @@ def _number_validator(spec: dict[str, Any]) -> DomainValidator:
 _VALIDATOR_FACTORIES: dict[str, Callable[[dict[str, Any]], DomainValidator]] = {
     "categorical": _categorical_validator,
     "bool": _bool_validator,
-    "cpf": _cpf_validator,
+    "brazilian_tax_id": _brazilian_tax_id_validator,
     "email": _email_validator,
     "name": _name_validator,
     "free_text": _free_text_validator,
@@ -425,16 +409,16 @@ def _field_description(
             for value in spec["values"]
             if value is not None or nullable
         )
-        parts.append(f"Interprete a fala do usuário e devolva SOMENTE um valor fechado: {tokens}.")
+        parts.append(f"Interpret the user's input and return ONLY one closed value: {tokens}.")
     elif spec.get("type") == "bool":
-        parts.append("Interprete como booleano: true para sim/afirmativo, false para não.")
+        parts.append("Interpret as a boolean: true for yes/affirmative, false for no/negative.")
     elif spec.get("type") == "integer":
-        parts.append("Interprete como um número inteiro.")
+        parts.append("Interpret as an integer.")
     elif spec.get("type") == "number":
-        parts.append("Interprete como um número finito.")
+        parts.append("Interpret as a finite number.")
     if extract_hint:
         parts.append(extract_hint)
-    return " ".join(parts) or f"Valor para {slot_name}."
+    return " ".join(parts) or f"Value for {slot_name}."
 
 
 def make_slot_model(
@@ -471,7 +455,7 @@ def make_slot_model(
     field_constraints: dict[str, Any] = {}
     if domain_type in {"integer", "number"}:
         field_constraints.update(ge=spec.get("minimum"), le=spec.get("maximum"))
-    elif domain_type == "cpf":
+    elif domain_type == "brazilian_tax_id":
         field_constraints["pattern"] = r"^[0-9]{11}$"
     elif domain_type == "email":
         field_constraints["pattern"] = _EMAIL_RE.pattern

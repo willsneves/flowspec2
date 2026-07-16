@@ -1,6 +1,6 @@
-"""identification@2 — method select → gov.br (await_external) | CPF → email → name.
+"""identification@2 — method select → gov.br (await_external) | Brazilian tax ID → email → name.
 
-Exposes the ``cpf``/``email``/``name`` slots. gov.br is modelled as an
+Exposes the ``brazilian_tax_id``/``email``/``name`` slots. gov.br is modelled as an
 out-of-band suspend/resume: the first visit emits the login affordance and
 pauses; a later turn carrying a ``govbr_token`` resumes and populates the slots.
 Refusal/abort (when identification is optional) routes to anonymous. Every
@@ -33,27 +33,25 @@ from ..observability import log_event
 from . import SubflowBuild
 
 _REFUSAL = (
-    "anonim",
-    "pular",
-    "sem ident",
-    "nao quero",
-    "nao me ident",
-    "recus",
-    "nenhum",
-    "sem cpf",
+    "anonymous",
+    "without identification",
+    "do not identify",
+    "refuse",
+    "none",
+    "without brazilian_tax_id",
     "skip",
 )
 END: Final[str] = LANGGRAPH_END
 _EXHAUSTION_MODES = frozenset({"reask", "skip", "default", "handoff", "END"})
-_EXHAUSTED_ERROR = "máximo de tentativas — vamos tentar de novo"
-_HANDOFF_DESCRIPTION = "Vou te encaminhar para um atendente da Central 1746."
-_END_DESCRIPTION = "Não consegui concluir a identificação. Tente novamente mais tarde."
-_CPF_LOOKUP_DERIVED_MARKERS: Final[dict[str, str]] = {
-    "email": "_cpf_lookup_derived:email",
-    "name": "_cpf_lookup_derived:name",
+_EXHAUSTED_ERROR = "maximum attempts reached; let us try again"
+_HANDOFF_DESCRIPTION = "I will transfer you to a support agent."
+_END_DESCRIPTION = "I could not complete identification. Try again later."
+_BRAZILIAN_TAX_ID_LOOKUP_DERIVED_MARKERS: Final[dict[str, str]] = {
+    "email": "_brazilian_tax_id_lookup_derived:email",
+    "name": "_brazilian_tax_id_lookup_derived:name",
 }
-_IdentificationStage = Literal["method", "cpf", "email", "name"]
-_IdentificationMethod = Literal["cpf", "govbr", "anonimo"]
+_IdentificationStage = Literal["method", "brazilian_tax_id", "email", "name"]
+_IdentificationMethod = Literal["brazilian_tax_id", "govbr", "anonymous"]
 _ExhaustionMode = Literal["reask", "skip", "default", "handoff", "END"]
 
 logger = logging.getLogger(__name__)
@@ -64,34 +62,34 @@ def _is_refusal(text: str) -> bool:
     return bool(norm) and any(tok in norm for tok in _REFUSAL)
 
 
-# Exact-token skip for the optional contact slots (email/name/cpf). Exact match —
+# Exact-token skip for the optional contact slots (email/name/brazilian_tax_id). Exact match —
 # not substring — so a real value like "skipper@x.com" is never read as a skip.
-_SKIP_TOKENS = {"pular", "skip", "nao", "nenhum", "passar", "proximo", "depois"}
+_SKIP_TOKENS = {"skip", "no", "none", "pass", "next", "later"}
 
 
 def _is_skip(text: str) -> bool:
     return normalize_text(text) in _SKIP_TOKENS
 
 
-def _clear_cpf_lookup_derived_contacts(state: ServiceState, ctx: FlowContext) -> None:
-    for contact_slot, marker_key in _CPF_LOOKUP_DERIVED_MARKERS.items():
+def _clear_brazilian_tax_id_lookup_derived_contacts(state: ServiceState, ctx: FlowContext) -> None:
+    for contact_slot, marker_key in _BRAZILIAN_TAX_ID_LOOKUP_DERIVED_MARKERS.items():
         if state.internal.pop(marker_key, False):
             clear_cascade(state, contact_slot, ctx)
 
 
-def _mark_cpf_lookup_derived_contact(state: ServiceState, contact_slot: str) -> None:
-    state.internal[_CPF_LOOKUP_DERIVED_MARKERS[contact_slot]] = True
+def _mark_brazilian_tax_id_lookup_derived_contact(state: ServiceState, contact_slot: str) -> None:
+    state.internal[_BRAZILIAN_TAX_ID_LOOKUP_DERIVED_MARKERS[contact_slot]] = True
 
 
-def _clear_cpf_lookup_provenance(state: ServiceState, contact_slot: str) -> None:
-    state.internal.pop(_CPF_LOOKUP_DERIVED_MARKERS[contact_slot], None)
+def _clear_brazilian_tax_id_lookup_provenance(state: ServiceState, contact_slot: str) -> None:
+    state.internal.pop(_BRAZILIAN_TAX_ID_LOOKUP_DERIVED_MARKERS[contact_slot], None)
 
 
 def _govbr_validation_failure_response(
     ctx: FlowContext,
     state: ServiceState,
     *,
-    cpf_fallback: bool = True,
+    tax_id_fallback: bool = True,
 ) -> AgentResponse:
     log_id = log_event(
         logger,
@@ -103,9 +101,9 @@ def _govbr_validation_failure_response(
     )
     return AgentResponse(
         description=(
-            "Não consegui validar o gov.br. Vamos tentar pelo CPF?"
-            if cpf_fallback
-            else "Não consegui validar o gov.br. Tente novamente."
+            "I could not validate gov.br. Shall we try the Brazilian tax ID instead?"
+            if tax_id_fallback
+            else "I could not validate gov.br. Try again."
         ),
         log_id=log_id,
     )
@@ -115,10 +113,10 @@ def _normalize_method(raw: str) -> Optional[_IdentificationMethod]:
     norm = normalize_text(raw)
     if "govbr" in norm or "gov.br" in norm or norm == "gov" or "gov br" in norm:
         return "govbr"
-    if "cpf" in norm:
-        return "cpf"
-    if _is_refusal(norm) or norm == "anonimo":
-        return "anonimo"
+    if "brazilian_tax_id" in norm:
+        return "brazilian_tax_id"
+    if _is_refusal(norm) or norm == "anonymous":
+        return "anonymous"
     return None
 
 
@@ -153,15 +151,18 @@ class IdentificationSubflow:
     def build(self, ctx: FlowContext, with_cfg: dict[str, Any]) -> SubflowBuild:
         required = bool(with_cfg.get("required", ctx.config.get("identification_required", False)))
         methods: tuple[_IdentificationMethod, ...] = tuple(
-            cast(list[_IdentificationMethod], with_cfg.get("methods", ["cpf", "govbr", "anonimo"]))
+            cast(
+                list[_IdentificationMethod],
+                with_cfg.get("methods", ["brazilian_tax_id", "govbr", "anonymous"]),
+            )
         )
         eligible_methods: tuple[_IdentificationMethod, ...] = tuple(
-            method for method in methods if method != "anonimo" or not required
+            method for method in methods if method != "anonymous" or not required
         )
         if not eligible_methods:
             raise ValueError(
                 "identification@2 requires an eligible method; required identification "
-                "must configure cpf or govbr"
+                "must configure brazilian_tax_id or govbr"
             )
         eligible_method_set: frozenset[_IdentificationMethod] = frozenset(eligible_methods)
         max_attempts = int(with_cfg.get("max_attempts", ctx.max_attempts))
@@ -175,16 +176,16 @@ class IdentificationSubflow:
         on_exhaust = cast(_ExhaustionMode, configured_on_exhaust)
 
         # register the slots this subflow contributes
-        ctx.domains.setdefault("CPF", {"type": "cpf"})
+        ctx.domains.setdefault("BrazilianTaxId", {"type": "brazilian_tax_id"})
         ctx.domains.setdefault("Email", {"type": "email"})
         ctx.domains.setdefault("Name", {"type": "name"})
-        ctx.slots.setdefault("cpf", {"domain": "CPF"})
+        ctx.slots.setdefault("brazilian_tax_id", {"domain": "BrazilianTaxId"})
         ctx.slots.setdefault("email", {"domain": "Email"})
         ctx.slots.setdefault("name", {"domain": "Name"})
-        ctx.slot_aux["cpf"] = ["cadastro_verificado", "identificacao_pulada"]
+        ctx.slot_aux["brazilian_tax_id"] = ["identity_verified", "identification_skipped"]
         ctx.slot_aux["email"] = ["email_processed"]
         ctx.slot_aux["name"] = ["name_processed"]
-        cpf_model = ctx.model_for("cpf")
+        tax_id_model = ctx.model_for("brazilian_tax_id")
         email_model = ctx.model_for("email")
         name_model = ctx.model_for("name")
 
@@ -198,10 +199,10 @@ class IdentificationSubflow:
                     f"{identification_method!r}"
                 )
             state.data["identification_method"] = identification_method
-            if identification_method == "anonimo":
-                state.data["identificacao_pulada"] = True
+            if identification_method == "anonymous":
+                state.data["identification_skipped"] = True
             else:
-                state.data.pop("identificacao_pulada", None)
+                state.data.pop("identification_skipped", None)
 
         def alternative_method(
             state: ServiceState,
@@ -209,8 +210,8 @@ class IdentificationSubflow:
             prefer_anonymous: bool,
         ) -> _IdentificationMethod | None:
             current_method = state.data.get("identification_method")
-            if prefer_anonymous and "anonimo" in eligible_method_set:
-                return "anonimo"
+            if prefer_anonymous and "anonymous" in eligible_method_set:
+                return "anonymous"
             return next(
                 (method for method in eligible_methods if method != current_method),
                 None,
@@ -229,8 +230,8 @@ class IdentificationSubflow:
                 log_event(
                     logger,
                     logging.WARNING,
-                    "CPF lookup contact failed slot validation",
-                    operation="cpf_lookup",
+                    "Brazilian tax ID lookup contact failed slot validation",
+                    operation="brazilian_tax_id_lookup",
                     log_id_generator=ctx.log_id_generator,
                     context={
                         "flow": state.service_name,
@@ -249,15 +250,15 @@ class IdentificationSubflow:
         ) -> ServiceState:
             reset_attempts(state, identification_stage)
             if identification_stage in {"email", "name"}:
-                _clear_cpf_lookup_provenance(state, identification_stage)
+                _clear_brazilian_tax_id_lookup_provenance(state, identification_stage)
                 state.data.pop(identification_stage, None)
                 state.data[f"{identification_stage}_processed"] = True
                 state.agent_response = None
                 return state
 
-            if identification_stage == "cpf":
-                _clear_cpf_lookup_derived_contacts(state, ctx)
-                state.data.pop("cpf", None)
+            if identification_stage == "brazilian_tax_id":
+                _clear_brazilian_tax_id_lookup_derived_contacts(state, ctx)
+                state.data.pop("brazilian_tax_id", None)
             fallback_method = alternative_method(state, prefer_anonymous=True)
             if fallback_method is None:
                 state.agent_response = reask_response
@@ -282,13 +283,13 @@ class IdentificationSubflow:
             reset_attempts(state, identification_stage)
             current_method = state.data.get("identification_method")
             default_method = (
-                "anonimo"
-                if identification_stage == "cpf" and "anonimo" in eligible_method_set
+                "anonymous"
+                if identification_stage == "brazilian_tax_id" and "anonymous" in eligible_method_set
                 else eligible_methods[0]
             )
-            if identification_stage == "cpf":
-                _clear_cpf_lookup_derived_contacts(state, ctx)
-                state.data.pop("cpf", None)
+            if identification_stage == "brazilian_tax_id":
+                _clear_brazilian_tax_id_lookup_derived_contacts(state, ctx)
+                state.data.pop("brazilian_tax_id", None)
             set_identification_method(state, default_method)
             state.agent_response = reask_response if default_method == current_method else None
             return state
@@ -338,18 +339,18 @@ class IdentificationSubflow:
                 {
                     "id": method,
                     "title": {
-                        "cpf": "CPF",
+                        "brazilian_tax_id": "Brazilian tax ID",
                         "govbr": "Gov.br",
-                        "anonimo": "Sem me identificar",
+                        "anonymous": "Continue anonymously",
                     }[method],
                 }
                 for method in eligible_methods
             ]
             return AgentResponse(
-                description="Como prefere se identificar?",
+                description="How would you like to identify yourself?",
                 error_message=error_message,
                 interactive={
-                    "body": "Como prefere se identificar?",
+                    "body": "How would you like to identify yourself?",
                     "field": "identification_method",
                     "buttons": buttons,
                 },
@@ -357,15 +358,15 @@ class IdentificationSubflow:
 
         def recover_from_govbr_validation_failure(state: ServiceState) -> ServiceState:
             state.data.pop("govbr_auth_sent", None)
-            if "cpf" in eligible_method_set:
-                set_identification_method(state, "cpf")
+            if "brazilian_tax_id" in eligible_method_set:
+                set_identification_method(state, "brazilian_tax_id")
                 state.agent_response = _govbr_validation_failure_response(ctx, state)
                 return state
 
             validation_failure_response = _govbr_validation_failure_response(
                 ctx,
                 state,
-                cpf_fallback=False,
+                tax_id_fallback=False,
             )
             if inc_attempts(state, "method") >= max_attempts:
                 return exhaust(
@@ -382,7 +383,7 @@ class IdentificationSubflow:
         ) -> ServiceState:
             state.data.pop("govbr_auth_sent", None)
             unavailable_method_response = method_response(
-                f"o método {requested_method!r} não está disponível neste atendimento"
+                f"the method {requested_method!r} is unavailable for this service session"
             )
             if inc_attempts(state, "method") >= max_attempts:
                 return exhaust(
@@ -393,16 +394,16 @@ class IdentificationSubflow:
             state.agent_response = unavailable_method_response
             return state
 
-        def reject_unavailable_anonymous_cpf_skip(state: ServiceState) -> ServiceState:
+        def reject_unavailable_anonymous_brazilian_tax_id_skip(state: ServiceState) -> ServiceState:
             unavailable_skip_response = AgentResponse(
-                description="Este atendimento exige um método de identificação disponível.",
-                payload_schema=cpf_model.model_json_schema(),
-                error_message="a continuação anônima não está configurada",
+                description="This service session requires an available identification method.",
+                payload_schema=tax_id_model.model_json_schema(),
+                error_message="anonymous continuation is not configured",
             )
-            if inc_attempts(state, "cpf") >= max_attempts:
+            if inc_attempts(state, "brazilian_tax_id") >= max_attempts:
                 return exhaust(
                     state,
-                    stage="cpf",
+                    stage="brazilian_tax_id",
                     reask_response=unavailable_skip_response,
                 )
             state.agent_response = unavailable_skip_response
@@ -412,7 +413,7 @@ class IdentificationSubflow:
         async def select(state: ServiceState) -> ServiceState:
             if (
                 state.data.get("identification_method")
-                or state.data.get("cpf")
+                or state.data.get("brazilian_tax_id")
                 or state.data.get("govbr_authenticated")
             ):
                 state.agent_response = None
@@ -421,8 +422,8 @@ class IdentificationSubflow:
             raw = (
                 str(pay.get("identification_method", "")) if "identification_method" in pay else ""
             )
-            if not required and not pay and "anonimo" in eligible_method_set:
-                set_identification_method(state, "anonimo")
+            if not required and not pay and "anonymous" in eligible_method_set:
+                set_identification_method(state, "anonymous")
                 state.agent_response = None
                 return state
             if "identification_method" in pay:
@@ -447,9 +448,9 @@ class IdentificationSubflow:
             method = state.data.get("identification_method")
             if method == "govbr":
                 return "authenticate_govbr"
-            if method == "cpf":
-                return "collect_cpf"
-            return "identification_done"  # anonimo / pulada
+            if method == "brazilian_tax_id":
+                return "collect_tax_id"
+            return "identification_done"  # anonymous / pulada
 
         # ── gov.br (await_external) ───────────────────────────────────────
         async def authenticate_legacy(state: ServiceState) -> ServiceState:
@@ -464,17 +465,19 @@ class IdentificationSubflow:
                 try:
                     if not isinstance(token, Mapping):
                         raise TypeError("gov.br token must be an object")
-                    if "cpf" not in token:
-                        raise ValueError("gov.br token did not contain CPF")
-                    validated_cpf = cast(
+                    if "brazilian_tax_id" not in token:
+                        raise ValueError("gov.br token did not contain Brazilian tax ID")
+                    validated_tax_id = cast(
                         str,
-                        cpf_model.model_validate({"cpf": token["cpf"]}).model_dump()["cpf"],
+                        tax_id_model.model_validate(
+                            {"brazilian_tax_id": token["brazilian_tax_id"]}
+                        ).model_dump()["brazilian_tax_id"],
                     )
-                    identity_writes: dict[str, Any] = {"cpf": validated_cpf}
-                    if "nome" in token:
+                    identity_writes: dict[str, Any] = {"brazilian_tax_id": validated_tax_id}
+                    if "name" in token:
                         identity_writes["name"] = cast(
                             str,
-                            name_model.model_validate({"name": token["nome"]}).model_dump()["name"],
+                            name_model.model_validate({"name": token["name"]}).model_dump()["name"],
                         )
                     if "email" in token:
                         identity_writes["email"] = cast(
@@ -489,7 +492,7 @@ class IdentificationSubflow:
                 enrich = await _call_optional_identification_tool(
                     ctx,
                     "get_user_info",
-                    cpf=validated_cpf,
+                    brazilian_tax_id=validated_tax_id,
                 )
                 if enrich and enrich.get("phones"):
                     identity_writes["phone"] = str(enrich["phones"][0])
@@ -498,12 +501,12 @@ class IdentificationSubflow:
                 if "email" in identity_writes:
                     identity_writes["email_processed"] = True
                 identity_writes["govbr_authenticated"] = True
-                identity_writes["cadastro_verificado"] = True
+                identity_writes["identity_verified"] = True
                 state.data.update(identity_writes)
                 if "name" in identity_writes:
-                    _clear_cpf_lookup_provenance(state, "name")
+                    _clear_brazilian_tax_id_lookup_provenance(state, "name")
                 if "email" in identity_writes:
-                    _clear_cpf_lookup_provenance(state, "email")
+                    _clear_brazilian_tax_id_lookup_provenance(state, "email")
                 state.data.pop("govbr_auth_sent", None)
                 state.agent_response = None
                 return state
@@ -512,26 +515,26 @@ class IdentificationSubflow:
                     f"{pay.get('message', '')} {pay.get('identification_method', '')}"
                 )
                 if not required and _is_refusal(text):
-                    if "anonimo" not in eligible_method_set:
-                        return reject_disabled_method(state, "anonimo")
-                    set_identification_method(state, "anonimo")
+                    if "anonymous" not in eligible_method_set:
+                        return reject_disabled_method(state, "anonymous")
+                    set_identification_method(state, "anonymous")
                     state.data.pop("govbr_auth_sent", None)
                     state.agent_response = None
                     return state
-                if "cpf" in text:
-                    if "cpf" not in eligible_method_set:
-                        return reject_disabled_method(state, "cpf")
-                    set_identification_method(state, "cpf")
+                if "brazilian_tax_id" in text:
+                    if "brazilian_tax_id" not in eligible_method_set:
+                        return reject_disabled_method(state, "brazilian_tax_id")
+                    set_identification_method(state, "brazilian_tax_id")
                     state.data.pop("govbr_auth_sent", None)
                     state.agent_response = None
                     return state
                 state.agent_response = AgentResponse(
-                    description="Estou aguardando você concluir o login gov.br. Quando terminar, é só me avisar. 🙂"
+                    description="I am waiting for you to complete the gov.br login. Let me know when you finish. 🙂"
                 )
                 return state
             state.data["govbr_auth_sent"] = True
             state.agent_response = AgentResponse(
-                description="Para se identificar pelo gov.br, toque no botão de login que enviei. 🔐",
+                description="To identify through gov.br, use the login button I sent. 🔐",
                 interactive={"out_of_band_sent": True, "next_step": "await_govbr_auth"},
             )
             return state
@@ -546,70 +549,70 @@ class IdentificationSubflow:
             if state.agent_response is not None:
                 return END
             method = state.data.get("identification_method")
-            if method == "cpf":
-                return "collect_cpf"
-            if method == "anonimo" or state.data.get("identificacao_pulada"):
+            if method == "brazilian_tax_id":
+                return "collect_tax_id"
+            if method == "anonymous" or state.data.get("identification_skipped"):
                 return "identification_done"
             return "identification_done"
 
-        # ── collect CPF ──────────────────────────────────────────────────
-        async def collect_cpf(state: ServiceState) -> ServiceState:
+        # ── collect Brazilian tax ID ──────────────────────────────────────────────────
+        async def collect_tax_id(state: ServiceState) -> ServiceState:
             if state.data.get("govbr_authenticated"):
                 state.agent_response = None
                 return state
-            if state.internal.get(CORRECTION_REQUESTED_INTERNAL_KEY) == "cpf":
-                _clear_cpf_lookup_derived_contacts(state, ctx)
-                clear_cascade(state, "cpf", ctx)
+            if state.internal.get(CORRECTION_REQUESTED_INTERNAL_KEY) == "brazilian_tax_id":
+                _clear_brazilian_tax_id_lookup_derived_contacts(state, ctx)
+                clear_cascade(state, "brazilian_tax_id", ctx)
                 state.internal.pop(CORRECTION_REQUESTED_INTERNAL_KEY, None)
-                if "cpf" not in eligible_method_set:
-                    return reject_disabled_method(state, "cpf")
+                if "brazilian_tax_id" not in eligible_method_set:
+                    return reject_disabled_method(state, "brazilian_tax_id")
                 # Persist the method so the NEXT turn's select node re-enters the
                 # subflow instead of short-circuiting to done (the citizen may have
-                # been "anonimo" before correcting). correction_requested is consumed
+                # been "anonymous" before correcting). correction_requested is consumed
                 # this turn, so the flip must outlive it.
-                set_identification_method(state, "cpf")
-            if state.data.get("cpf") or state.data.get("identificacao_pulada"):
+                set_identification_method(state, "brazilian_tax_id")
+            if state.data.get("brazilian_tax_id") or state.data.get("identification_skipped"):
                 state.agent_response = None
                 return state
             pay = state.payload or {}
-            if "cpf" in pay:
-                raw = pay["cpf"]
+            if "brazilian_tax_id" in pay:
+                raw = pay["brazilian_tax_id"]
                 if (raw is None or str(raw).strip() == "" or _is_skip(str(raw))) and not required:
-                    if "anonimo" not in eligible_method_set:
-                        return reject_unavailable_anonymous_cpf_skip(state)
+                    if "anonymous" not in eligible_method_set:
+                        return reject_unavailable_anonymous_brazilian_tax_id_skip(state)
                     return complete_without_value(
                         state,
-                        "cpf",
+                        "brazilian_tax_id",
                         reask_response=AgentResponse(
-                            description="Qual o seu CPF?",
-                            payload_schema=cpf_model.model_json_schema(),
+                            description="What is your Brazilian tax ID?",
+                            payload_schema=tax_id_model.model_json_schema(),
                         ),
                     )
                 try:
-                    validated = cpf_model.model_validate({"cpf": raw})
-                    validated_cpf = cast(str, validated.model_dump()["cpf"])
+                    validated = tax_id_model.model_validate({"brazilian_tax_id": raw})
+                    validated_tax_id = cast(str, validated.model_dump()["brazilian_tax_id"])
                 except Exception as exc:
-                    if inc_attempts(state, "cpf") >= max_attempts:
+                    if inc_attempts(state, "brazilian_tax_id") >= max_attempts:
                         return exhaust(
                             state,
-                            stage="cpf",
+                            stage="brazilian_tax_id",
                             reask_response=AgentResponse(
-                                description="Não consegui validar seu CPF. Pode tentar de novo?",
-                                payload_schema=cpf_model.model_json_schema(),
+                                description="I could not validate your Brazilian tax ID. Try again.",
+                                payload_schema=tax_id_model.model_json_schema(),
                                 error_message=_EXHAUSTED_ERROR,
                             ),
                         )
                     state.agent_response = AgentResponse(
-                        description="CPF inválido. Pode conferir e enviar de novo? (11 dígitos)",
-                        payload_schema=cpf_model.model_json_schema(),
+                        description="Invalid Brazilian tax ID. Check and resubmit all 11 digits.",
+                        payload_schema=tax_id_model.model_json_schema(),
                         error_message=str(exc),
                     )
                     return state
 
-                state.data["cpf"] = validated_cpf
-                reset_attempts(state, "cpf")
+                state.data["brazilian_tax_id"] = validated_tax_id
+                reset_attempts(state, "brazilian_tax_id")
                 info = await _call_optional_identification_tool(
-                    ctx, "cpf_lookup", cpf=validated_cpf
+                    ctx, "brazilian_tax_id_lookup", brazilian_tax_id=validated_tax_id
                 )
                 if info and info.get("status") == "ok":
                     if info.get("email") and not state.data.get("email_processed"):
@@ -621,7 +624,7 @@ class IdentificationSubflow:
                         if validated_email is not None:
                             state.data["email"] = validated_email
                             state.data["email_processed"] = True
-                            _mark_cpf_lookup_derived_contact(state, "email")
+                            _mark_brazilian_tax_id_lookup_derived_contact(state, "email")
                     if info.get("name") and not state.data.get("name_processed"):
                         validated_name = validate_optional_lookup_contact(
                             state,
@@ -631,37 +634,37 @@ class IdentificationSubflow:
                         if validated_name is not None:
                             state.data["name"] = validated_name
                             state.data["name_processed"] = True
-                            _mark_cpf_lookup_derived_contact(state, "name")
-                    state.data["cadastro_verificado"] = True
+                            _mark_brazilian_tax_id_lookup_derived_contact(state, "name")
+                    state.data["identity_verified"] = True
                 state.agent_response = None
                 return state
             if not required and _is_refusal(str(pay.get("message", ""))):
-                if "anonimo" not in eligible_method_set:
-                    return reject_unavailable_anonymous_cpf_skip(state)
+                if "anonymous" not in eligible_method_set:
+                    return reject_unavailable_anonymous_brazilian_tax_id_skip(state)
                 return complete_without_value(
                     state,
-                    "cpf",
+                    "brazilian_tax_id",
                     reask_response=AgentResponse(
-                        description="Qual o seu CPF?",
-                        payload_schema=cpf_model.model_json_schema(),
+                        description="What is your Brazilian tax ID?",
+                        payload_schema=tax_id_model.model_json_schema(),
                     ),
                 )
             state.agent_response = AgentResponse(
                 description=(
-                    "Qual o seu CPF?"
+                    "What is your Brazilian tax ID?"
                     if required
-                    else "Qual o seu CPF? (ou diga 'pular' para seguir sem se identificar)"
+                    else "What is your Brazilian tax ID? (or say 'skip' to continue anonymously)"
                 ),
-                payload_schema=cpf_model.model_json_schema(),
+                payload_schema=tax_id_model.model_json_schema(),
             )
             return state
 
-        def cpf_router(state: ServiceState) -> str:
+        def tax_id_router(state: ServiceState) -> str:
             if state.agent_response is not None:
                 return END
             if state.data.get("identification_method") == "govbr":
                 return "authenticate_govbr"
-            if state.data.get("identificacao_pulada"):
+            if state.data.get("identification_skipped"):
                 return "identification_done"
             if not state.data.get("email") and not state.data.get("email_processed"):
                 return "collect_email"
@@ -672,7 +675,7 @@ class IdentificationSubflow:
         # ── collect email (optional) ─────────────────────────────────────
         async def collect_email(state: ServiceState) -> ServiceState:
             if state.internal.get(CORRECTION_REQUESTED_INTERNAL_KEY) == "email":
-                _clear_cpf_lookup_provenance(state, "email")
+                _clear_brazilian_tax_id_lookup_provenance(state, "email")
                 clear_cascade(state, "email", ctx)
                 state.internal.pop(CORRECTION_REQUESTED_INTERNAL_KEY, None)
             if state.data.get("email_processed"):
@@ -686,7 +689,7 @@ class IdentificationSubflow:
                         state,
                         "email",
                         reask_response=AgentResponse(
-                            description="Qual o seu e-mail? (ou diga 'pular')",
+                            description="What is your email address? (or say 'skip')",
                             payload_schema=email_model.model_json_schema(),
                         ),
                     )
@@ -694,7 +697,7 @@ class IdentificationSubflow:
                     validated = email_model.model_validate({"email": raw})
                     state.data["email"] = cast(str, validated.model_dump()["email"])
                     state.data["email_processed"] = True
-                    _clear_cpf_lookup_provenance(state, "email")
+                    _clear_brazilian_tax_id_lookup_provenance(state, "email")
                     reset_attempts(state, "email")
                     state.agent_response = None
                     return state
@@ -704,19 +707,19 @@ class IdentificationSubflow:
                             state,
                             stage="email",
                             reask_response=AgentResponse(
-                                description="E-mail inválido. Pode reenviar? (ou 'pular')",
+                                description="Invalid email address. Resubmit it or say 'skip'.",
                                 payload_schema=email_model.model_json_schema(),
                                 error_message=_EXHAUSTED_ERROR,
                             ),
                         )
                     state.agent_response = AgentResponse(
-                        description="E-mail inválido. Pode reenviar? (ou 'pular')",
+                        description="Invalid email address. Resubmit it or say 'skip'.",
                         payload_schema=email_model.model_json_schema(),
                         error_message=str(exc),
                     )
                     return state
             state.agent_response = AgentResponse(
-                description="Qual o seu e-mail? (ou diga 'pular')",
+                description="What is your email address? (or say 'skip')",
                 payload_schema=email_model.model_json_schema(),
             )
             return state
@@ -731,7 +734,7 @@ class IdentificationSubflow:
         # ── collect name (optional) ──────────────────────────────────────
         async def collect_name(state: ServiceState) -> ServiceState:
             if state.internal.get(CORRECTION_REQUESTED_INTERNAL_KEY) == "name":
-                _clear_cpf_lookup_provenance(state, "name")
+                _clear_brazilian_tax_id_lookup_provenance(state, "name")
                 clear_cascade(state, "name", ctx)
                 state.internal.pop(CORRECTION_REQUESTED_INTERNAL_KEY, None)
             if state.data.get("name_processed"):
@@ -745,7 +748,7 @@ class IdentificationSubflow:
                         state,
                         "name",
                         reask_response=AgentResponse(
-                            description="Qual o seu nome completo? (ou diga 'pular')",
+                            description="What is your full name? (or say 'skip')",
                             payload_schema=name_model.model_json_schema(),
                         ),
                     )
@@ -753,7 +756,7 @@ class IdentificationSubflow:
                     validated = name_model.model_validate({"name": raw})
                     state.data["name"] = cast(str, validated.model_dump()["name"])
                     state.data["name_processed"] = True
-                    _clear_cpf_lookup_provenance(state, "name")
+                    _clear_brazilian_tax_id_lookup_provenance(state, "name")
                     reset_attempts(state, "name")
                     state.agent_response = None
                     return state
@@ -763,19 +766,19 @@ class IdentificationSubflow:
                             state,
                             stage="name",
                             reask_response=AgentResponse(
-                                description="Nome inválido. Pode reenviar? (ou 'pular')",
+                                description="Invalid name. Resubmit it or say 'skip'.",
                                 payload_schema=name_model.model_json_schema(),
                                 error_message=_EXHAUSTED_ERROR,
                             ),
                         )
                     state.agent_response = AgentResponse(
-                        description="Nome inválido. Pode reenviar? (ou 'pular')",
+                        description="Invalid name. Resubmit it or say 'skip'.",
                         payload_schema=name_model.model_json_schema(),
                         error_message=str(exc),
                     )
                     return state
             state.agent_response = AgentResponse(
-                description="Qual o seu nome completo? (ou diga 'pular')",
+                description="What is your full name? (or say 'skip')",
                 payload_schema=name_model.model_json_schema(),
             )
             return state
@@ -792,7 +795,7 @@ class IdentificationSubflow:
             authenticate_legacy,
             authenticate_router,
             targets=[
-                "collect_cpf",
+                "collect_tax_id",
                 "collect_email",
                 "collect_name",
                 "identification_done",
@@ -809,9 +812,9 @@ class IdentificationSubflow:
             }
             transition_methods: dict[str, _IdentificationMethod | None] = {}
             method_for_target: dict[str, _IdentificationMethod] = {
-                "collect_cpf": "cpf",
+                "collect_tax_id": "brazilian_tax_id",
                 "authenticate_govbr": "govbr",
-                "identification_done": "anonimo",
+                "identification_done": "anonymous",
             }
             for transition_name, transition in configured_transitions.items():
                 if transition is None:
@@ -822,9 +825,9 @@ class IdentificationSubflow:
                 transition_set = transition.get("set") or {}
                 configured_method = transition_set.get("identification_method")
                 if configured_method is not None and configured_method not in {
-                    "cpf",
+                    "brazilian_tax_id",
                     "govbr",
-                    "anonimo",
+                    "anonymous",
                 }:
                     raise ValueError(
                         "identification@2 await_external transition "
@@ -855,7 +858,7 @@ class IdentificationSubflow:
                 configured_on_resume["enrich"] = {
                     "tool": configured_on_resume["enrich"],
                     "optional": True,
-                    "input": {"cpf": "$token.cpf"},
+                    "input": {"brazilian_tax_id": "$token.brazilian_tax_id"},
                     "set": {"phone": "$result.phones.0"},
                 }
             configured_step: dict[str, Any] = {"step": "authenticate_govbr"}
@@ -872,15 +875,15 @@ class IdentificationSubflow:
                 configured_step,
                 default_router=authenticate_router,
                 additional_targets=[
-                    "collect_cpf",
+                    "collect_tax_id",
                     "collect_email",
                     "collect_name",
                     "identification_done",
                 ],
                 legacy_sent_data_key="govbr_auth_sent",
                 waiting_description=(
-                    "Estou aguardando você concluir o login gov.br. "
-                    "Quando terminar, é só me avisar. 🙂"
+                    "I am waiting for you to complete the gov.br login. "
+                    "Let me know when you finish. 🙂"
                 ),
             )
             await_sent_internal_key = f"_await_external_sent:{generic_descriptor.id}"
@@ -912,23 +915,23 @@ class IdentificationSubflow:
                     if not required and _is_refusal(recovery_text):
                         if "abort" in recovery:
                             payload["_external_event"] = "abort"
-                        elif "anonimo" not in eligible_method_set:
+                        elif "anonymous" not in eligible_method_set:
                             clear_configured_await_markers(state)
-                            return reject_disabled_method(state, "anonimo")
+                            return reject_disabled_method(state, "anonymous")
                         else:
-                            set_identification_method(state, "anonimo")
+                            set_identification_method(state, "anonymous")
                             clear_configured_await_markers(state)
                             state.status = "progress"
                             state.agent_response = None
                             return state
-                    elif "cpf" in recovery_text:
-                        if "cpf" not in eligible_method_set:
+                    elif "brazilian_tax_id" in recovery_text:
+                        if "brazilian_tax_id" not in eligible_method_set:
                             clear_configured_await_markers(state)
-                            return reject_disabled_method(state, "cpf")
+                            return reject_disabled_method(state, "brazilian_tax_id")
                         if "switch" in recovery:
                             payload["_external_event"] = "switch"
                         else:
-                            set_identification_method(state, "cpf")
+                            set_identification_method(state, "brazilian_tax_id")
                             clear_configured_await_markers(state)
                             state.status = "progress"
                             state.agent_response = None
@@ -936,7 +939,8 @@ class IdentificationSubflow:
 
                 resume_token = payload.get(resume_on)
                 if resume_on in payload and (
-                    not isinstance(resume_token, Mapping) or not resume_token.get("cpf")
+                    not isinstance(resume_token, Mapping)
+                    or not resume_token.get("brazilian_tax_id")
                 ):
                     if "switch" in recovery:
                         payload.pop(resume_on, None)
@@ -961,24 +965,24 @@ class IdentificationSubflow:
                     if transition["goto"] == "select_identification_method":
                         if transition_method is None:
                             updated_state.data.pop("identification_method", None)
-                            updated_state.data.pop("identificacao_pulada", None)
+                            updated_state.data.pop("identification_skipped", None)
                         updated_state.internal.pop(await_completed_internal_key, None)
 
                 if not has_resume_token:
                     return updated_state
-                if not updated_state.data.get("cpf"):
+                if not updated_state.data.get("brazilian_tax_id"):
                     updated_state.data.pop("govbr_authenticated", None)
-                    updated_state.data.pop("cadastro_verificado", None)
+                    updated_state.data.pop("identity_verified", None)
                     clear_configured_await_markers(updated_state)
                     return recover_from_govbr_validation_failure(updated_state)
                 if updated_state.data.get("name"):
                     updated_state.data["name_processed"] = True
-                    _clear_cpf_lookup_provenance(updated_state, "name")
+                    _clear_brazilian_tax_id_lookup_provenance(updated_state, "name")
                 if updated_state.data.get("email"):
                     updated_state.data["email_processed"] = True
-                    _clear_cpf_lookup_provenance(updated_state, "email")
+                    _clear_brazilian_tax_id_lookup_provenance(updated_state, "email")
                 updated_state.data["govbr_authenticated"] = True
-                updated_state.data["cadastro_verificado"] = True
+                updated_state.data["identity_verified"] = True
                 return updated_state
 
             authenticate_descriptor = NodeDesc(
@@ -993,13 +997,13 @@ class IdentificationSubflow:
                 "select_identification_method",
                 select,
                 select_router,
-                targets=["authenticate_govbr", "collect_cpf", "identification_done"],
+                targets=["authenticate_govbr", "collect_tax_id", "identification_done"],
             ),
             authenticate_descriptor,
             NodeDesc(
-                "collect_cpf",
-                collect_cpf,
-                cpf_router,
+                "collect_tax_id",
+                collect_tax_id,
+                tax_id_router,
                 targets=[
                     "authenticate_govbr",
                     "collect_email",
@@ -1019,5 +1023,9 @@ class IdentificationSubflow:
         return SubflowBuild(
             descriptors=descriptors,
             entry_id="select_identification_method",
-            node_for_slot={"cpf": "collect_cpf", "email": "collect_email", "name": "collect_name"},
+            node_for_slot={
+                "brazilian_tax_id": "collect_tax_id",
+                "email": "collect_email",
+                "name": "collect_name",
+            },
         )

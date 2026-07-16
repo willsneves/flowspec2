@@ -9,73 +9,75 @@ from __future__ import annotations
 from conftest import require_agent_response, step
 
 
-async def _to_confirm_praca(luminaria):
-    """Drive to the confirm-ticket hub with a Praça address (quadra asked)."""
-    st = await step(luminaria, None, {})
+async def _to_confirm_square(streetlight):
+    """Drive to the confirm-ticket hub with a Public square address (sports_court asked)."""
+    st = await step(streetlight, None, {})
     st = await step(
-        luminaria,
+        streetlight,
         st,
-        {"_source": "whatsapp_flow", "defect_type": "Danificada", "location": "Praça"},
+        {"_source": "whatsapp_flow", "defect_type": "Damaged", "location": "Public square"},
     )
-    st = await step(luminaria, st, {"address": "Praça Mauá, Centro"})  # kind=praca
-    st = await step(luminaria, st, {"confirmacao": "sim"})  # confirm address
-    st = await step(
-        luminaria, st, {"reparo_luminaria_quadra_esportes": "sim"}
-    )  # quadra (gated open)
-    st = await step(luminaria, st, {"ponto_referencia": "perto da quadra de tênis"})
-    st = await step(luminaria, st, {"identification_method": "anonimo"})
+    st = await step(streetlight, st, {"address": "Central Square, Downtown"})  # kind=square
+    st = await step(streetlight, st, {"confirmation": "yes"})  # confirm address
+    st = await step(streetlight, st, {"near_sports_court": "yes"})  # sports_court (gated open)
+    st = await step(streetlight, st, {"reference_point": "near the tennis court"})
+    st = await step(streetlight, st, {"identification_method": "anonymous"})
     return st  # now at confirm_ticket_data
 
 
-async def test_bug_a_address_correction_clears_dependents(luminaria):
-    st = await _to_confirm_praca(luminaria)
-    assert st.data.get("reparo_luminaria_quadra_esportes") is True
-    assert st.data.get("ponto_referencia")
+async def test_bug_a_address_correction_clears_dependents(streetlight):
+    st = await _to_confirm_square(streetlight)
+    assert st.data.get("near_sports_court") is True
+    assert st.data.get("reference_point")
 
     # correct the address -> address + its requires-dependents must be cleared,
-    # so no stale quadra flag / reference point reaches the ticket.
-    st = await step(luminaria, st, {"correcao": "address"})
+    # so no stale sports_court flag / reference point reaches the ticket.
+    st = await step(streetlight, st, {"correction": "address"})
     assert "address" not in st.data
-    assert "reparo_luminaria_quadra_esportes" not in st.data
-    assert "ponto_referencia" not in st.data
+    assert "near_sports_court" not in st.data
+    assert "reference_point" not in st.data
     assert "ticket_data_confirmed" not in st.data
 
 
-async def test_bug_b_text_reanswer_after_correction_is_not_swallowed(luminaria):
-    st = await step(luminaria, None, {})
+async def test_bug_b_text_reanswer_after_correction_is_not_swallowed(streetlight):
+    st = await step(streetlight, None, {})
     st = await step(
-        luminaria,
+        streetlight,
         st,
         {
             "_source": "whatsapp_flow",
-            "defect_type": "Apagada",
-            "qty_pattern": "uma",
-            "location": "Rua",
+            "defect_type": "Not working",
+            "qty_pattern": "single",
+            "location": "Street",
         },
     )
-    st = await step(luminaria, st, {"address": "Rua A, 1"})
-    st = await step(luminaria, st, {"confirmacao": "sim"})
-    st = await step(luminaria, st, {"ponto_referencia": "esquina"})
-    st = await step(luminaria, st, {"identification_method": "anonimo"})
-    st = await step(luminaria, st, {"correcao": "luminaria_defeito"})  # clears luminaria_defeito
-    assert "luminaria_defeito" not in st.data
+    st = await step(streetlight, st, {"address": "Street A, 1"})
+    st = await step(streetlight, st, {"confirmation": "yes"})
+    st = await step(streetlight, st, {"reference_point": "esquina"})
+    st = await step(streetlight, st, {"identification_method": "anonymous"})
+    st = await step(
+        streetlight, st, {"correction": "streetlight_issue"}
+    )  # clears streetlight_issue
+    assert "streetlight_issue" not in st.data
 
     # the citizen TYPES the new defect — auto_flow must NOT re-fire and swallow it
-    st = await step(luminaria, st, {"luminaria_defeito": "Piscando"})
+    st = await step(streetlight, st, {"streetlight_issue": "Flickering"})
     assert (require_agent_response(st).interactive or {}).get("status") != "flow_sent"
-    assert st.data["luminaria_defeito"] == "Piscando"
+    assert st.data["streetlight_issue"] == "Flickering"
 
 
-async def test_bug_c_correct_cpf_after_anonimo_reenters_subflow(luminaria):
-    st = await step(luminaria, None, {})
+async def test_bug_c_correct_brazilian_tax_id_after_anonymous_reenters_subflow(streetlight):
+    st = await step(streetlight, None, {})
     st = await step(
-        luminaria, st, {"_source": "whatsapp_flow", "defect_type": "Danificada", "location": "Rua"}
+        streetlight,
+        st,
+        {"_source": "whatsapp_flow", "defect_type": "Damaged", "location": "Street"},
     )
-    st = await step(luminaria, st, {"address": "Rua A, 1"})
-    st = await step(luminaria, st, {"confirmacao": "sim"})
-    st = await step(luminaria, st, {"ponto_referencia": "esquina"})
-    st = await step(luminaria, st, {"identification_method": "anonimo"})
+    st = await step(streetlight, st, {"address": "Street A, 1"})
+    st = await step(streetlight, st, {"confirmation": "yes"})
+    st = await step(streetlight, st, {"reference_point": "esquina"})
+    st = await step(streetlight, st, {"identification_method": "anonymous"})
     # at confirm: now the citizen wants to identify after all
-    st = await step(luminaria, st, {"correcao": "cpf"})
-    st = await step(luminaria, st, {"cpf": "52998224725"})
-    assert st.data.get("cpf") == "52998224725"
+    st = await step(streetlight, st, {"correction": "brazilian_tax_id"})
+    st = await step(streetlight, st, {"brazilian_tax_id": "52998224725"})
+    assert st.data.get("brazilian_tax_id") == "52998224725"

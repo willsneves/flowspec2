@@ -50,10 +50,10 @@ def test_number_domain_rejects_non_finite_and_boolean_values() -> None:
 
 
 def test_semantic_linker_rejects_inverted_numeric_range(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    invalid_flow["domains"]["Tamanho"] = {
+    invalid_flow = copy.deepcopy(pothole_document)
+    invalid_flow["domains"]["Size"] = {
         "type": "integer",
         "minimum": 5,
         "maximum": 1,

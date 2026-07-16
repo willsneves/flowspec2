@@ -124,8 +124,8 @@ cache.
 ```bash
 flowspec2 rasa-export path/to/portable.flow.json --output-dir build/rasa --allow-lossy
 flowspec2 rasa-import build/rasa/flows.yml --domain build/rasa/domain.yml --flow collect_contact --version 1.0.0 --output build/collect_contact.flow.json --allow-lossy
-flowspec2 open-workflow-export examples/reparo_luminaria.flow.json --output build/reparo_luminaria.workflow.yaml
-flowspec2 open-workflow-import build/reparo_luminaria.workflow.yaml --output build/reparo_luminaria.flow.json
+flowspec2 open-workflow-export examples/streetlight_repair.flow.json --output build/streetlight_repair.workflow.yaml
+flowspec2 open-workflow-import build/streetlight_repair.workflow.yaml --output build/streetlight_repair.flow.json
 ```
 
 The CLI refuses to overwrite an existing file or Rasa output directory. It
@@ -168,7 +168,7 @@ does not define. Each collect uses one non-empty, unconditional `utter_*`
 response. Static buttons must cover the domain in declared order and use one
 `/SetSlots(slot=value)` assignment. Curly braces are rejected because Rasa
 interprets them as response interpolation. Categorical button titles equal the
-stored token. Boolean exports use “Sim”/“Não” titles with `true`/`false`
+stored token. Boolean exports use “Yes”/“No” titles with `true`/`false`
 payloads; imports also accept the legacy token-as-title form.
 
 The profile is intentionally prescriptive. It excludes Rasa autonomous steps,

@@ -78,7 +78,7 @@ async def test_required_address_treats_null_as_a_failed_attempt() -> None:
     assert state.status == "progress"
     assert state.data["address_attempts"] == 1
     assert state.agent_response is not None
-    assert state.agent_response.error_message == "o endereço é obrigatório"
+    assert state.agent_response.error_message == "the address is required"
     assert state.agent_response.payload_schema is not None
     assert state.agent_response.payload_schema["properties"]["address"]["type"] == "string"
 
@@ -94,7 +94,7 @@ async def test_address_reask_resets_attempt_budget_after_exhaustion() -> None:
     assert state.status == "progress"
     assert "address_attempts" not in state.data
     assert state.agent_response is not None
-    assert state.agent_response.error_message == "máximo de tentativas — vamos tentar de novo"
+    assert state.agent_response.error_message == "maximum attempts reached; let us try again"
 
 
 async def test_address_skip_advances_without_storing_a_default() -> None:
@@ -135,7 +135,7 @@ async def test_address_handoff_pauses_with_the_handoff_message() -> None:
 
     assert state.status == "progress"
     assert state.agent_response is not None
-    assert "Central 1746" in state.agent_response.description
+    assert "support agent" in state.agent_response.description
     assert state.data["address_attempts"] == 1
 
 
@@ -177,10 +177,10 @@ async def test_geocode_call_failure_is_correlated_and_retryable(
             "status": "ok",
             "needs_confirmation": False,
             "address": {
-                "logradouro": address,
-                "kind": "rua",
-                "bairro": "Centro",
-                "municipio": "Rio de Janeiro",
+                "street": address,
+                "kind": "street",
+                "district": "Centro",
+                "city": "Rio de Janeiro",
             },
         }
 
@@ -190,7 +190,7 @@ async def test_geocode_call_failure_is_correlated_and_retryable(
     with caplog.at_level(logging.ERROR, logger="flowspec2.nodes"):
         state = await runtime.execute(
             runtime.new_state("address-tool-retry"),
-            {"address": "Rua das Flores, 100"},
+            {"address": "Street das Flores, 100"},
         )
 
     assert state.status == "error"
@@ -202,10 +202,10 @@ async def test_geocode_call_failure_is_correlated_and_retryable(
         for log_record in caplog.records
     )
 
-    state = await runtime.execute(state, {"address": "Rua das Flores, 100"})
+    state = await runtime.execute(state, {"address": "Street das Flores, 100"})
 
     assert state.status == "completed"
-    assert state.data["address"]["logradouro"] == "Rua das Flores, 100"
+    assert state.data["address"]["street"] == "Street das Flores, 100"
 
 
 @pytest.mark.parametrize(
@@ -229,7 +229,7 @@ async def test_geocode_success_requires_a_meaningful_address(
 
     state = await runtime.execute(
         runtime.new_state("address-contract-failure"),
-        {"address": "Rua das Flores, 100"},
+        {"address": "Street das Flores, 100"},
     )
 
     assert state.status == "error"
@@ -242,20 +242,20 @@ async def test_ambiguous_address_confirmation_reasks_without_clearing_address() 
     runtime = FlowRuntime(_address_flow_document(needs_confirmation=True, max_attempts=2))
     state = await runtime.execute(
         runtime.new_state("ambiguous-address-confirmation"),
-        {"address": "Rua das Flores, 100"},
+        {"address": "Street das Flores, 100"},
     )
 
-    state = await runtime.execute(state, {"confirmacao": "talvez"})
+    state = await runtime.execute(state, {"confirmation": "talvez"})
 
     assert state.status == "progress"
-    assert state.data["address"]["logradouro"] == "Rua das Flores, 100"
+    assert state.data["address"]["street"] == "Street das Flores, 100"
     assert state.data["address_attempts"] == 1
     assert state.agent_response is not None
     assert state.agent_response.error_message == (
-        "não consegui identificar se a resposta foi sim ou não"
+        "the response could not be interpreted as yes or no"
     )
 
-    state = await runtime.execute(state, {"confirmacao": "sim"})
+    state = await runtime.execute(state, {"confirmation": "yes"})
 
     assert state.status == "completed"
     assert state.data["address_confirmed"] is True
@@ -272,10 +272,10 @@ async def test_ambiguous_address_confirmation_uses_exhaustion_policy() -> None:
     )
     state = await runtime.execute(
         runtime.new_state("ambiguous-address-exhaustion"),
-        {"address": "Rua das Flores, 100"},
+        {"address": "Street das Flores, 100"},
     )
 
-    state = await runtime.execute(state, {"confirmacao": None})
+    state = await runtime.execute(state, {"confirmation": None})
 
     assert state.status == "completed"
     assert state.data["address_skipped"] is True
@@ -286,10 +286,10 @@ async def test_negative_address_confirmation_alone_clears_and_recollects() -> No
     runtime = FlowRuntime(_address_flow_document(needs_confirmation=True, max_attempts=2))
     state = await runtime.execute(
         runtime.new_state("negative-address-confirmation"),
-        {"address": "Rua das Flores, 100"},
+        {"address": "Street das Flores, 100"},
     )
 
-    state = await runtime.execute(state, {"confirmacao": "não"})
+    state = await runtime.execute(state, {"confirmation": "no"})
 
     assert state.status == "progress"
     assert "address" not in state.data
@@ -297,4 +297,4 @@ async def test_negative_address_confirmation_alone_clears_and_recollects() -> No
     assert "address_attempts" not in state.data
     assert state.agent_response is not None
     assert state.agent_response.payload_schema is not None
-    assert "endereço completo" in state.agent_response.description.lower()
+    assert "complete address" in state.agent_response.description.lower()

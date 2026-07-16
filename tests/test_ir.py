@@ -34,25 +34,25 @@ async def _unused_profile_tool(**inputs: Any) -> dict[str, Any]:
 
 
 def test_normalization_is_non_mutating_idempotent_and_schema_valid(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_document = copy.deepcopy(buraco_doc)
+    source_document = copy.deepcopy(pothole_document)
 
-    normalized_document = normalize_flow(buraco_doc)
+    normalized_document = normalize_flow(pothole_document)
 
-    assert buraco_doc == source_document
+    assert pothole_document == source_document
     assert normalize_flow(normalized_document) == normalized_document
     assert normalized_document["config"]["max_attempts"] == 3
-    assert normalized_document["domains"]["SimNao"]["normalize"]["emoji_veto"] is False
-    assert normalized_document["slots"]["buraco_tipo"]["persist"] == "data"
-    assert normalized_document["path"][0]["step"] == "collect_tipo"
+    assert normalized_document["domains"]["YesNo"]["normalize"]["emoji_veto"] is False
+    assert normalized_document["slots"]["pothole_type"]["persist"] == "data"
+    assert normalized_document["path"][0]["step"] == "collect_type"
     validate_flow(normalized_document)
 
 
 def test_normalization_does_not_invent_absent_service_metadata(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(buraco_doc)
+    flow_document = copy.deepcopy(pothole_document)
     flow_document.pop("service")
 
     normalized_document = normalize_flow(flow_document)
@@ -62,10 +62,10 @@ def test_normalization_does_not_invent_absent_service_metadata(
     assert "data.service" not in flow_ir.nodes[0].writes
 
 
-def test_ir_is_stable_across_json_key_order(buraco_doc: dict[str, Any]) -> None:
-    reordered_document = json.loads(json.dumps(buraco_doc, sort_keys=True))
+def test_ir_is_stable_across_json_key_order(pothole_document: dict[str, Any]) -> None:
+    reordered_document = json.loads(json.dumps(pothole_document, sort_keys=True))
 
-    original_ir = build_flow_ir(buraco_doc)
+    original_ir = build_flow_ir(pothole_document)
     reordered_ir = build_flow_ir(reordered_document)
 
     assert original_ir.source_digest == reordered_ir.source_digest
@@ -73,38 +73,38 @@ def test_ir_is_stable_across_json_key_order(buraco_doc: dict[str, Any]) -> None:
     assert original_ir.canonical_json == reordered_ir.canonical_json
 
 
-def test_ir_carries_explicit_versioned_format_identity(buraco_doc: dict[str, Any]) -> None:
-    flow_ir = build_flow_ir(buraco_doc)
+def test_ir_carries_explicit_versioned_format_identity(pothole_document: dict[str, Any]) -> None:
+    flow_ir = build_flow_ir(pothole_document)
 
     assert flow_ir.ir_format == FLOW_IR_FORMAT
     assert flow_ir.to_dict()["ir_format"] == FLOW_IR_FORMAT
 
 
 def test_ir_materializes_nodes_state_access_references_and_capabilities(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    flow_ir = build_flow_ir(buraco_doc)
+    flow_ir = build_flow_ir(pothole_document)
 
     assert flow_ir.nodes[0].identifier == "__init__"
-    assert flow_ir.nodes[1].identifier == "collect_tipo"
-    assert flow_ir.nodes[1].writes == ("data.buraco_tipo",)
-    assert flow_ir.transitions[0].target == "collect_tipo"
+    assert flow_ir.nodes[1].identifier == "collect_type"
+    assert flow_ir.nodes[1].writes == ("data.pothole_type",)
+    assert flow_ir.transitions[0].target == "collect_type"
     assert "subflow:address@1" in flow_ir.required_capabilities
-    assert "tool:sgrc_open_ticket" in flow_ir.required_capabilities
+    assert "tool:open_service_request" in flow_ir.required_capabilities
     assert any(
-        reference.source == "/slots/buraco_tipo/domain" and reference.target == "BuracoTipo"
+        reference.source == "/slots/pothole_type/domain" and reference.target == "PotholeType"
         for reference in flow_ir.references
     )
 
 
-def test_ir_generates_partitioned_state_schema(luminaria_doc: dict[str, Any]) -> None:
-    state_schema = build_flow_ir(luminaria_doc).state_schema()
+def test_ir_generates_partitioned_state_schema(streetlight_document: dict[str, Any]) -> None:
+    state_schema = build_flow_ir(streetlight_document).state_schema()
 
     Draft202012Validator.check_schema(state_schema)
-    assert state_schema["properties"]["data"]["properties"]["luminaria_defeito"] == {
-        "enum": luminaria_doc["domains"]["LuminariaDefeito"]["values"]
+    assert state_schema["properties"]["data"]["properties"]["streetlight_issue"] == {
+        "enum": streetlight_document["domains"]["StreetlightIssue"]["values"]
     }
-    location_values = state_schema["properties"]["data"]["properties"]["luminaria_localizacao"][
+    location_values = state_schema["properties"]["data"]["properties"]["streetlight_location"][
         "enum"
     ]
     assert None not in location_values
@@ -112,9 +112,9 @@ def test_ir_generates_partitioned_state_schema(luminaria_doc: dict[str, Any]) ->
 
 
 def test_ir_preserves_local_references_in_embedded_subflow_slot_schemas(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(buraco_doc)
+    flow_document = copy.deepcopy(pothole_document)
     flow_document["uses"].append({"ref": "schema_contract@1", "with": {}})
     subflows = default_subflows()
     subflows.register(
@@ -144,14 +144,14 @@ def test_ir_preserves_local_references_in_embedded_subflow_slot_schemas(
 
 
 def test_ir_await_writes_follow_declared_slot_partitions(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
-    internal_slots = ("ponto_referencia", "ticket_data_confirmed", "service_confirmed")
+    flow_document = copy.deepcopy(streetlight_document)
+    internal_slots = ("reference_point", "ticket_data_confirmed", "service_confirmed")
     for slot_name in internal_slots:
         flow_document["slots"][slot_name]["persist"] = "internal"
     await_definition = flow_document["capabilities"]["await_external"]
-    await_definition["on_resume"]["set"]["ponto_referencia"] = "$token.reference"
+    await_definition["on_resume"]["set"]["reference_point"] = "$token.reference"
     await_definition["on_resume"]["enrich"]["set"]["ticket_data_confirmed"] = "$result.confirmed"
     await_definition["timeout"]["set"]["service_confirmed"] = False
 
@@ -166,7 +166,7 @@ def test_ir_await_writes_follow_declared_slot_partitions(
     internal_properties = state_schema["properties"]["internal"]["properties"]
 
     assert {
-        "internal.ponto_referencia",
+        "internal.reference_point",
         "internal.ticket_data_confirmed",
         "internal.service_confirmed",
     } <= set(await_node.writes)
@@ -177,15 +177,15 @@ def test_ir_await_writes_follow_declared_slot_partitions(
     assert any(
         reference.source == "/capabilities/await_external/resume/correlation"
         and reference.namespace == "token"
-        and reference.target == "$token.cpf"
+        and reference.target == "$token.brazilian_tax_id"
         for reference in flow_ir.references
     )
 
 
 def test_ir_declares_opt_in_await_resend_budget_state(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     await_definition = flow_document["capabilities"]["await_external"]
     await_definition["max_resends"] = 2
 
@@ -207,9 +207,9 @@ def test_ir_declares_opt_in_await_resend_budget_state(
 
 
 def test_ir_terminal_node_includes_success_literal_writes(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(buraco_doc)
+    flow_document = copy.deepcopy(pothole_document)
     flow_document["terminal"]["outcomes"]["success"]["set"] = {"submission_status": "submitted"}
 
     terminal_node = next(
@@ -220,15 +220,15 @@ def test_ir_terminal_node_includes_success_literal_writes(
 
 
 def test_ir_derive_source_default_preserves_source_domain_schema(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(buraco_doc)
+    flow_document = copy.deepcopy(pothole_document)
     flow_document["derive"] = [
         {
             "writes": "classification",
-            "from": ["buraco_tipo"],
-            "after": "collect_tipo",
-            "lookup": {"Buraco no asfalto": "mapped"},
+            "from": ["pothole_type"],
+            "after": "collect_type",
+            "lookup": {"Asphalt pothole": "mapped"},
             "default": "$from[0]",
         }
     ]
@@ -236,19 +236,17 @@ def test_ir_derive_source_default_preserves_source_domain_schema(
     state_schema = build_flow_ir(flow_document).state_schema()
     validator = Draft202012Validator(state_schema)
 
-    assert validator.is_valid(
-        {"data": {"classification": "Cratera"}, "internal": {}, "payload": {}}
-    )
+    assert validator.is_valid({"data": {"classification": "Crater"}, "internal": {}, "payload": {}})
     assert validator.is_valid({"data": {"classification": "mapped"}, "internal": {}, "payload": {}})
 
 
-def test_ir_rejects_unplaced_derive_without_anchor(buraco_doc: dict[str, Any]) -> None:
-    flow_document = copy.deepcopy(buraco_doc)
+def test_ir_rejects_unplaced_derive_without_anchor(pothole_document: dict[str, Any]) -> None:
+    flow_document = copy.deepcopy(pothole_document)
     flow_document["derive"] = [
         {
             "writes": "classification",
-            "from": ["buraco_tipo"],
-            "lookup": {"Buraco no asfalto": "mapped"},
+            "from": ["pothole_type"],
+            "lookup": {"Asphalt pothole": "mapped"},
         }
     ]
 
@@ -256,29 +254,29 @@ def test_ir_rejects_unplaced_derive_without_anchor(buraco_doc: dict[str, Any]) -
         build_flow_ir(flow_document)
 
 
-def test_ir_returns_fresh_documents(buraco_doc: dict[str, Any]) -> None:
-    flow_ir = build_flow_ir(buraco_doc)
+def test_ir_returns_fresh_documents(pothole_document: dict[str, Any]) -> None:
+    flow_ir = build_flow_ir(pothole_document)
 
     first_document = flow_ir.to_document()
     first_document["flow"] = "mutated"
 
-    assert flow_ir.to_document()["flow"] == buraco_doc["flow"]
+    assert flow_ir.to_document()["flow"] == pothole_document["flow"]
 
 
 def test_external_wait_requires_explicit_out_of_band_send_semantics(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    source_document = copy.deepcopy(luminaria_doc)
+    source_document = copy.deepcopy(streetlight_document)
     source_document["capabilities"]["await_external"]["interactive"].pop("out_of_band")
 
     with pytest.raises(ValidationError):
         normalize_flow(source_document)
 
 
-def test_ir_projection_is_complete_and_json_compatible(buraco_doc: dict[str, Any]) -> None:
-    projection = build_flow_ir(buraco_doc).to_dict()
+def test_ir_projection_is_complete_and_json_compatible(pothole_document: dict[str, Any]) -> None:
+    projection = build_flow_ir(pothole_document).to_dict()
 
-    assert projection["document"]["flow"] == buraco_doc["flow"]
+    assert projection["document"]["flow"] == pothole_document["flow"]
     assert projection["nodes"][0]["identifier"] == "__init__"
     assert projection["profile_digest"]
     assert projection["dependency_digest"]
@@ -287,11 +285,11 @@ def test_ir_projection_is_complete_and_json_compatible(buraco_doc: dict[str, Any
 
 
 def test_default_ir_resolves_the_reference_profile_contract(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
     profile = reference_profile()
-    implicit_profile_ir = build_flow_ir(buraco_doc)
-    explicit_profile_ir = build_flow_ir(buraco_doc, profile=profile)
+    implicit_profile_ir = build_flow_ir(pothole_document)
+    explicit_profile_ir = build_flow_ir(pothole_document, profile=profile)
 
     assert implicit_profile_ir.digest == explicit_profile_ir.digest
     assert implicit_profile_ir.profile_digest == explicit_profile_ir.profile_digest
@@ -302,7 +300,7 @@ def test_default_ir_resolves_the_reference_profile_contract(
     assert "capability:geocoding" in implicit_profile_ir.required_capabilities
 
 
-def test_ir_digest_includes_resolved_profile_contract(buraco_doc: dict[str, Any]) -> None:
+def test_ir_digest_includes_resolved_profile_contract(pothole_document: dict[str, Any]) -> None:
     base_profile = reference_profile()
     reduced_profile = FlowProfile(
         identifier=base_profile.identifier,
@@ -312,8 +310,8 @@ def test_ir_digest_includes_resolved_profile_contract(buraco_doc: dict[str, Any]
         domain_types=base_profile.domain_types,
     )
 
-    base_ir = build_flow_ir(buraco_doc, profile=base_profile)
-    reduced_ir = build_flow_ir(buraco_doc, profile=reduced_profile)
+    base_ir = build_flow_ir(pothole_document, profile=base_profile)
+    reduced_ir = build_flow_ir(pothole_document, profile=reduced_profile)
 
     assert base_ir.profile == reduced_ir.profile
     assert base_ir.profile_digest != reduced_ir.profile_digest
@@ -322,9 +320,9 @@ def test_ir_digest_includes_resolved_profile_contract(buraco_doc: dict[str, Any]
 
 
 def test_ir_includes_transitive_subflow_tool_contract_in_dependency_digest(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    base_ir = build_flow_ir(buraco_doc)
+    base_ir = build_flow_ir(pothole_document)
     altered_tools = default_tool_registry()
     altered_geocode_definition = replace(
         altered_tools.definition("geocode"),
@@ -337,7 +335,7 @@ def test_ir_includes_transitive_subflow_tool_contract_in_dependency_digest(
     )
 
     altered_ir = build_flow_ir(
-        buraco_doc,
+        pothole_document,
         profile=reference_profile(tools=altered_tools),
     )
 
@@ -347,38 +345,40 @@ def test_ir_includes_transitive_subflow_tool_contract_in_dependency_digest(
 
 
 def test_ir_projects_complete_subflow_owned_state_by_partition(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_ir = build_flow_ir(luminaria_doc)
+    flow_ir = build_flow_ir(streetlight_document)
     state_schema = flow_ir.state_schema()
     validator = Draft202012Validator(state_schema)
     data_properties = state_schema["properties"]["data"]["properties"]
     internal_properties = state_schema["properties"]["internal"]["properties"]
 
     assert data_properties["address_completed"]["type"] == "boolean"
-    assert data_properties["cpf"]["pattern"] == "^[0-9]{11}$"
-    assert internal_properties["_cpf_lookup_derived:email"]["type"] == "boolean"
-    assert "_cpf_lookup_derived:email" not in data_properties
+    assert data_properties["brazilian_tax_id"]["pattern"] == "^[0-9]{11}$"
+    assert internal_properties["_brazilian_tax_id_lookup_derived:email"]["type"] == "boolean"
+    assert "_brazilian_tax_id_lookup_derived:email" not in data_properties
     assert validator.is_valid(
         {
-            "data": {"address_completed": True, "cpf": "12345678901"},
-            "internal": {"_cpf_lookup_derived:email": True},
+            "data": {"address_completed": True, "brazilian_tax_id": "12345678901"},
+            "internal": {"_brazilian_tax_id_lookup_derived:email": True},
             "payload": {},
         }
     )
     assert not validator.is_valid(
         {
             "data": {"address_completed": "yes"},
-            "internal": {"_cpf_lookup_derived:email": "yes"},
+            "internal": {"_brazilian_tax_id_lookup_derived:email": "yes"},
             "payload": {},
         }
     )
 
 
 def test_ir_subflow_node_conservatively_indexes_all_owned_state(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    address_node = next(node for node in build_flow_ir(buraco_doc).nodes if node.kind == "subflow")
+    address_node = next(
+        node for node in build_flow_ir(pothole_document).nodes if node.kind == "subflow"
+    )
 
     assert "data.address" in address_node.reads
     assert "data.address_completed" in address_node.reads
@@ -386,14 +386,14 @@ def test_ir_subflow_node_conservatively_indexes_all_owned_state(
 
 
 def test_ir_predicate_references_use_explicit_partition_namespaces(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(buraco_doc)
+    flow_document = copy.deepcopy(pothole_document)
     flow_document["path"][0]["ask_when"] = {
         "and": [
-            {"eq": ["slots.buraco_tipo", "payload.requested_type"]},
+            {"eq": ["slots.pothole_type", "payload.requested_type"]},
             {"is_present": "internal._collection_asked_slot"},
-            {"eq": ["address.kind", {"literal": "praca"}]},
+            {"eq": ["address.kind", {"literal": "square"}]},
             {"eq": ["config.identification_required", False]},
         ]
     }
@@ -405,7 +405,7 @@ def test_ir_predicate_references_use_explicit_partition_namespaces(
     }
 
     assert {
-        ("data", "buraco_tipo"),
+        ("data", "pothole_type"),
         ("payload", "requested_type"),
         ("internal", "_collection_asked_slot"),
         ("address", "kind"),
@@ -414,13 +414,13 @@ def test_ir_predicate_references_use_explicit_partition_namespaces(
 
 
 def test_ir_execution_digest_ignores_unused_profile_additions(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
     profile = reference_profile()
-    base_ir = build_flow_ir(buraco_doc, profile=profile)
+    base_ir = build_flow_ir(pothole_document, profile=profile)
 
     profile.tools.register("unused_profile_tool", _unused_profile_tool)
-    expanded_ir = build_flow_ir(buraco_doc, profile=profile)
+    expanded_ir = build_flow_ir(pothole_document, profile=profile)
 
     assert base_ir.profile_digest != expanded_ir.profile_digest
     assert base_ir.dependency_digest == expanded_ir.dependency_digest

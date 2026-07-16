@@ -11,23 +11,23 @@ EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
 
 @pytest.fixture
-def luminaria_doc() -> dict[str, Any]:
-    return load_flow(str(EXAMPLES / "reparo_luminaria.flow.json"))
+def streetlight_document() -> dict[str, Any]:
+    return load_flow(str(EXAMPLES / "streetlight_repair.flow.json"))
 
 
 @pytest.fixture
-def buraco_doc() -> dict[str, Any]:
-    return load_flow(str(EXAMPLES / "reparo_buraco.flow.json"))
+def pothole_document() -> dict[str, Any]:
+    return load_flow(str(EXAMPLES / "pothole_repair.flow.json"))
 
 
 @pytest.fixture
-def luminaria(luminaria_doc) -> FlowRuntime:
-    return FlowRuntime(luminaria_doc)
+def streetlight(streetlight_document) -> FlowRuntime:
+    return FlowRuntime(streetlight_document)
 
 
 @pytest.fixture
-def buraco(buraco_doc) -> FlowRuntime:
-    return FlowRuntime(buraco_doc)
+def pothole(pothole_document) -> FlowRuntime:
+    return FlowRuntime(pothole_document)
 
 
 async def step(

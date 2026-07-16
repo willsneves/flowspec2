@@ -27,17 +27,17 @@ from .json_codec import strict_json_loads
 from .models import CORRECTION_TARGETS_SCHEMA_KEY, AgentResponse
 
 DEFAULT_ROUTE_SYSTEM_PROMPT = (
-    "Você roteia mensagens para um catálogo de serviços. "
-    "Dada a mensagem da pessoa usuária, decida qual serviço (se algum) atende ao pedido. "
-    "Responda APENAS com JSON."
+    "You route messages to a service catalog. "
+    "Given the user's message, decide which service, if any, handles the request. "
+    "Respond ONLY with JSON."
 )
 
 DEFAULT_EXTRACTION_SYSTEM_PROMPT = (
-    "Você extrai dados estruturados para um fluxo conversacional. "
-    "O sistema fez uma pergunta à pessoa usuária; converta a resposta em texto "
-    "livre num objeto JSON com os campos pedidos, usando SOMENTE os valores permitidos "
-    "quando houver lista fechada. Interprete sinônimos, gírias, números e emojis. "
-    "Responda APENAS com JSON, sem comentários."
+    "You extract structured data for a conversational flow. "
+    "The system asked the user a question; convert the free-text response into a JSON "
+    "object with the requested fields, using ONLY permitted values for closed lists. "
+    "Interpret synonyms, informal expressions, numbers, and emojis. "
+    "Respond ONLY with JSON and no commentary."
 )
 
 
@@ -113,7 +113,7 @@ def _fields_spec(
         field = ar.interactive["field"]
         buttons = ar.interactive.get("buttons") or []
         ids = [b.get("id") for b in buttons if b.get("id")]
-        if ids and set(ids) <= {"sim", "nao"}:
+        if ids and set(ids) <= {"yes", "no"}:
             spec.append((field, "bool", None, False))
         elif ids:
             spec.append((field, "closed", ids, False))
@@ -165,13 +165,13 @@ def build_route_request(
         sort_keys=True,
     )
     prompt = (
-        f"Catálogo de serviços em JSON:\n{serialized_catalog}\n\n"
-        "Use description como a definição principal de cada serviço. "
-        "trigger_phrases contém apenas exemplos de mensagens compatíveis; "
-        "não trate esses exemplos como lista exclusiva nem como garantia de correspondência.\n\n"
-        f'Mensagem da pessoa usuária: "{text}"\n\n'
-        'Devolva {"service": "<nome do serviço>"} se algum atende, '
-        'ou {"service": null} se nenhum atende.'
+        f"Service catalog as JSON:\n{serialized_catalog}\n\n"
+        "Use description as each service's primary definition. "
+        "trigger_phrases contains only examples of compatible messages; "
+        "do not treat them as an exclusive list or a match guarantee.\n\n"
+        f'User message: "{text}"\n\n'
+        'Return {"service": "<service name>"} if one applies, '
+        'or {"service": null} if none applies.'
     )
     return StructuredOutputRequest(
         system=system_prompt,
@@ -211,13 +211,13 @@ def _extraction_response_schema(agent_response: AgentResponse) -> dict[str, Any]
     if required:
         response_schema["required"] = required
     if allows_correction:
-        properties["correcao"] = {"enum": correction_targets}
+        properties["correction"] = {"enum": correction_targets}
         payload_branch = {
             "required": required,
-            "not": {"required": ["correcao"]},
+            "not": {"required": ["correction"]},
         }
         correction_branch = {
-            "required": ["correcao"],
+            "required": ["correction"],
             "not": {"anyOf": [{"required": [field_name]} for field_name in required]},
         }
         response_schema.pop("required", None)
@@ -237,43 +237,45 @@ def build_extraction_request(
     spec = _fields_spec(agent_response)
     lines: list[str] = []
     for field, kind, allowed, nullable in spec:
-        null_alternative = " ou null" if nullable and kind != "closed" else ""
+        null_alternative = " or null" if nullable and kind != "closed" else ""
         if kind == "closed":
             values = ", ".join(
                 json.dumps(value, ensure_ascii=False, separators=(",", ":"))
                 for value in (allowed or [])
             )
-            lines.append(f'- "{field}": um destes valores EXATOS: [{values}]')
+            lines.append(f'- "{field}": one of these EXACT values: [{values}]')
         elif kind == "bool":
             lines.append(
-                f'- "{field}": true (sim/afirmativo), false (não/negativo){null_alternative}'
+                f'- "{field}": true (yes/affirmative), false (no/negative){null_alternative}'
             )
         elif kind == "integer":
-            lines.append(f'- "{field}": número inteiro em JSON, sem aspas{null_alternative}')
+            lines.append(f'- "{field}": a JSON integer without quotes{null_alternative}')
         elif kind == "number":
-            lines.append(f'- "{field}": número finito em JSON, sem aspas{null_alternative}')
+            lines.append(f'- "{field}": a finite JSON number without quotes{null_alternative}')
         elif kind == "null":
             lines.append(f'- "{field}": null')
         else:
-            lines.append(f'- "{field}": string JSON com o texto informado{null_alternative}')
+            lines.append(
+                f'- "{field}": a JSON string containing the supplied text{null_alternative}'
+            )
     options = _interactive_options(agent_response)
-    options_hint = f"\nOpções oferecidas à pessoa usuária: {', '.join(options)}." if options else ""
+    options_hint = f"\nOptions offered to the user: {', '.join(options)}." if options else ""
     correction_targets = (agent_response.payload_schema or {}).get(CORRECTION_TARGETS_SCHEMA_KEY)
     correction_rule = (
-        "- Se a pessoa usuária quer CORRIGIR algo já informado, devolva somente "
-        '{"correcao": "<identificador>"}, usando um destes identificadores EXATOS: '
+        "- If the user wants to CORRECT previously supplied data, return only "
+        '{"correction": "<identifier>"}, using one of these EXACT identifiers: '
         f"{json.dumps(correction_targets, ensure_ascii=False)}.\n"
         if isinstance(correction_targets, list) and correction_targets
         else ""
     )
     prompt = (
-        f'Pergunta do sistema: "{agent_response.description}"\n'
-        f"Campos a extrair:\n" + "\n".join(lines) + options_hint + "\n\n"
-        f'Resposta da pessoa usuária: "{text}"\n\n'
-        "Regras:\n"
-        "- Use SOMENTE os valores permitidos nas listas fechadas.\n"
+        f'System question: "{agent_response.description}"\n'
+        f"Fields to extract:\n" + "\n".join(lines) + options_hint + "\n\n"
+        f'User response: "{text}"\n\n'
+        "Rules:\n"
+        "- Use ONLY permitted values from closed lists.\n"
         f"{correction_rule}"
-        "- Devolva apenas o JSON com os campos pedidos."
+        "- Return only JSON with the requested fields."
     )
     return StructuredOutputRequest(
         system=system_prompt,

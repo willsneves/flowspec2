@@ -2,7 +2,7 @@
 
 These materialize button and list envelopes from the closed options provided by
 ``domains.py``. Categorical options retain their declared values/rows; boolean
-options use canonical ``true``/``false`` identifiers with ``Sim``/``Não``
+options use canonical ``true``/``false`` identifiers with ``Yes``/``No``
 titles. Limits mirror the Meta Cloud API (and the production
 ``whatsapp_interactive``).
 """
@@ -287,7 +287,7 @@ def options_from_domain(
             }
             for domain_option in domain_options
         ]
-        return {"body": body, "field": field, "sections": [{"title": "Opções", "rows": rows}]}
+        return {"body": body, "field": field, "sections": [{"title": "Options", "rows": rows}]}
 
     if interactive.get("out_of_band"):
         return {
