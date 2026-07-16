@@ -33,6 +33,8 @@ _VENDOR_SCHEMA_DIRECTORY = _SCHEMA_DIRECTORY / "vendor"
 _OFFICIAL_SCHEMA_PATH = _VENDOR_SCHEMA_DIRECTORY / "open-workflow-1.0.3.workflow.yaml"
 _OFFICIAL_LICENSE_PATH = _VENDOR_SCHEMA_DIRECTORY / "open-workflow-1.0.3.LICENSE"
 _OFFICIAL_PROVENANCE_PATH = _VENDOR_SCHEMA_DIRECTORY / "open-workflow-1.0.3.provenance.json"
+_PUBLIC_PROFILE_NAMESPACE = "https://wllsena.github.io/flowspec2/profiles/"
+_PUBLIC_SCHEMA_NAMESPACE = "https://wllsena.github.io/flowspec2/schemas/"
 
 
 def _load_json_object(document_path: Path) -> dict[str, Any]:
@@ -69,6 +71,8 @@ def test_profile_schema_is_valid_draft_2020_12() -> None:
     profile_schema = _load_json_object(_PROFILE_SCHEMA_PATH)
 
     jsonschema.Draft202012Validator.check_schema(profile_schema)
+    assert profile_schema["$id"] == (f"{_PUBLIC_SCHEMA_NAMESPACE}open-workflow-conversation-1.json")
+    assert OPEN_WORKFLOW_PROFILE_ID == (f"{_PUBLIC_PROFILE_NAMESPACE}open-workflow-conversation-1")
 
 
 def test_official_schema_provenance_and_integrity_are_pinned() -> None:

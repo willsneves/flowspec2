@@ -5,8 +5,8 @@ Table of Contents:
 - Package versions: 20 <!-- section:package-versions -->
 - Format and contract versions: 35 <!-- section:contract-versions -->
 - Compatibility promises: 75 <!-- section:compatibility-promises -->
-- Release procedure: 90 <!-- section:release-procedure -->
-- Artifact rollback: 125 <!-- section:artifact-rollback -->
+- Release procedure: 91 <!-- section:release-procedure -->
+- Artifact rollback: 126 <!-- section:artifact-rollback -->
 
 <!-- /section:toc -->
 
@@ -19,11 +19,11 @@ documents, intermediate representations, corpora, profiles, and evidence.
 
 ## Package versions
 
-The `flowspec2` distribution follows Semantic Versioning. Before the stable
-release line, a minor release may contain an intentional public-API break and a
-patch release remains backward compatible within its minor line. After the
-stable release line begins, incompatible public-API changes require a major
-release.
+The `flowspec2` distribution follows Semantic Versioning. The stable release
+line begins with `1.0.0`; incompatible changes to its public package surfaces
+require a major release. The decision and its experimental exclusion are
+recorded in
+[ADR 0013](adr/0013-stable-package-release-boundary.md).
 
 The package version is declared in `pyproject.toml`; `flowspec2.__version__`
 reads installed distribution metadata so it cannot drift from the built
@@ -82,7 +82,8 @@ Public Python imports, CLI commands, machine-readable diagnostics, canonical IR,
 state provenance, compatibility profiles, and evidence schemas are versioned
 surfaces. Changes update tests, documentation, callers, and the changelog in the
 same changeset. Deprecated implementations are replaced rather than kept beside
-their successor in this pre-stable project.
+their successor. The `flowspec/3-draft` experiment is explicitly outside these
+compatibility promises until a new decision promotes a versioned successor.
 
 <!-- /section:compatibility-promises -->
 <!-- section:release-procedure -->

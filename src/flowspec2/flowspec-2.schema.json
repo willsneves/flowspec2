@@ -11,7 +11,7 @@
     "flow": { "description": "RAIL. Stable flow id == service_name; StateManager + checkpointer + config.yaml flow.registry key. Immutable across versions.", "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
     "version": { "description": "RAIL. Semver of this flow document. Bump per change; diff-friendly.", "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
     "service": {
-      "description": "RAIL. First-class service-identity metadata . Decoupled from any node. Carries SGRC/1746 codes + knowledge ids. Author NEVER puts these in an initialize node.",
+      "description": "RAIL. First-class service-identity metadata, decoupled from executable nodes. Carries service catalog codes, slugs, and knowledge identifiers; authors declare these values here instead of synthesizing an initialization node.",
       "type": "object", "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "description": "SGRC/1746 service id, e.g. '18131'." },
@@ -40,7 +40,7 @@
       }
     },
     "entry": {
-      "description": "RAIL. Generic best-effort, NON-terminal entry side-effect . Runs once before the path; never asks, never blocks, never resets. Home for 'initialize' node behavior WITHOUT folding service identity into it.",
+      "description": "RAIL. Generic best-effort, non-terminal entry side effect. Runs once before the path; never asks, blocks, or resets. Service identity remains in the service contract instead of this executable hook.",
       "type": "object", "additionalProperties": false, "required": ["tool"],
       "properties": {
         "tool": { "$ref": "#/$defs/identifier", "description": "Registered tool name to call on entry." },
@@ -311,7 +311,7 @@
       "properties": { "text": { "type": "string" }, "verbatim": { "type": "boolean", "default": false }, "extract_hint": { "type": "string" } }
     },
     "predicate": {
-      "description": "FROZEN object-form predicate grammar. Read-only namespaces ONLY: slots.<name>, internal.<name>, payload.<key>, config.<flag>, address.<field>. Operators: in, eq, ne, is_present, and, or, not. No string sugar in canonical flows. null is a valid literal.",
+      "description": "Closed object-form predicate grammar. Read-only namespaces: slots.<name>, internal.<name>, payload.<key>, config.<flag>, address.<field>. Operators: in, eq, ne, is_present, and, or, not. Canonical flows do not accept string-expression shorthand. null is a valid literal.",
       "type": "object", "minProperties": 1, "maxProperties": 1, "additionalProperties": false,
       "properties": {
         "in": { "type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [ { "$ref": "#/$defs/stateReference" }, { "type": "array", "items": { "type": ["string", "number", "boolean", "null"] } } ], "items": false },

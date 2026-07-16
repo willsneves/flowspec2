@@ -13,9 +13,15 @@ from jsonschema.exceptions import best_match
 
 from flowspec2 import schema, validate_flow
 
+PUBLIC_SCHEMA_NAMESPACE = "https://wllsena.github.io/flowspec2/schemas/"
+
 
 def test_schema_is_valid_draft202012():
     jsonschema.Draft202012Validator.check_schema(schema())
+
+
+def test_schema_uses_the_project_owned_public_namespace() -> None:
+    assert schema()["$id"] == f"{PUBLIC_SCHEMA_NAMESPACE}flowspec-2.json"
 
 
 def test_schema_returns_an_owned_copy() -> None:

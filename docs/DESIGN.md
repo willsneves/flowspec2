@@ -3,13 +3,13 @@
 Table of Contents:
 
 - Files: 28 <!-- section:files -->
-- Authoring-to-execution pipeline: 80 <!-- section:authoring-execution-pipeline -->
-- The one idea: the boundary is the closed value-domain: 159 <!-- section:closed-value-domain -->
-- Top-level shape (the two tiers): 176 <!-- section:top-level-shape -->
-- Mapping table — every construct → its LangGraph primitive: 197 <!-- section:mapping-table -->
-- Rationale (1 page): 257 <!-- section:rationale -->
-    - Rejected alternatives: 277 <!-- section:rationale-rejected-alternatives -->
-- How this was produced: 293 <!-- section:production-method -->
+- Authoring-to-execution pipeline: 82 <!-- section:authoring-execution-pipeline -->
+- The one idea: the boundary is the closed value-domain: 161 <!-- section:closed-value-domain -->
+- Top-level shape (the two tiers): 178 <!-- section:top-level-shape -->
+- Mapping table — every construct → its LangGraph primitive: 199 <!-- section:mapping-table -->
+- Rationale (1 page): 259 <!-- section:rationale -->
+    - Rejected alternatives: 279 <!-- section:rationale-rejected-alternatives -->
+- How this was produced: 295 <!-- section:production-method -->
 
 <!-- /section:toc -->
 
@@ -67,6 +67,8 @@ that graph as a callable tool.
 | [`adr/0002-format-authoring-execution-boundary.md`](adr/0002-format-authoring-execution-boundary.md) | Decision record for the source/link/profile/IR boundary. |
 | [`adr/0003-benchmark-author-trust-boundary.md`](adr/0003-benchmark-author-trust-boundary.md) | Decision record for evaluator-private oracles and effective model identity. |
 | [`adr/0004-evidence-authenticity.md`](adr/0004-evidence-authenticity.md) | Decision record for detached evidence signatures and external trust roots. |
+| [`adr/0012-public-contract-namespace.md`](adr/0012-public-contract-namespace.md) | Decision record for project-owned schema and profile identifiers. |
+| [`adr/0013-stable-package-release-boundary.md`](adr/0013-stable-package-release-boundary.md) | Decision record for the stable package and experimental preview boundary. |
 
 The project test suite checks the schema itself, validates both example
 documents, and rejects adversarial mutations such as unknown keys, ambiguous

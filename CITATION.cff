@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use flowspec2, cite the software using this metadata."
+title: flowspec2
+type: software
+authors:
+  - name: wllsena
+repository-code: "https://github.com/wllsena/flowspec2"
+url: "https://github.com/wllsena/flowspec2"
+license: MIT
+keywords:
+  - conversational-ai
+  - workflow
+  - state-machine
+  - langgraph

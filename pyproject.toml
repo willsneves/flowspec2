@@ -4,7 +4,8 @@ version = "0.2.0"
 description = "A JSON conversational-flow format that compiles to a LangGraph StateGraph at runtime."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "wllsena" }]
 keywords = ["langgraph", "conversational-ai", "slot-filling", "whatsapp", "dsl", "state-machine"]
 classifiers = [

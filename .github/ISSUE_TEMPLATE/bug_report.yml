@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a reproducible defect in the format, runtime, CLI, or package.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not include credentials, citizen data, private flows, or undisclosed
+        vulnerabilities. Use the private process in SECURITY.md for security reports.
+  - type: input
+    id: version
+    attributes:
+      label: flowspec2 version
+      description: Package version, tag, or commit used to reproduce the defect.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: What happened, including the complete non-secret diagnostic.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened under the documented contract.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the smallest sanitized flow or command that reproduces the defect.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, operating system, installation method, and relevant extras.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I removed secrets, personal data, and private flow content.
+          required: true
+        - label: I checked the current documentation and existing issues.
+          required: true

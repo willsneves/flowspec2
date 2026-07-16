@@ -1,7 +1,7 @@
 """LLM-driven simulation — the bot's *intelligence* doing the non-deterministic work.
 
-Here the citizen speaks in messy free text. A real LLM (Gemini 2.5 Flash, the
-the configured model) does the non-deterministic part:
+Here the citizen speaks in messy free text. A real LLM (Gemini 2.5 Flash) does
+the non-deterministic part:
 routing into the flow and extracting the closed token for each slot from the
 node's payload_schema / interactive options. flowspec2 holds the rails — the
 validators reject anything out of domain. The transcript shows the boundary:

@@ -4,12 +4,12 @@ Table of Contents:
 
 - Unreleased: 23 <!-- section:unreleased -->
     - Added: 27 <!-- section:unreleased-added -->
-    - Changed: 48 <!-- section:unreleased-changed -->
-    - Security: 84 <!-- section:unreleased-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 97 <!-- section:version-0-2-0 -->
-    - Added: 101 <!-- section:version-0-2-0-added -->
-    - Changed: 118 <!-- section:version-0-2-0-changed -->
-    - Security: 133 <!-- section:version-0-2-0-security -->
+    - Changed: 50 <!-- section:unreleased-changed -->
+    - Security: 91 <!-- section:unreleased-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 104 <!-- section:version-0-2-0 -->
+    - Added: 108 <!-- section:version-0-2-0-added -->
+    - Changed: 125 <!-- section:version-0-2-0-changed -->
+    - Security: 140 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -26,6 +26,8 @@ All notable project changes are recorded here. Versioning follows
 
 ### Added
 
+- Public contribution, conduct, citation, issue, and pull-request contracts for
+  the stable open-source release.
 - Optional persisted `await_external.max_resends` enforcement with a host-facing
   remaining-budget contract, atomic exhaustion rejection, and backward-compatible
   host-owned limiting when omitted.
@@ -47,6 +49,11 @@ All notable project changes are recorded here. Versioning follows
 
 ### Changed
 
+- Moved project-owned schema and compatibility-profile identifiers to the
+  `wllsena.github.io/flowspec2` namespace, replaced operational-looking example
+  hosts with reserved domains, and removed internal editorial annotations.
+- Adopted PEP 639 license metadata and documented the stable package boundary
+  around `flowspec/2`, with `flowspec/3-draft` remaining experimental.
 - Removed repository-local harness doctrine and model integrations that depended
   on non-public sibling tooling; the public package now exposes only its
   self-contained transport and provider-neutral evidence contracts.

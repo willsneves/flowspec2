@@ -25,7 +25,9 @@ from flowspec2.json_codec import strict_json_loads
 from flowspec2.schema import schema as flowspec_schema
 from flowspec2.tools import ToolRegistry, default_tool_registry
 
-OPEN_WORKFLOW_PROFILE_ID = "https://wllsena.github.io/flowspec2/profiles/open-workflow-conversation-1"
+OPEN_WORKFLOW_PROFILE_ID = (
+    "https://wllsena.github.io/flowspec2/profiles/open-workflow-conversation-1"
+)
 OPEN_WORKFLOW_SCHEMA_VERSION = "1.0.3"
 
 _OPEN_WORKFLOW_DSL_VERSION = OPEN_WORKFLOW_SCHEMA_VERSION

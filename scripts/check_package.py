@@ -55,6 +55,9 @@ EXPECTED_SDIST_MEMBERS: Final[frozenset[str]] = frozenset(
     {
         *(f"src/{member_name}" for member_name in EXPECTED_WHEEL_MEMBERS),
         "CHANGELOG.md",
+        "CITATION.cff",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
         "LICENSE",
         "README.md",
         "SECURITY.md",

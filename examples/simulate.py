@@ -36,7 +36,7 @@ CYAN = "\033[36m"
 
 
 def make_transport(sgrc) -> httpx.MockTransport:
-    """A deterministic stand-in for the Prefeitura services."""
+    """A deterministic stand-in for a civic-service backend."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path

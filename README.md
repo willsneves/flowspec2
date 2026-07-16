@@ -2,18 +2,19 @@
 
 Table of Contents:
 
-- Install: 67 <!-- section:install -->
-- LLM-driven (the engine side): 109 <!-- section:llm-driven -->
-- Quickstart: 178 <!-- section:quickstart -->
-- Real backends: 202 <!-- section:real-backends -->
-- Error correlation: 219 <!-- section:error-correlation -->
-- CLI: 242 <!-- section:cli -->
-- What it compiles: 302 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 328 <!-- section:example -->
-    - The flowspec/2 document: 335 <!-- section:example-document -->
-    - Compiled LangGraph: 973 <!-- section:example-compiled-langgraph -->
-- Layout: 1091 <!-- section:layout -->
-- Status: 1140 <!-- section:status -->
+- Install: 78 <!-- section:install -->
+- LLM-driven (the engine side): 120 <!-- section:llm-driven -->
+- Quickstart: 189 <!-- section:quickstart -->
+- Real backends: 213 <!-- section:real-backends -->
+- Error correlation: 230 <!-- section:error-correlation -->
+- CLI: 253 <!-- section:cli -->
+- What it compiles: 313 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 339 <!-- section:example -->
+    - The flowspec/2 document: 346 <!-- section:example-document -->
+    - Compiled LangGraph: 984 <!-- section:example-compiled-langgraph -->
+- Layout: 1102 <!-- section:layout -->
+- Governance: 1151 <!-- section:governance -->
+- Status: 1168 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -21,7 +22,11 @@ Table of Contents:
 
 **A JSON conversational-flow format that compiles to a [LangGraph](https://langchain-ai.github.io/langgraph/) `StateGraph` at runtime.**
 
-You write one self-contained JSON document per service flow. A running agent loads it and `flowspec2` compiles it into an executable `StateGraph[ServiceState]` — the flow becomes immediately callable as a tool/subgraph. The design comes from the Prefeitura do Rio WhatsApp bot's `multi_step_service` framework; this repo is a clean, self-contained, dependency-light reimplementation of the *format* and its *runtime compiler*.
+You write one self-contained JSON document per service flow. A running agent
+loads it and `flowspec2` compiles it into an executable
+`StateGraph[ServiceState]` — the flow becomes immediately callable as a
+tool/subgraph. The package is a self-contained, dependency-light format and
+runtime compiler for bounded conversational service flows.
 
 > **One idea — the boundary is the closed value-domain.** The JSON pins the **rails** (states, value-domains, transitions, guards, tool bindings, interrupts, idempotency, guardrails); the LLM reasons and acts **freely within** them (which flow to enter, extracting the closed token from free text/voice/photo, phrasing, side actions). The LLM structurally *cannot* invent a transition, skip a required slot without an author-declared exhaustion route, or widen a value-domain.
 
@@ -57,6 +62,12 @@ existing documents.
 The [public model transport decision](docs/adr/0011-public-model-transport-scope.md)
 keeps the repository self-contained by limiting integrated live-model execution
 to dependencies available through the public package contract.
+The [public namespace decision](docs/adr/0012-public-contract-namespace.md)
+places every project-owned schema and profile identifier under a namespace
+controlled by the repository owner. The
+[stable release decision](docs/adr/0013-stable-package-release-boundary.md)
+defines the compatibility boundary between stable `flowspec/2` and the isolated
+`flowspec/3-draft` experiment.
 
 Release history and compatibility policy live in [CHANGELOG.md](CHANGELOG.md)
 and [VERSIONING.md](docs/VERSIONING.md). Report vulnerabilities through the
@@ -211,7 +222,7 @@ cfg = BackendConfig.from_env()      # FLOWSPEC2_GEOCODE_URL / _CPF_LOOKUP_URL / 
 rt = FlowRuntime(doc, tools=make_registry(cfg))
 ```
 
-Install the HTTP extra with `uv sync --extra http`. The SGRC adapter maps HTTP semantics onto the terminal outcome trichotomy: **2xx → `success`**, **5xx / timeout / connection error → `retryable`** (the terminal node preserves state and re-fires next turn), **4xx → `fatal`** (resets). Backends are injectable (`transport=`) so they're tested offline with `httpx.MockTransport` — no network. Point each URL at a real Prefeitura endpoint (or a thin adapter conforming to the contracts in `backends/http.py`).
+Install the HTTP extra with `uv sync --extra http`. The SGRC adapter maps HTTP semantics onto the terminal outcome trichotomy: **2xx → `success`**, **5xx / timeout / connection error → `retryable`** (the terminal node preserves state and re-fires next turn), **4xx → `fatal`** (resets). Backends are injectable (`transport=`) so they're tested offline with `httpx.MockTransport` — no network. Point each URL at an authorized service endpoint or a thin adapter conforming to the contracts in `backends/http.py`.
 
 <!-- /section:real-backends -->
 <!-- section:error-correlation -->
@@ -1135,6 +1146,23 @@ tests/             schema · boundaries · linker · IR · authoring · compatib
 ```
 
 <!-- /section:layout -->
+<!-- section:governance -->
+
+## Governance
+
+Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md) and community
+interactions follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Cite the project
+with [CITATION.cff](CITATION.cff), report security issues through
+[SECURITY.md](SECURITY.md), and use the repository issue forms for public bug
+reports and feature proposals.
+
+Development is substantially AI-assisted. The repository owner remains
+responsible for scope, review, verification, release decisions, and acceptance
+of every change. AI-generated commits carry an authorship trailer when
+applicable; no model output is accepted as evidence without the deterministic
+gates documented in this repository.
+
+<!-- /section:governance -->
 <!-- section:status -->
 
 ## Status
@@ -1148,8 +1176,8 @@ The live runner emits the reproducible evidence artifact needed for that
 decision, but does not reinterpret fixture success as model-quality evidence.
 Subflows ship with in-memory fake backends so the suite runs offline; each
 backend is an injectable protocol that maps to the real production integration.
-Not affiliated with or deployed by the Prefeitura do Rio — this is a clean-room
-reimplementation of a format design.
+Examples use civic-service scenarios and reserved demonstration endpoints; they
+do not represent an affiliation or a deployed integration.
 
 MIT licensed.
 

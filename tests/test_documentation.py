@@ -10,6 +10,8 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTATION_PATHS = (
     PROJECT_ROOT / "README.md",
+    PROJECT_ROOT / "CODE_OF_CONDUCT.md",
+    PROJECT_ROOT / "CONTRIBUTING.md",
     *sorted((PROJECT_ROOT / "docs").rglob("*.md")),
 )
 MAXIMUM_MARKER_DISTANCE_LINES = 10
