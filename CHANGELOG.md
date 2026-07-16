@@ -3,7 +3,7 @@
 Table of Contents:
 
 - Unreleased: 24 <!-- section:unreleased -->
-- Version 1.0.0 — 2026-07-16: 29 <!-- section:version-1-0-0 -->
+- Version 1.0.0 — prepared 2026-07-16, not published: 29 <!-- section:version-1-0-0 -->
     - Added: 33 <!-- section:version-1-0-0-added -->
     - Changed: 60 <!-- section:version-1-0-0-changed -->
     - Security: 113 <!-- section:version-1-0-0-security -->
@@ -26,7 +26,7 @@ All notable project changes are recorded here. Versioning follows
 <!-- /section:unreleased -->
 <!-- section:version-1-0-0 -->
 
-## Version 1.0.0 — 2026-07-16
+## Version 1.0.0 — prepared 2026-07-16, not published
 
 <!-- section:version-1-0-0-added -->
 
