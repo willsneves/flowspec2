@@ -1,6 +1,6 @@
 [project]
 name = "flowspec2"
-version = "1.0.0"
+version = "1.0.1"
 description = "A JSON conversational-flow format that compiles to a LangGraph StateGraph at runtime."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
