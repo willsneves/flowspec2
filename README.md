@@ -2,19 +2,20 @@
 
 Table of Contents:
 
-- Install: 78 <!-- section:install -->
-- LLM-driven (the engine side): 127 <!-- section:llm-driven -->
-- Quickstart: 196 <!-- section:quickstart -->
-- Real backends: 220 <!-- section:real-backends -->
-- Error correlation: 237 <!-- section:error-correlation -->
-- CLI: 260 <!-- section:cli -->
-- What it compiles: 320 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 346 <!-- section:example -->
-    - The flowspec/2 document: 353 <!-- section:example-document -->
-    - Compiled LangGraph: 991 <!-- section:example-compiled-langgraph -->
-- Layout: 1109 <!-- section:layout -->
-- Governance: 1158 <!-- section:governance -->
-- Status: 1175 <!-- section:status -->
+- Install: 80 <!-- section:install -->
+- LLM-driven (the engine side): 129 <!-- section:llm-driven -->
+- Quickstart: 198 <!-- section:quickstart -->
+- Real backends: 222 <!-- section:real-backends -->
+- Error correlation: 239 <!-- section:error-correlation -->
+- CLI: 262 <!-- section:cli -->
+- What it compiles: 322 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 348 <!-- section:example -->
+    - The flowspec/2 document: 355 <!-- section:example-document -->
+    - Compiled LangGraph: 993 <!-- section:example-compiled-langgraph -->
+- Layout: 1111 <!-- section:layout -->
+- Public contracts: 1160 <!-- section:public-contracts -->
+- Governance: 1183 <!-- section:governance -->
+- Status: 1200 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -64,7 +65,8 @@ keeps the repository self-contained by limiting integrated live-model execution
 to dependencies available through the public package contract.
 The [public namespace decision](docs/adr/0012-public-contract-namespace.md)
 places every project-owned schema and profile identifier under a namespace
-controlled by the repository owner. The
+controlled by the repository owner. The deterministic GitHub Pages publication
+serves those identifiers directly from their canonical package sources. The
 [stable release decision](docs/adr/0013-stable-package-release-boundary.md)
 defines the compatibility boundary between stable `flowspec/2` and the isolated
 `flowspec/3-draft` experiment.
@@ -1153,6 +1155,29 @@ tests/             schema · boundaries · linker · IR · authoring · compatib
 ```
 
 <!-- /section:layout -->
+<!-- section:public-contracts -->
+
+## Public contracts
+
+Every project-owned JSON Schema is published at its canonical `$id` under
+[`wllsena.github.io/flowspec2`](https://wllsena.github.io/flowspec2/). The Open
+Workflow conversational-profile identifier resolves to a human-readable page
+linked to its schema and compatibility documentation.
+
+The site is generated from package sources rather than committed copies:
+
+```bash
+make public-site-check
+make public-site-build PUBLIC_SITE=build/public-site
+```
+
+The checker validates every schema, rejects duplicate or off-namespace
+identifiers, and proves that the generated resources equal the canonical
+documents. GitHub Pages deploys only the artifact built from `main` with
+short-lived identity and narrowly scoped permissions, then verifies over HTTP
+that every deployed resource still equals its canonical source.
+
+<!-- /section:public-contracts -->
 <!-- section:governance -->
 
 ## Governance

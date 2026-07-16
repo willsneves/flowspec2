@@ -4,9 +4,9 @@ Table of Contents:
 
 - Context: 20 <!-- section:context -->
 - Decision: 36 <!-- section:decision -->
-- Consequences: 52 <!-- section:consequences -->
-    - What becomes easier: 56 <!-- section:consequences-easier -->
-    - What becomes harder: 68 <!-- section:consequences-harder -->
+- Consequences: 57 <!-- section:consequences -->
+    - What becomes easier: 61 <!-- section:consequences-easier -->
+    - What becomes harder: 73 <!-- section:consequences-harder -->
 
 <!-- /section:toc -->
 
@@ -40,6 +40,11 @@ Every project-owned schema and profile identifier uses the
 IANA-reserved example domains, and documentation describes integrations without
 claiming deployment or affiliation.
 
+A deterministic static-site build publishes each JSON Schema directly at its
+canonical `$id` and publishes a human-readable resource for each profile
+identifier. The build consumes package sources and generated schema APIs, so
+the repository never maintains a second editable schema copy.
+
 The identifier change is blocking immediately because no package release has
 published the earlier values and exact-identity tests already cover every
 consumer. No report-only window would produce additional compatibility signal.
@@ -56,8 +61,8 @@ reinterpretation of an existing identifier.
 ### What becomes easier
 
 - The repository owner controls the namespace used by all project contracts.
-- Public documentation can later make each schema identifier resolvable without
-  changing the identifier.
+- Public consumers can resolve each schema and profile identifier without a
+  package installation.
 - Examples are clearly synthetic and cannot be mistaken for operational
   endpoints.
 - Package smoke tests can enforce namespace ownership across distributions.
@@ -73,6 +78,9 @@ reinterpretation of an existing identifier.
   existing namespace indefinitely.
 - Additional public contract families must follow the same ownership and
   versioning convention.
+- GitHub Pages availability becomes part of the public documentation surface;
+  deterministic local checks cover content, while deployment monitoring covers
+  hosting availability.
 
 <!-- /section:consequences-harder -->
 <!-- /section:consequences -->

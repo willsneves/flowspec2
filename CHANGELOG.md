@@ -5,12 +5,12 @@ Table of Contents:
 - Unreleased: 24 <!-- section:unreleased -->
 - Version 1.0.0 — prepared 2026-07-15, not published: 31 <!-- section:version-1-0-0 -->
     - Added: 35 <!-- section:version-1-0-0-added -->
-    - Changed: 58 <!-- section:version-1-0-0-changed -->
-    - Security: 102 <!-- section:version-1-0-0-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 115 <!-- section:version-0-2-0 -->
-    - Added: 119 <!-- section:version-0-2-0-added -->
-    - Changed: 136 <!-- section:version-0-2-0-changed -->
-    - Security: 151 <!-- section:version-0-2-0-security -->
+    - Changed: 60 <!-- section:version-1-0-0-changed -->
+    - Security: 104 <!-- section:version-1-0-0-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 117 <!-- section:version-0-2-0 -->
+    - Added: 121 <!-- section:version-0-2-0-added -->
+    - Changed: 138 <!-- section:version-0-2-0-changed -->
+    - Security: 153 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -36,6 +36,8 @@ No changes yet.
 
 - Public contribution, conduct, citation, issue, and pull-request contracts for
   the stable open-source release.
+- Deterministic GitHub Pages publication that resolves every project-owned
+  schema and compatibility-profile identifier from canonical package sources.
 - Optional persisted `await_external.max_resends` enforcement with a host-facing
   remaining-budget contract, atomic exhaustion rejection, and backward-compatible
   host-owned limiting when omitted.
