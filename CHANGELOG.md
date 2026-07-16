@@ -6,11 +6,11 @@ Table of Contents:
 - Version 1.0.0 — prepared 2026-07-16, not published: 29 <!-- section:version-1-0-0 -->
     - Added: 33 <!-- section:version-1-0-0-added -->
     - Changed: 60 <!-- section:version-1-0-0-changed -->
-    - Security: 113 <!-- section:version-1-0-0-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 128 <!-- section:version-0-2-0 -->
-    - Added: 132 <!-- section:version-0-2-0-added -->
-    - Changed: 149 <!-- section:version-0-2-0-changed -->
-    - Security: 164 <!-- section:version-0-2-0-security -->
+    - Security: 115 <!-- section:version-1-0-0-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 130 <!-- section:version-0-2-0 -->
+    - Added: 134 <!-- section:version-0-2-0-added -->
+    - Changed: 151 <!-- section:version-0-2-0-changed -->
+    - Security: 166 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -99,6 +99,8 @@ All notable project changes are recorded here. Versioning follows
   attaches the same distributions and checksum manifest to a GitHub Release.
 - Bounded public runtime and optional dependencies to supported major lines and
   added a machine-checked dependency-policy contract.
+- Updated the tested LangGraph floor and made the dependency-policy test verify
+  semantic bounds instead of rejecting valid patch upgrades.
 - Added grouped Dependabot updates for the uv lock and immutable GitHub Actions
   references, with repository-wide tests enforcing both automation contracts.
 - Made runtime LLM system prompts deployment-neutral and configurable without
