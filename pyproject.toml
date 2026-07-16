@@ -1,6 +1,6 @@
 [project]
 name = "flowspec2"
-version = "0.2.0"
+version = "1.0.0"
 description = "A JSON conversational-flow format that compiles to a LangGraph StateGraph at runtime."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -9,7 +9,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "wllsena" }]
 keywords = ["langgraph", "conversational-ai", "slot-filling", "whatsapp", "dsl", "state-machine"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",

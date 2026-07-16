@@ -14,7 +14,7 @@ from unittest.mock import Mock, call
 
 import pytest
 
-EXPECTED_VERSION = "0.3.0"
+EXPECTED_VERSION = "1.0.0"
 
 
 def _load_package_check() -> ModuleType:
@@ -90,8 +90,8 @@ def test_checksum_manifest_is_canonical_and_detects_tampering(tmp_path: Path) ->
         source_distribution_path,
     )
     assert [line.split("  ", maxsplit=1)[1] for line in recorded_manifest.splitlines()] == [
-        "flowspec2-0.3.0-py3-none-any.whl",
-        "flowspec2-0.3.0.tar.gz",
+        "flowspec2-1.0.0-py3-none-any.whl",
+        "flowspec2-1.0.0.tar.gz",
     ]
     source_distribution_path.write_bytes(b"tampered")
     with pytest.raises(RuntimeError, match="checksum manifest"):
@@ -101,10 +101,10 @@ def test_checksum_manifest_is_canonical_and_detects_tampering(tmp_path: Path) ->
 @pytest.mark.parametrize(
     "invalid_manifest",
     [
-        "0" * 64 + "  ../flowspec2-0.3.0.tar.gz\n",
-        "0" * 64 + " *flowspec2-0.3.0.tar.gz\n",
-        "0" * 64 + "  flowspec2-0.3.0.tar.gz\n\n",
-        "A" * 64 + "  flowspec2-0.3.0.tar.gz\n",
+        "0" * 64 + "  ../flowspec2-1.0.0.tar.gz\n",
+        "0" * 64 + " *flowspec2-1.0.0.tar.gz\n",
+        "0" * 64 + "  flowspec2-1.0.0.tar.gz\n\n",
+        "A" * 64 + "  flowspec2-1.0.0.tar.gz\n",
     ],
 )
 def test_checksum_manifest_rejects_noncanonical_grammar(
@@ -253,8 +253,8 @@ def test_successful_release_build_promotes_only_verified_files(
     package_check._verify_checksum_manifest(artifact_directory, EXPECTED_VERSION)
     assert {artifact_path.name for artifact_path in artifact_directory.iterdir()} == {
         "SHA256SUMS",
-        "flowspec2-0.3.0-py3-none-any.whl",
-        "flowspec2-0.3.0.tar.gz",
+        "flowspec2-1.0.0-py3-none-any.whl",
+        "flowspec2-1.0.0.tar.gz",
     }
     artifact_checker.assert_called_once()
 
@@ -295,7 +295,7 @@ def test_release_check_never_builds(
 
 
 def test_wheel_version_must_match_expected_version(tmp_path: Path) -> None:
-    wheel_path = tmp_path / "flowspec2-0.3.0-py3-none-any.whl"
+    wheel_path = tmp_path / "flowspec2-1.0.0-py3-none-any.whl"
     _minimal_wheel(wheel_path, "9.9.9")
 
     with pytest.raises(RuntimeError, match="wheel metadata version"):
@@ -307,7 +307,7 @@ def test_wheel_rejects_unsafe_paths(
     tmp_path: Path,
     unsafe_member_name: str,
 ) -> None:
-    wheel_path = tmp_path / "flowspec2-0.3.0-py3-none-any.whl"
+    wheel_path = tmp_path / "flowspec2-1.0.0-py3-none-any.whl"
     with zipfile.ZipFile(wheel_path, mode="w") as wheel_archive:
         wheel_archive.writestr(unsafe_member_name, "unsafe")
 
@@ -316,7 +316,7 @@ def test_wheel_rejects_unsafe_paths(
 
 
 def test_wheel_rejects_symlink_member(tmp_path: Path) -> None:
-    wheel_path = tmp_path / "flowspec2-0.3.0-py3-none-any.whl"
+    wheel_path = tmp_path / "flowspec2-1.0.0-py3-none-any.whl"
     symlink_entry = zipfile.ZipInfo("flowspec2/unsafe-link")
     symlink_entry.create_system = 3
     symlink_entry.external_attr = (stat.S_IFLNK | 0o777) << 16
@@ -328,7 +328,7 @@ def test_wheel_rejects_symlink_member(tmp_path: Path) -> None:
 
 
 def test_sdist_versions_must_match_expected_version(tmp_path: Path) -> None:
-    source_distribution_path = tmp_path / "flowspec2-0.3.0.tar.gz"
+    source_distribution_path = tmp_path / "flowspec2-1.0.0.tar.gz"
     _minimal_sdist(source_distribution_path, "9.9.9")
 
     with pytest.raises(RuntimeError, match="source distribution metadata version"):
@@ -336,18 +336,18 @@ def test_sdist_versions_must_match_expected_version(tmp_path: Path) -> None:
 
 
 def test_sdist_rejects_path_traversal(tmp_path: Path) -> None:
-    source_distribution_path = tmp_path / "flowspec2-0.3.0.tar.gz"
+    source_distribution_path = tmp_path / "flowspec2-1.0.0.tar.gz"
     with tarfile.open(source_distribution_path, mode="w:gz") as source_archive:
-        _add_tar_member(source_archive, "flowspec2-0.3.0/../escaped", b"unsafe")
+        _add_tar_member(source_archive, "flowspec2-1.0.0/../escaped", b"unsafe")
 
     with pytest.raises(RuntimeError, match="unsafe member"):
         package_check._check_sdist(source_distribution_path, EXPECTED_VERSION)
 
 
 def test_sdist_rejects_unexpected_symlink(tmp_path: Path) -> None:
-    source_distribution_path = tmp_path / "flowspec2-0.3.0.tar.gz"
+    source_distribution_path = tmp_path / "flowspec2-1.0.0.tar.gz"
     with tarfile.open(source_distribution_path, mode="w:gz") as source_archive:
-        archive_member = tarfile.TarInfo("flowspec2-0.3.0/unsafe-link")
+        archive_member = tarfile.TarInfo("flowspec2-1.0.0/unsafe-link")
         archive_member.type = tarfile.SYMTYPE
         archive_member.linkname = "../../outside"
         source_archive.addfile(archive_member)
@@ -368,7 +368,7 @@ def test_release_source_requires_clean_matching_tag(
     assert command_output.call_args_list == [
         call(("git", "status", "--porcelain", "--untracked-files=all")),
         call(("git", "rev-parse", "HEAD")),
-        call(("git", "rev-parse", "--verify", "refs/tags/v0.3.0^{commit}")),
+        call(("git", "rev-parse", "--verify", "refs/tags/v1.0.0^{commit}")),
     ]
 
 

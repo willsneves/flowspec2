@@ -3,18 +3,18 @@
 Table of Contents:
 
 - Install: 78 <!-- section:install -->
-- LLM-driven (the engine side): 120 <!-- section:llm-driven -->
-- Quickstart: 189 <!-- section:quickstart -->
-- Real backends: 213 <!-- section:real-backends -->
-- Error correlation: 230 <!-- section:error-correlation -->
-- CLI: 253 <!-- section:cli -->
-- What it compiles: 313 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 339 <!-- section:example -->
-    - The flowspec/2 document: 346 <!-- section:example-document -->
-    - Compiled LangGraph: 984 <!-- section:example-compiled-langgraph -->
-- Layout: 1102 <!-- section:layout -->
-- Governance: 1151 <!-- section:governance -->
-- Status: 1168 <!-- section:status -->
+- LLM-driven (the engine side): 127 <!-- section:llm-driven -->
+- Quickstart: 196 <!-- section:quickstart -->
+- Real backends: 220 <!-- section:real-backends -->
+- Error correlation: 237 <!-- section:error-correlation -->
+- CLI: 260 <!-- section:cli -->
+- What it compiles: 320 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 346 <!-- section:example -->
+    - The flowspec/2 document: 353 <!-- section:example-document -->
+    - Compiled LangGraph: 991 <!-- section:example-compiled-langgraph -->
+- Layout: 1109 <!-- section:layout -->
+- Governance: 1158 <!-- section:governance -->
+- Status: 1175 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -97,6 +97,13 @@ rebuilding:
 make release-build RELEASE_ARTIFACTS=build/release
 make release-check RELEASE_ARTIFACTS=build/release
 ```
+
+Pushing an immutable matching tag runs the same build-once verification in the
+release workflow. The verified wheel and source distribution are published to
+PyPI through OpenID Connect Trusted Publishing with provenance attestations;
+the same files and `SHA256SUMS` are then attached to the GitHub Release. The
+`pypi` environment must require maintainer approval and be registered as the
+project's PyPI Trusted Publisher before the first tag is pushed.
 
 Development tooling is pinned in `pyproject.toml` and `uv.lock`. `make lint`,
 `make typecheck`, and `make test` run independently; `make format` applies the

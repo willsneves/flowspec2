@@ -2,14 +2,15 @@
 
 Table of Contents:
 
-- Unreleased: 23 <!-- section:unreleased -->
-    - Added: 27 <!-- section:unreleased-added -->
-    - Changed: 50 <!-- section:unreleased-changed -->
-    - Security: 91 <!-- section:unreleased-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 104 <!-- section:version-0-2-0 -->
-    - Added: 108 <!-- section:version-0-2-0-added -->
-    - Changed: 125 <!-- section:version-0-2-0-changed -->
-    - Security: 140 <!-- section:version-0-2-0-security -->
+- Unreleased: 24 <!-- section:unreleased -->
+- Version 1.0.0 — 2026-07-15: 31 <!-- section:version-1-0-0 -->
+    - Added: 35 <!-- section:version-1-0-0-added -->
+    - Changed: 58 <!-- section:version-1-0-0-changed -->
+    - Security: 102 <!-- section:version-1-0-0-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 115 <!-- section:version-0-2-0 -->
+    - Added: 119 <!-- section:version-0-2-0-added -->
+    - Changed: 136 <!-- section:version-0-2-0-changed -->
+    - Security: 151 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -22,7 +23,14 @@ All notable project changes are recorded here. Versioning follows
 
 ## Unreleased
 
-<!-- section:unreleased-added -->
+No changes yet.
+
+<!-- /section:unreleased -->
+<!-- section:version-1-0-0 -->
+
+## Version 1.0.0 — 2026-07-15
+
+<!-- section:version-1-0-0-added -->
 
 ### Added
 
@@ -44,8 +52,8 @@ All notable project changes are recorded here. Versioning follows
   full v2 profile and compilation checks, policy-bound loss rehydration, stable
   rejection diagnostics, and an exact preview fixed-point proof.
 
-<!-- /section:unreleased-added -->
-<!-- section:unreleased-changed -->
+<!-- /section:version-1-0-0-added -->
+<!-- section:version-1-0-0-changed -->
 
 ### Changed
 
@@ -84,9 +92,12 @@ All notable project changes are recorded here. Versioning follows
 - Added manually dispatched CI and build-once release verification that uses a
   pinned build backend, validates archive safety and installability, and
   atomically preserves checksummed package artifacts for publication.
+- Added a tag-triggered release workflow that publishes the one verified
+  artifact set to PyPI through Trusted Publishing with attestations, then
+  attaches the same distributions and checksum manifest to a GitHub Release.
 
-<!-- /section:unreleased-changed -->
-<!-- section:unreleased-security -->
+<!-- /section:version-1-0-0-changed -->
+<!-- section:version-1-0-0-security -->
 
 ### Security
 
@@ -96,9 +107,9 @@ All notable project changes are recorded here. Versioning follows
   private keys remain outside evidence and cannot be loaded from environment
   files.
 
-<!-- /section:unreleased-security -->
+<!-- /section:version-1-0-0-security -->
 
-<!-- /section:unreleased -->
+<!-- /section:version-1-0-0 -->
 <!-- section:version-0-2-0 -->
 
 ## Version 0.2.0 — prepared 2026-07-13, not published

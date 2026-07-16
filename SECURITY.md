@@ -3,10 +3,10 @@
 Table of Contents:
 
 - Supported versions: 17 <!-- section:supported-versions -->
-- Reporting a vulnerability: 29 <!-- section:reporting -->
-- Artifact signing keys: 43 <!-- section:evidence-signing-keys -->
-- Model execution: 66 <!-- section:model-execution -->
-- Scope and handling: 74 <!-- section:scope-handling -->
+- Reporting a vulnerability: 30 <!-- section:reporting -->
+- Artifact signing keys: 44 <!-- section:evidence-signing-keys -->
+- Model execution: 67 <!-- section:model-execution -->
+- Scope and handling: 75 <!-- section:scope-handling -->
 
 <!-- /section:toc -->
 
@@ -20,8 +20,9 @@ Security fixes target the current release line. Users should reproduce a report
 against the newest available release before submitting it. Older releases may
 require upgrading to receive a fix.
 
-The repository has not published a stable release line. Pre-release interfaces
-may change according to [VERSIONING.md](docs/VERSIONING.md).
+The `1.x` release line receives security fixes. Experimental interfaces remain
+outside the stable compatibility promise described in
+[VERSIONING.md](docs/VERSIONING.md).
 
 <!-- /section:supported-versions -->
 <!-- section:reporting -->

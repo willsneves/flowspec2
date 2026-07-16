@@ -6,7 +6,7 @@ Table of Contents:
 - Format and contract versions: 35 <!-- section:contract-versions -->
 - Compatibility promises: 75 <!-- section:compatibility-promises -->
 - Release procedure: 91 <!-- section:release-procedure -->
-- Artifact rollback: 126 <!-- section:artifact-rollback -->
+- Artifact rollback: 131 <!-- section:artifact-rollback -->
 
 <!-- /section:toc -->
 
@@ -95,26 +95,31 @@ compatibility promises until a new decision promotes a versioned successor.
    remote CI jobs to execute successfully on the exact release commit.
 3. Commit the release preparation with an atomic conventional commit.
 4. Create an immutable `vX.Y.Z` tag only after reviewing the exact commit.
-5. From a clean checkout of that tag, run `make release-build` with a new
-   persistent artifact directory. The target rejects an untagged, dirty, or
-   version-mismatched checkout; inspects the wheel and source distribution;
-   installs and smoke-tests them independently from the lock embedded in the
-   source distribution; builds through the pinned backend under lock-derived
-   hashed constraints; and atomically exposes the directory only after
-   successful verification with `SHA256SUMS` written.
-6. Run `make release-check` against that directory to verify its checksums and
-   closed file set, versions, installability, and package contracts without
-   rebuilding a publication artifact. Run this checker only from the same clean
-   release-tag checkout so its packaged-contract assertions match the release.
-7. Publish the preserved wheel, source distribution, and checksum manifest in
-   a GitHub Release attached to the immutable tag.
-8. Download the published files, verify their checksums, and confirm the
-   installed package version, CLI entry point, and packaged contracts.
+5. Push the tag only after the `pypi` GitHub environment requires maintainer
+   approval and PyPI identifies that environment as the project's Trusted
+   Publisher.
+6. The release workflow runs `make release-build` from a clean checkout of the
+   tag. The target rejects an untagged, dirty, or version-mismatched checkout;
+   inspects the wheel and source distribution; installs and smoke-tests them
+   independently from the lock embedded in the source distribution; builds
+   through the pinned backend under lock-derived hashed constraints; and
+   atomically exposes the directory only after successful verification with
+   `SHA256SUMS` written.
+7. Later jobs download that single artifact set and run `make release-check` to
+   verify its checksums, closed file set, versions, installability, and package
+   contracts without rebuilding it.
+8. After environment approval, publish the wheel and source distribution to
+   PyPI through OpenID Connect Trusted Publishing with provenance attestations.
+   No long-lived package-index credential is stored by GitHub.
+9. Publish the same wheel and source distribution plus `SHA256SUMS` in a GitHub
+   Release attached to the immutable tag.
+10. Download the published files, verify their checksums, and confirm the
+    installed package version, CLI entry point, and packaged contracts.
 
 Tagging and publishing are explicit external actions and are never implied by a
-version bump or release-preparation commit. PyPI publication is a separate
-process that requires explicit package ownership and trusted-publisher
-configuration; a GitHub Release does not imply it.
+version bump or release-preparation commit. PyPI publication requires explicit
+Trusted Publisher configuration; the GitHub Release is created only after PyPI
+accepts the preserved distributions.
 
 `SHA256SUMS` provides byte integrity for the wheel and source distribution. It
 is not a package signature and does not establish authenticity independently of
