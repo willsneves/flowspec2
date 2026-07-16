@@ -7,6 +7,7 @@ import io
 import stat
 import sys
 import tarfile
+import tomllib
 import zipfile
 from datetime import date
 from pathlib import Path
@@ -15,11 +16,27 @@ from unittest.mock import Mock, call
 
 import pytest
 
+PROJECT_ROOT = Path(__file__).parents[1]
 EXPECTED_VERSION = "1.0.0"
+EXPECTED_SDIST_ONLY_INCLUDE = frozenset(
+    {
+        "src/flowspec2",
+        "CHANGELOG.md",
+        "CITATION.cff",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
+        "LICENSE",
+        "README.md",
+        "SECURITY.md",
+        "docs/VERSIONING.md",
+        "pyproject.toml",
+        "uv.lock",
+    }
+)
 
 
 def _load_package_check() -> ModuleType:
-    script_path = Path(__file__).parents[1] / "scripts" / "check_package.py"
+    script_path = PROJECT_ROOT / "scripts" / "check_package.py"
     module_specification = importlib.util.spec_from_file_location("check_package", script_path)
     if module_specification is None or module_specification.loader is None:
         raise RuntimeError(f"could not load package-check script: {script_path}")
@@ -61,7 +78,12 @@ def _minimal_wheel(wheel_path: Path, metadata_version: str) -> None:
         )
 
 
-def _minimal_sdist(source_distribution_path: Path, metadata_version: str) -> None:
+def _minimal_sdist(
+    source_distribution_path: Path,
+    metadata_version: str,
+    *,
+    additional_members: tuple[tuple[str, bytes], ...] = (),
+) -> None:
     source_root = f"flowspec2-{EXPECTED_VERSION}"
     project_document = (f'[project]\nname = "flowspec2"\nversion = "{EXPECTED_VERSION}"\n').encode()
     with tarfile.open(source_distribution_path, mode="w:gz") as source_archive:
@@ -73,6 +95,17 @@ def _minimal_sdist(source_distribution_path: Path, metadata_version: str) -> Non
             f"{source_root}/PKG-INFO",
             (f"Metadata-Version: 2.4\nName: flowspec2\nVersion: {metadata_version}\n").encode(),
         )
+        for member_name, member_content in additional_members:
+            _add_tar_member(source_archive, f"{source_root}/{member_name}", member_content)
+
+
+def test_sdist_build_uses_an_explicit_public_allowlist() -> None:
+    with (PROJECT_ROOT / "pyproject.toml").open("rb") as project_file:
+        project_document = tomllib.load(project_file)
+
+    sdist_configuration = project_document["tool"]["hatch"]["build"]["targets"]["sdist"]
+
+    assert frozenset(sdist_configuration["only-include"]) == EXPECTED_SDIST_ONLY_INCLUDE
 
 
 def test_checksum_manifest_is_canonical_and_detects_tampering(tmp_path: Path) -> None:
@@ -354,6 +387,18 @@ def test_sdist_rejects_unexpected_symlink(tmp_path: Path) -> None:
         source_archive.addfile(archive_member)
 
     with pytest.raises(RuntimeError, match="non-regular member"):
+        package_check._check_sdist(source_distribution_path, EXPECTED_VERSION)
+
+
+def test_sdist_rejects_unlisted_regular_member(tmp_path: Path) -> None:
+    source_distribution_path = tmp_path / "flowspec2-1.0.0.tar.gz"
+    _minimal_sdist(
+        source_distribution_path,
+        EXPECTED_VERSION,
+        additional_members=(("private-local-artifact.json", b"not public"),),
+    )
+
+    with pytest.raises(RuntimeError, match="unexpected members"):
         package_check._check_sdist(source_distribution_path, EXPECTED_VERSION)
 
 

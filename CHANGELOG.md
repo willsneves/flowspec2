@@ -2,15 +2,16 @@
 
 Table of Contents:
 
-- Unreleased: 24 <!-- section:unreleased -->
-- Version 1.0.0 — prepared 2026-07-15, not published: 31 <!-- section:version-1-0-0 -->
-    - Added: 35 <!-- section:version-1-0-0-added -->
-    - Changed: 60 <!-- section:version-1-0-0-changed -->
-    - Security: 104 <!-- section:version-1-0-0-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 117 <!-- section:version-0-2-0 -->
-    - Added: 121 <!-- section:version-0-2-0-added -->
-    - Changed: 138 <!-- section:version-0-2-0-changed -->
-    - Security: 153 <!-- section:version-0-2-0-security -->
+- Unreleased: 25 <!-- section:unreleased -->
+    - Security: 29 <!-- section:unreleased-security -->
+- Version 1.0.0 — prepared 2026-07-15, not published: 39 <!-- section:version-1-0-0 -->
+    - Added: 43 <!-- section:version-1-0-0-added -->
+    - Changed: 68 <!-- section:version-1-0-0-changed -->
+    - Security: 112 <!-- section:version-1-0-0-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 125 <!-- section:version-0-2-0 -->
+    - Added: 129 <!-- section:version-0-2-0-added -->
+    - Changed: 146 <!-- section:version-0-2-0-changed -->
+    - Security: 161 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -23,7 +24,14 @@ All notable project changes are recorded here. Versioning follows
 
 ## Unreleased
 
-No changes yet.
+<!-- section:unreleased-security -->
+
+### Security
+
+- Restricted source-distribution discovery to an explicit public allowlist and
+  made package verification reject regular files outside that boundary.
+
+<!-- /section:unreleased-security -->
 
 <!-- /section:unreleased -->
 <!-- section:version-1-0-0 -->

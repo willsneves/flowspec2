@@ -3,19 +3,19 @@
 Table of Contents:
 
 - Install: 63 <!-- section:install -->
-- LLM-driven (the engine side): 109 <!-- section:llm-driven -->
-- Quickstart: 167 <!-- section:quickstart -->
-- Real backends: 192 <!-- section:real-backends -->
-- Error correlation: 215 <!-- section:error-correlation -->
-- CLI: 232 <!-- section:cli -->
-- What it compiles: 281 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 307 <!-- section:example -->
-    - The flowspec/2 document: 314 <!-- section:example-document -->
-    - Compiled LangGraph: 952 <!-- section:example-compiled-langgraph -->
-- Layout: 1071 <!-- section:layout -->
-- Public contracts: 1125 <!-- section:public-contracts -->
-- Governance: 1145 <!-- section:governance -->
-- Status: 1159 <!-- section:status -->
+- LLM-driven (the engine side): 111 <!-- section:llm-driven -->
+- Quickstart: 169 <!-- section:quickstart -->
+- Real backends: 194 <!-- section:real-backends -->
+- Error correlation: 217 <!-- section:error-correlation -->
+- CLI: 234 <!-- section:cli -->
+- What it compiles: 283 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 309 <!-- section:example -->
+    - The flowspec/2 document: 316 <!-- section:example-document -->
+    - Compiled LangGraph: 954 <!-- section:example-compiled-langgraph -->
+- Layout: 1073 <!-- section:layout -->
+- Public contracts: 1127 <!-- section:public-contracts -->
+- Governance: 1147 <!-- section:governance -->
+- Status: 1161 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -72,8 +72,10 @@ uv run python examples/simulate.py   # 6 real citizen conversations over the HTT
 Release artifacts are built once from a clean checkout of the matching
 `vX.Y.Z` tag. The build verifies metadata, packaged contracts, locked
 dependencies, and installed behavior; writes `SHA256SUMS`; and refuses an
-existing destination. The check verifies the exact artifact set, integrity, and
-current `pyproject.toml` version without rebuilding:
+existing destination. An explicit sdist allowlist prevents unrelated local
+files from entering or breaking the build. The check verifies the allowed
+archive contents, exact artifact set, integrity, and current `pyproject.toml`
+version without rebuilding:
 
 ```bash
 make release-build RELEASE_ARTIFACTS=build/release

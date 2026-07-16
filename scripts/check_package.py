@@ -69,6 +69,17 @@ EXPECTED_SDIST_MEMBERS: Final[frozenset[str]] = frozenset(
         "uv.lock",
     }
 )
+ALLOWED_SDIST_ROOT_MEMBERS: Final[frozenset[str]] = frozenset(
+    {
+        ".gitignore",
+        "PKG-INFO",
+        *(
+            member_name
+            for member_name in EXPECTED_SDIST_MEMBERS
+            if not member_name.startswith("src/")
+        ),
+    }
+)
 INSTALLED_PACKAGE_SMOKE: Final[str] = """
 import sys
 from importlib.metadata import version as installed_package_version
@@ -331,6 +342,15 @@ def _validated_sdist_members(
     missing_members = sorted(EXPECTED_SDIST_MEMBERS - project_members)
     if missing_members:
         raise RuntimeError(f"source distribution is missing packaged contracts: {missing_members}")
+    unexpected_members = sorted(
+        member_name
+        for member_name in project_members
+        if member_name not in ALLOWED_SDIST_ROOT_MEMBERS
+        and member_name not in {"src", "src/flowspec2"}
+        and not member_name.startswith("src/flowspec2/")
+    )
+    if unexpected_members:
+        raise RuntimeError(f"source distribution contains unexpected members: {unexpected_members}")
     return archive_members
 
 
