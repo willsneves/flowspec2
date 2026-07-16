@@ -7,7 +7,7 @@ Table of Contents:
 - Python API: 87 <!-- section:python-api -->
 - CLI: 122 <!-- section:cli -->
 - Rasa CALM portable profile: 139 <!-- section:rasa-calm-profile -->
-- Open Workflow conversational profile: 208 <!-- section:open-workflow-profile -->
+- Open Workflow conversational profile: 216 <!-- section:open-workflow-profile -->
 
 <!-- /section:toc -->
 
@@ -170,6 +170,14 @@ response. Static buttons must cover the domain in declared order and use one
 interprets them as response interpolation. Categorical button titles equal the
 stored token. Boolean exports use “Sim”/“Não” titles with `true`/`false`
 payloads; imports also accept the legacy token-as-title form.
+
+The profile is intentionally prescriptive. It excludes Rasa autonomous steps,
+ReAct subagents, direct MCP calls, MCP-backed subagents, A2A agents, and their
+exit or failure semantics. It also excludes Rasa's MCP authoring tools and
+model-driven simulation/evaluation artifacts because those are development and
+runtime facilities, not fields in the portable flow contract. A project using
+them can still contain portable prescriptive flows, but the adapter makes no
+equivalence claim for those external resources.
 
 flowspec2 `confirm` and Rasa `ask_before_filling: true` are hard errors, not a
 mapping: their prefill, clearing, retry, and exhaustion semantics differ.

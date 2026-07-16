@@ -2,16 +2,17 @@
 
 Table of Contents:
 
-- Closest projects and formats: 24 <!-- section:closest-projects-and-formats -->
-- Positioning decision: 44 <!-- section:positioning-decision -->
-- Borrowed constraints: 65 <!-- section:borrowed-constraints -->
-- Compatibility strategy: 91 <!-- section:compatibility-strategy -->
+- Closest projects and formats: 25 <!-- section:closest-projects-and-formats -->
+- Capability ownership: 51 <!-- section:capability-ownership -->
+- Positioning decision: 67 <!-- section:positioning-decision -->
+- Borrowed constraints: 91 <!-- section:borrowed-constraints -->
+- Compatibility strategy: 126 <!-- section:compatibility-strategy -->
 
 <!-- /section:toc -->
 
 # Prior art and positioning
 
-Reviewed on 2026-07-13.
+Reviewed on 2026-07-16.
 
 flowspec2 is not the first system to combine conversation state, slot collection,
 guards, tool calls, and reusable subflows. Its narrower contribution is a
@@ -25,7 +26,13 @@ the executable graph and lifecycle behavior.
 
 | Project or format | Shared objective | Important difference | flowspec2 position |
 |---|---|---|---|
-| [Rasa CALM flows](https://rasa.com/docs/reference/primitives/flows/) | Declarative conversational business logic with ordered collection, actions, conditions, and child flows | A Rasa assistant spreads behavior across flow and domain files and relies on the Rasa runtime and conversation-repair patterns | Closest direct peer; supported through the bounded portable profile described in [COMPATIBILITY.md](COMPATIBILITY.md) |
+| [Rasa CALM flows](https://rasa.com/docs/reference/primitives/flows/) | Declarative conversational business logic with collection, actions, conditions, child flows, and mixed prescriptive/autonomous steps | A Rasa assistant spreads behavior across flow, domain, endpoint, and agent configuration and relies on Rasa repair, MCP, and A2A runtime facilities | Closest direct peer; only the bounded prescriptive profile in [COMPATIBILITY.md](COMPATIBILITY.md) is portable |
+| [Parlant Journeys](https://www.parlant.io/docs/concepts/customization/journeys/) | Directed conversational graphs with branching, merging, tools, linking, and backtracking | Journey progress is deliberately adaptive: model reasoning may skip or revisit reachable states instead of replaying one compiler-derived rail | Strong runtime analogue for natural recovery; not an equivalent deterministic contract |
+| [OpenDialog](https://docs.opendialog.ai/core-concepts/the-opendialog-model) | Goal-driven conversational processes combining explicit rules, context, integrations, and generative behavior | A managed visual model and engine distribute behavior across application resources rather than one portable contract with canonical IR and replay evidence | Product-level analogue; no compatibility adapter is currently promised |
+| [Voiceflow workflows](https://docs.voiceflow.com/documentation/build/overview) | Visual deterministic multi-step conversations with branching, variables, tools, and embedded autonomous playbooks | Platform projects and visual runtime semantics are broader than a self-contained, offline-verifiable source document | Authoring-platform analogue; exported project data is not treated as a stable interchange promise |
+| [Botpress workflows](https://botpress.com/docs/studio/concepts/workflows/) | Visual reusable conversational workflows with nodes, transitions, variables, actions, and autonomous nodes | Studio and hosted runtime own the project model, deployment behavior, and operational integrations | Product-level analogue; no compatibility adapter is currently promised |
+| [Langflow](https://docs.langflow.org/concepts-flows) | Portable JSON graphs for composing model, tool, data, and agent components | General component wiring does not define transactional conversation rails, closed slot domains, correction semantics, or terminal-effect protocols | Useful visual orchestration prior art, not a conversational contract peer |
+| [Flowise](https://docs.flowiseai.com/using-flowise/prediction) | Visual agent/workflow execution with conversation memory, tools, checkpoints, and human input | Runtime chatflows and agentflows expose open orchestration primitives rather than a closed conversation-specific source and conformance kit | Useful orchestration prior art, not a stable flowspec2 projection |
 | [Pipecat Flows](https://docs.pipecat.ai/api-reference/pipecat-flows/overview) | Structured, stateful conversations in an LLM-driven voice pipeline | Nodes and transitions are configured through a Python runtime API and can be created dynamically | A runtime/library analogue, not the canonical interchange format for flowspec2 |
 | [Dialogflow CX](https://cloud.google.com/dialogflow/cx/docs/concept/page) | Page-based conversational state machines with forms, parameters, routes, and fulfillment | Managed platform resources, APIs, and console configuration replace a portable, self-contained source document | A product-level analogue; no compatibility adapter is currently promised |
 | [Microsoft Agent Framework declarative workflows](https://learn.microsoft.com/en-us/agent-framework/workflows/declarative) | YAML workflow definitions compiled into executable workflow graphs | General agent orchestration with action kinds and an expression language, rather than a closed conversational-domain spine | Evidence that declarative graph compilation is a useful model, but not a replacement for the conversational contract |
@@ -39,6 +46,22 @@ the executable graph and lifecycle behavior.
 | [LangGraph](https://docs.langchain.com/oss/python/langgraph/overview) | Stateful graph runtime for long-running agents and workflows | Runtime primitives and deployment configuration do not define this project's conversational source format | Execution target of the reference compiler |
 
 <!-- /section:closest-projects-and-formats -->
+<!-- section:capability-ownership -->
+
+## Capability ownership
+
+Claims are separated by layer so a host feature is never attributed to the
+format and a reference implementation is never mistaken for the only possible
+runtime:
+
+| Concern | Stable format | Reference runtime and tools | Host or provider |
+|---|---|---|---|
+| Conversation contract | closed domains, path steps, guards, correction targets, waits, terminal outcomes | structural and semantic validation, linking, canonical IR, graph compilation | channel-specific rendering and session transport |
+| Execution safety | typed tool and subflow requirements, idempotency and recovery declarations | state provenance, profile and dependency digests, duplicate-resume policy, deterministic trace checks | durable persistence, distributed uniqueness, backend authorization, effect isolation |
+| AI boundary | route descriptions, trigger examples, payload schemas, extraction hints | provider-neutral closed requests, benchmark corpus, exact capture replay, evidence verification and signatures | model availability, generated language, credentials, quotas, network policy |
+| Operations | explicit external-wait and observability contracts | CLI, compatibility diagnostics, package and public-contract checks | deployment, monitoring, review policy, incident response, service guarantees |
+
+<!-- /section:capability-ownership -->
 <!-- section:positioning-decision -->
 
 ## Positioning decision
@@ -55,6 +78,9 @@ The specialization is intentional:
   rather than being approximated as ordinary user-input slots.
 - Compatibility is a projection with evidence. A target artifact is never
   presented as equivalent when a source rail could not be preserved.
+- AI-assisted authoring is evaluated by reproducible captures bound to public
+  acceptance contracts and executable traces. Natural-language generation or
+  editor integration alone is not evidence that a flow preserves semantics.
 
 This positioning is recorded in
 [ADR 0001](adr/0001-interoperability-boundaries.md).
@@ -66,10 +92,19 @@ This positioning is recorded in
 
 The comparison changes contracts, not the format's specialization:
 
-- Rasa CALM validates a compact conversational command boundary: language models
-  may identify a flow, value, correction, or recovery intent, while the runtime
-  owns transitions. FlowSpec2 therefore exposes exact closed correction and
-  interaction schemas instead of accepting fuzzy control text.
+- Rasa CALM validates a compact conversational command boundary for
+  prescriptive steps, while its current autonomous steps can delegate control to
+  local ReAct agents, MCP tools, or A2A agents. FlowSpec2 keeps autonomous
+  orchestration outside the stable format and exposes exact closed correction
+  and interaction schemas instead of accepting fuzzy control text.
+- [Rasa MCP Tools](https://rasa.com/docs/pro/installation/rasa-mcp-tools/) now let
+  IDE agents inspect, author, validate, run, and evaluate Rasa projects. That
+  improves AI-assisted authoring, but does not replace content-addressed request
+  capture, public grading contracts, or deterministic offline replay.
+- Rasa's [simulation and evaluation](https://rasa.com/docs/reference/testing/evals/overview/)
+  complements scripted tests with model-simulated users and judges. FlowSpec2
+  retains the same boundary: model-quality evidence is report-only, while
+  deterministic conformance remains the release gate.
 - SCXML and Open Workflow make deterministic traces and conformance corpora more
   useful than prose-only lifecycle claims. FlowSpec2 conformance covers source
   validation, ordered diagnostics, canonical IR/digests, and executable traces.

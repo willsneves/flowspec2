@@ -16,9 +16,10 @@ import pytest
 
 from flowspec2 import FlowRuntime
 from flowspec2.llm import (
-    EXTRACT_SYS,
-    ROUTE_SYS,
+    DEFAULT_EXTRACTION_SYSTEM_PROMPT,
+    DEFAULT_ROUTE_SYSTEM_PROMPT,
     GeminiAgent,
+    StructuredOutputAgent,
     _enum_of,
     _extraction_response_schema,
     _fields_spec,
@@ -186,7 +187,7 @@ def test_route_request_renders_description_first_and_trigger_phrases_as_examples
         ],
     )
 
-    assert request.system == ROUTE_SYS
+    assert request.system == DEFAULT_ROUTE_SYSTEM_PROMPT
     assert request.prompt == (
         "Catálogo de serviços em JSON:\n"
         '[{"description":"Registra defeitos na iluminação pública.","service":"repair_light",'
@@ -195,7 +196,7 @@ def test_route_request_renders_description_first_and_trigger_phrases_as_examples
         "Use description como a definição principal de cada serviço. trigger_phrases contém "
         "apenas exemplos de mensagens compatíveis; não trate esses exemplos como lista "
         "exclusiva nem como garantia de correspondência.\n\n"
-        'Mensagem do cidadão: "o poste da esquina apagou"\n\n'
+        'Mensagem da pessoa usuária: "o poste da esquina apagou"\n\n'
         'Devolva {"service": "<nome do serviço>"} se algum atende, ou {"service": null} se '
         "nenhum atende."
     )
@@ -224,11 +225,11 @@ def test_extraction_request_preserves_extract_hint_in_closed_response_schema() -
         ),
     )
 
-    assert request.system == EXTRACT_SYS
+    assert request.system == DEFAULT_EXTRACTION_SYSTEM_PROMPT
     assert request.prompt == (
-        'Pergunta do bot: "Qual é o defeito?"\n'
+        'Pergunta do sistema: "Qual é o defeito?"\n'
         'Campos a extrair:\n- "defect": um destes valores EXATOS: ["Off", "Flashing"]\n\n'
-        'Resposta do cidadão: "tá tudo escuro"\n\n'
+        'Resposta da pessoa usuária: "tá tudo escuro"\n\n'
         "Regras:\n- Use SOMENTE os valores permitidos nas listas fechadas.\n"
         "- Devolva apenas o JSON com os campos pedidos."
     )
@@ -243,6 +244,49 @@ def test_extraction_request_preserves_extract_hint_in_closed_response_schema() -
         },
         "required": ["defect"],
     }
+
+
+def test_default_system_prompts_are_provider_and_deployment_neutral() -> None:
+    combined_prompts = f"{DEFAULT_ROUTE_SYSTEM_PROMPT} {DEFAULT_EXTRACTION_SYSTEM_PROMPT}"
+
+    assert "Prefeitura" not in combined_prompts
+    assert "Rio" not in combined_prompts
+
+
+def test_structured_output_agent_uses_custom_system_prompts() -> None:
+    captured_system_prompts: list[str] = []
+
+    class CapturingAgent(StructuredOutputAgent):
+        def _json(
+            self,
+            system: str,
+            prompt: str,
+            response_schema: dict[str, Any],
+        ) -> dict[str, Any]:
+            captured_system_prompts.append(system)
+            return {"service": None} if "service" in response_schema["properties"] else {}
+
+    agent = CapturingAgent(
+        route_system_prompt="custom route",
+        extraction_system_prompt="custom extraction",
+    )
+    agent.route(
+        "hello",
+        [{"flow": "support", "route": {"description": "Provides support."}}],
+    )
+    agent.extract(
+        "hello",
+        AgentResponse(
+            description="What happened?",
+            payload_schema={
+                "type": "object",
+                "properties": {"answer": {"type": "string"}},
+                "required": ["answer"],
+            },
+        ),
+    )
+
+    assert captured_system_prompts == ["custom route", "custom extraction"]
 
 
 def test_extraction_response_schema_supports_payload_or_correction() -> None:

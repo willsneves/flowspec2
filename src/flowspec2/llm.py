@@ -3,13 +3,13 @@
 flowspec2 pins the rails (states, closed value-domains, transitions). This module
 is the agent that reasons *within* them: given a flow's ``route.description`` and
 non-exclusive ``route.trigger_phrases`` examples it decides whether to enter,
-and at each pause it reads the citizen's free
-text/voice and the node's ``payload_schema`` (or the interactive options) and
+and at each pause it reads the user's free text/voice and the node's
+``payload_schema`` (or the interactive options) and
 extracts the **closed token** for the slot. The flowspec2 validators then enforce
 the rail — an out-of-domain extraction is rejected and the node re-asks.
 
-Default provider: Google Gemini (``gemini-2.5-flash``, the model the production
-Prefeitura bot uses), via ``GEMINI_API_KEY``. The driver is a thin protocol —
+Default provider: Google Gemini (``gemini-2.5-flash``), via ``GEMINI_API_KEY``.
+The driver is a thin protocol —
 ``route`` + ``extract`` — so any provider can implement it.
 """
 
@@ -26,15 +26,15 @@ from jsonschema import Draft202012Validator
 from .json_codec import strict_json_loads
 from .models import CORRECTION_TARGETS_SCHEMA_KEY, AgentResponse
 
-ROUTE_SYS = (
-    "Você é o roteador de um bot de serviços da Prefeitura do Rio. "
-    "Dada a mensagem do cidadão, decida qual serviço (se algum) atende ao pedido. "
+DEFAULT_ROUTE_SYSTEM_PROMPT = (
+    "Você roteia mensagens para um catálogo de serviços. "
+    "Dada a mensagem da pessoa usuária, decida qual serviço (se algum) atende ao pedido. "
     "Responda APENAS com JSON."
 )
 
-EXTRACT_SYS = (
-    "Você é o motor de extração de um bot de serviços da Prefeitura do Rio. "
-    "O bot fez uma pergunta ao cidadão; sua tarefa é converter a resposta em texto "
+DEFAULT_EXTRACTION_SYSTEM_PROMPT = (
+    "Você extrai dados estruturados para um fluxo conversacional. "
+    "O sistema fez uma pergunta à pessoa usuária; converta a resposta em texto "
     "livre num objeto JSON com os campos pedidos, usando SOMENTE os valores permitidos "
     "quando houver lista fechada. Interprete sinônimos, gírias, números e emojis. "
     "Responda APENAS com JSON, sem comentários."
@@ -144,6 +144,8 @@ def _route_response_schema(flows: list[dict[str, Any]]) -> dict[str, Any]:
 def build_route_request(
     text: str,
     flows: list[dict[str, Any]],
+    *,
+    system_prompt: str = DEFAULT_ROUTE_SYSTEM_PROMPT,
 ) -> StructuredOutputRequest:
     """Render the exact routing request, including non-exclusive trigger examples."""
 
@@ -167,12 +169,12 @@ def build_route_request(
         "Use description como a definição principal de cada serviço. "
         "trigger_phrases contém apenas exemplos de mensagens compatíveis; "
         "não trate esses exemplos como lista exclusiva nem como garantia de correspondência.\n\n"
-        f'Mensagem do cidadão: "{text}"\n\n'
+        f'Mensagem da pessoa usuária: "{text}"\n\n'
         'Devolva {"service": "<nome do serviço>"} se algum atende, '
         'ou {"service": null} se nenhum atende.'
     )
     return StructuredOutputRequest(
-        system=ROUTE_SYS,
+        system=system_prompt,
         prompt=prompt,
         response_schema=_route_response_schema(flows),
     )
@@ -227,6 +229,8 @@ def _extraction_response_schema(agent_response: AgentResponse) -> dict[str, Any]
 def build_extraction_request(
     text: str,
     agent_response: AgentResponse,
+    *,
+    system_prompt: str = DEFAULT_EXTRACTION_SYSTEM_PROMPT,
 ) -> StructuredOutputRequest:
     """Render the exact extraction request, preserving payload-schema guidance."""
 
@@ -253,26 +257,26 @@ def build_extraction_request(
         else:
             lines.append(f'- "{field}": string JSON com o texto informado{null_alternative}')
     options = _interactive_options(agent_response)
-    options_hint = f"\nOpções oferecidas ao cidadão: {', '.join(options)}." if options else ""
+    options_hint = f"\nOpções oferecidas à pessoa usuária: {', '.join(options)}." if options else ""
     correction_targets = (agent_response.payload_schema or {}).get(CORRECTION_TARGETS_SCHEMA_KEY)
     correction_rule = (
-        "- Se o cidadão quer CORRIGIR algo já informado, devolva somente "
+        "- Se a pessoa usuária quer CORRIGIR algo já informado, devolva somente "
         '{"correcao": "<identificador>"}, usando um destes identificadores EXATOS: '
         f"{json.dumps(correction_targets, ensure_ascii=False)}.\n"
         if isinstance(correction_targets, list) and correction_targets
         else ""
     )
     prompt = (
-        f'Pergunta do bot: "{agent_response.description}"\n'
+        f'Pergunta do sistema: "{agent_response.description}"\n'
         f"Campos a extrair:\n" + "\n".join(lines) + options_hint + "\n\n"
-        f'Resposta do cidadão: "{text}"\n\n'
+        f'Resposta da pessoa usuária: "{text}"\n\n'
         "Regras:\n"
         "- Use SOMENTE os valores permitidos nas listas fechadas.\n"
         f"{correction_rule}"
         "- Devolva apenas o JSON com os campos pedidos."
     )
     return StructuredOutputRequest(
-        system=EXTRACT_SYS,
+        system=system_prompt,
         prompt=prompt,
         response_schema=_extraction_response_schema(agent_response),
     )
@@ -280,6 +284,15 @@ def build_extraction_request(
 
 class StructuredOutputAgent:
     """Provider-neutral routing and extraction over one closed JSON completion."""
+
+    def __init__(
+        self,
+        *,
+        route_system_prompt: str = DEFAULT_ROUTE_SYSTEM_PROMPT,
+        extraction_system_prompt: str = DEFAULT_EXTRACTION_SYSTEM_PROMPT,
+    ) -> None:
+        self.route_system_prompt = route_system_prompt
+        self.extraction_system_prompt = extraction_system_prompt
 
     def _json(
         self,
@@ -290,20 +303,35 @@ class StructuredOutputAgent:
         raise NotImplementedError
 
     def route(self, text: str, flows: list[dict[str, Any]]) -> Optional[str]:
-        request = build_route_request(text, flows)
+        request = build_route_request(text, flows, system_prompt=self.route_system_prompt)
         return self._json(request.system, request.prompt, request.response_schema).get("service")
 
     def extract(self, text: str, ar: AgentResponse) -> dict[str, Any]:
-        request = build_extraction_request(text, ar)
+        request = build_extraction_request(
+            text,
+            ar,
+            system_prompt=self.extraction_system_prompt,
+        )
         return self._json(request.system, request.prompt, request.response_schema)
 
 
 class GeminiAgent(StructuredOutputAgent):
     """Engine-side driver backed by Google Gemini structured output."""
 
-    def __init__(self, model: str = "gemini-2.5-flash", api_key: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        model: str = "gemini-2.5-flash",
+        api_key: Optional[str] = None,
+        *,
+        route_system_prompt: str = DEFAULT_ROUTE_SYSTEM_PROMPT,
+        extraction_system_prompt: str = DEFAULT_EXTRACTION_SYSTEM_PROMPT,
+    ) -> None:
         from google import genai
 
+        super().__init__(
+            route_system_prompt=route_system_prompt,
+            extraction_system_prompt=extraction_system_prompt,
+        )
         self.model = model
         self.client = genai.Client(api_key=api_key or os.environ["GEMINI_API_KEY"])
 

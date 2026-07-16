@@ -2,16 +2,15 @@
 
 Table of Contents:
 
-- Unreleased: 25 <!-- section:unreleased -->
-    - Security: 29 <!-- section:unreleased-security -->
-- Version 1.0.0 — prepared 2026-07-15, not published: 39 <!-- section:version-1-0-0 -->
-    - Added: 43 <!-- section:version-1-0-0-added -->
-    - Changed: 68 <!-- section:version-1-0-0-changed -->
-    - Security: 112 <!-- section:version-1-0-0-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 125 <!-- section:version-0-2-0 -->
-    - Added: 129 <!-- section:version-0-2-0-added -->
-    - Changed: 146 <!-- section:version-0-2-0-changed -->
-    - Security: 161 <!-- section:version-0-2-0-security -->
+- Unreleased: 24 <!-- section:unreleased -->
+- Version 1.0.0 — 2026-07-16: 29 <!-- section:version-1-0-0 -->
+    - Added: 33 <!-- section:version-1-0-0-added -->
+    - Changed: 60 <!-- section:version-1-0-0-changed -->
+    - Security: 113 <!-- section:version-1-0-0-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 128 <!-- section:version-0-2-0 -->
+    - Added: 132 <!-- section:version-0-2-0-added -->
+    - Changed: 149 <!-- section:version-0-2-0-changed -->
+    - Security: 164 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -24,19 +23,10 @@ All notable project changes are recorded here. Versioning follows
 
 ## Unreleased
 
-<!-- section:unreleased-security -->
-
-### Security
-
-- Restricted source-distribution discovery to an explicit public allowlist and
-  made package verification reject regular files outside that boundary.
-
-<!-- /section:unreleased-security -->
-
 <!-- /section:unreleased -->
 <!-- section:version-1-0-0 -->
 
-## Version 1.0.0 — prepared 2026-07-15, not published
+## Version 1.0.0 — 2026-07-16
 
 <!-- section:version-1-0-0-added -->
 
@@ -44,6 +34,8 @@ All notable project changes are recorded here. Versioning follows
 
 - Public contribution, conduct, citation, issue, and pull-request contracts for
   the stable open-source release.
+- Public support routing for usage questions, reproducible defects, proposals,
+  and private vulnerability reports.
 - Deterministic GitHub Pages publication that resolves every project-owned
   schema and compatibility-profile identifier from canonical package sources.
 - Optional persisted `await_external.max_resends` enforcement with a host-facing
@@ -105,6 +97,15 @@ All notable project changes are recorded here. Versioning follows
 - Added a tag-triggered release workflow that publishes the one verified
   artifact set to PyPI through Trusted Publishing with attestations, then
   attaches the same distributions and checksum manifest to a GitHub Release.
+- Bounded public runtime and optional dependencies to supported major lines and
+  added a machine-checked dependency-policy contract.
+- Added grouped Dependabot updates for the uv lock and immutable GitHub Actions
+  references, with repository-wide tests enforcing both automation contracts.
+- Made runtime LLM system prompts deployment-neutral and configurable without
+  changing their closed routing or extraction schemas.
+- Expanded prior-art and compatibility analysis across current Rasa CALM,
+  Parlant, OpenDialog, Voiceflow, Botpress, Langflow, and Flowise capabilities,
+  with explicit format, runtime, and host ownership boundaries.
 
 <!-- /section:version-1-0-0-changed -->
 <!-- section:version-1-0-0-security -->
@@ -116,6 +117,8 @@ All notable project changes are recorded here. Versioning follows
 - Pinned the maintained `cryptography` implementation for Ed25519 operations;
   private keys remain outside evidence and cannot be loaded from environment
   files.
+- Restricted source-distribution discovery to an explicit public allowlist and
+  made package verification reject regular files outside that boundary.
 
 <!-- /section:version-1-0-0-security -->
 

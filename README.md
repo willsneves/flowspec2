@@ -4,18 +4,18 @@ Table of Contents:
 
 - Install: 63 <!-- section:install -->
 - LLM-driven (the engine side): 111 <!-- section:llm-driven -->
-- Quickstart: 169 <!-- section:quickstart -->
-- Real backends: 194 <!-- section:real-backends -->
-- Error correlation: 217 <!-- section:error-correlation -->
-- CLI: 234 <!-- section:cli -->
-- What it compiles: 283 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 309 <!-- section:example -->
-    - The flowspec/2 document: 316 <!-- section:example-document -->
-    - Compiled LangGraph: 954 <!-- section:example-compiled-langgraph -->
-- Layout: 1073 <!-- section:layout -->
-- Public contracts: 1127 <!-- section:public-contracts -->
-- Governance: 1147 <!-- section:governance -->
-- Status: 1161 <!-- section:status -->
+- Quickstart: 179 <!-- section:quickstart -->
+- Real backends: 204 <!-- section:real-backends -->
+- Error correlation: 227 <!-- section:error-correlation -->
+- CLI: 244 <!-- section:cli -->
+- What it compiles: 293 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 319 <!-- section:example -->
+    - The flowspec/2 document: 326 <!-- section:example-document -->
+    - Compiled LangGraph: 964 <!-- section:example-compiled-langgraph -->
+- Layout: 1083 <!-- section:layout -->
+- Public contracts: 1137 <!-- section:public-contracts -->
+- Governance: 1157 <!-- section:governance -->
+- Status: 1172 <!-- section:status -->
 
 <!-- /section:toc -->
 
@@ -129,6 +129,16 @@ The LLM has two jobs:
 Closed response schemas constrain both jobs, and local Draft 2020-12 validation
 still runs before runtime execution. Invalid values are rejected and re-asked.
 Live-model tests require explicit opt-in; the default suite is offline.
+
+The provider-neutral agent accepts deployment-specific system prompts without
+changing routing or extraction schemas:
+
+```python
+agent = GeminiAgent(
+    route_system_prompt="Route requests for Acme services. Return only JSON.",
+    extraction_system_prompt="Extract Acme workflow fields. Return only JSON.",
+)
+```
 
 Authoring evaluation is separate. `GeminiAuthor` receives the packaged corpus,
 complete runtime profile, public acceptance contract, prior source, and repair
@@ -1148,7 +1158,8 @@ permissions, then verifies the deployed resources against source over HTTP.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md),
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [CITATION.cff](CITATION.cff), and
-[SECURITY.md](SECURITY.md); use the issue forms for public bugs and proposals.
+[SECURITY.md](SECURITY.md). [SUPPORT.md](SUPPORT.md) routes usage questions,
+public bugs, proposals, and private security reports.
 
 Development is substantially AI-assisted, but the repository owner remains
 responsible for scope, review, verification, release, and acceptance.

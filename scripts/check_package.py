@@ -64,6 +64,7 @@ EXPECTED_SDIST_MEMBERS: Final[frozenset[str]] = frozenset(
         "LICENSE",
         "README.md",
         "SECURITY.md",
+        "SUPPORT.md",
         "docs/VERSIONING.md",
         "pyproject.toml",
         "uv.lock",

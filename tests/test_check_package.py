@@ -28,6 +28,7 @@ EXPECTED_SDIST_ONLY_INCLUDE = frozenset(
         "LICENSE",
         "README.md",
         "SECURITY.md",
+        "SUPPORT.md",
         "docs/VERSIONING.md",
         "pyproject.toml",
         "uv.lock",

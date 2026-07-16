@@ -2,7 +2,7 @@
 
 Each factory returns an async ``(**kwargs) -> dict`` matching the tool protocol.
 The contracts below are what these adapters speak; point the configured URL at a
-real Prefeitura endpoint (or a thin adapter that conforms to them).
+real service endpoint (or a thin adapter that conforms to them).
 
 Error handling is the point: the SGRC terminal maps transport/5xx to
 ``retryable`` (the terminal node preserves state and re-fires next turn) and 4xx
