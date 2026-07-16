@@ -83,9 +83,9 @@ def test_contract_modules_do_not_import_private_cross_module_symbols() -> None:
 
 
 def test_semantic_contract_partition_preserves_exact_diagnostic_identity(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["uses"].append(copy.deepcopy(invalid_flow["uses"][0]))
     invalid_flow["uses"].append({"ref": "unused@1"})
 

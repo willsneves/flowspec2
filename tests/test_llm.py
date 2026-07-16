@@ -43,11 +43,13 @@ def test_fields_spec_from_payload_schema():
         description="?",
         payload_schema={
             "type": "object",
-            "properties": {"luminaria_defeito": {"enum": ["Apagada", "Piscando"]}},
-            "required": ["luminaria_defeito"],
+            "properties": {"streetlight_issue": {"enum": ["Not working", "Flickering"]}},
+            "required": ["streetlight_issue"],
         },
     )
-    assert _fields_spec(ar) == [("luminaria_defeito", "closed", ["Apagada", "Piscando"], False)]
+    assert _fields_spec(ar) == [
+        ("streetlight_issue", "closed", ["Not working", "Flickering"], False)
+    ]
 
 
 def test_fields_spec_preserves_boolean_kind_for_nullable_schema():
@@ -86,29 +88,34 @@ def test_fields_spec_falls_back_to_interactive_buttons():
     ar = AgentResponse(
         description="?",
         interactive={
-            "field": "confirmacao",
-            "buttons": [{"id": "sim", "title": "Sim"}, {"id": "nao", "title": "Não"}],
+            "field": "confirmation",
+            "buttons": [{"id": "yes", "title": "Yes"}, {"id": "no", "title": "No"}],
         },
     )
-    assert _fields_spec(ar) == [("confirmacao", "bool", None, False)]
+    assert _fields_spec(ar) == [("confirmation", "bool", None, False)]
     ar2 = AgentResponse(
         description="?",
         interactive={
             "field": "identification_method",
-            "buttons": [{"id": "cpf", "title": "CPF"}, {"id": "govbr", "title": "Gov.br"}],
+            "buttons": [
+                {"id": "brazilian_tax_id", "title": "Brazilian tax ID"},
+                {"id": "govbr", "title": "Gov.br"},
+            ],
         },
     )
-    assert _fields_spec(ar2) == [("identification_method", "closed", ["cpf", "govbr"], False)]
+    assert _fields_spec(ar2) == [
+        ("identification_method", "closed", ["brazilian_tax_id", "govbr"], False)
+    ]
 
 
 def _capture_extraction_prompt(agent_response: AgentResponse) -> str:
-    return build_extraction_request("resposta", agent_response).prompt
+    return build_extraction_request("answer", agent_response).prompt
 
 
 def test_extraction_prompt_uses_exact_json_scalar_types_and_null() -> None:
     prompt = _capture_extraction_prompt(
         AgentResponse(
-            description="Informe os valores.",
+            description="Provide the values.",
             payload_schema={
                 "type": "object",
                 "properties": {
@@ -123,16 +130,16 @@ def test_extraction_prompt_uses_exact_json_scalar_types_and_null() -> None:
         )
     )
 
-    assert '"quantity": número inteiro em JSON, sem aspas' in prompt
-    assert '"distance": número finito em JSON, sem aspas ou null' in prompt
-    assert '"label": string JSON com o texto informado ou null' in prompt
-    assert '"enabled": true (sim/afirmativo), false (não/negativo) ou null' in prompt
-    assert '"choice": um destes valores EXATOS: ["alpha", null]' in prompt
+    assert '"quantity": a JSON integer without quotes' in prompt
+    assert '"distance": a finite JSON number without quotes or null' in prompt
+    assert '"label": a JSON string containing the supplied text or null' in prompt
+    assert '"enabled": true (yes/affirmative), false (no/negative) or null' in prompt
+    assert '"choice": one of these EXACT values: ["alpha", null]' in prompt
 
 
 def test_extraction_prompt_only_mentions_correction_for_correction_hub() -> None:
     ordinary_response = AgentResponse(
-        description="Informe.",
+        description="Provide an answer.",
         payload_schema={
             "type": "object",
             "properties": {"answer": {"type": "string"}},
@@ -143,13 +150,13 @@ def test_extraction_prompt_only_mentions_correction_for_correction_hub() -> None
         update={
             "payload_schema": {
                 **(ordinary_response.payload_schema or {}),
-                CORRECTION_TARGETS_SCHEMA_KEY: ["address", "cpf"],
+                CORRECTION_TARGETS_SCHEMA_KEY: ["address", "brazilian_tax_id"],
             }
         }
     )
 
-    assert "CORRIGIR" not in _capture_extraction_prompt(ordinary_response)
-    assert "CORRIGIR" in _capture_extraction_prompt(correction_response)
+    assert "CORRECT" not in _capture_extraction_prompt(ordinary_response)
+    assert "CORRECT" in _capture_extraction_prompt(correction_response)
 
 
 def test_route_response_schema_closes_service_to_catalog() -> None:
@@ -171,34 +178,34 @@ def test_route_response_schema_closes_service_to_catalog() -> None:
 
 def test_route_request_renders_description_first_and_trigger_phrases_as_examples() -> None:
     request = build_route_request(
-        "o poste da esquina apagou",
+        "the streetlight on the corner is out",
         [
             {
                 "flow": "repair_light",
                 "route": {
-                    "description": "Registra defeitos na iluminação pública.",
-                    "trigger_phrases": ["poste apagado", "luz piscando"],
+                    "description": "Report public streetlight issues.",
+                    "trigger_phrases": ["streetlight out", "flickering light"],
                 },
             },
             {
                 "flow": "repair_road",
-                "route": {"description": "Registra defeitos no pavimento."},
+                "route": {"description": "Report road-surface issues."},
             },
         ],
     )
 
     assert request.system == DEFAULT_ROUTE_SYSTEM_PROMPT
     assert request.prompt == (
-        "Catálogo de serviços em JSON:\n"
-        '[{"description":"Registra defeitos na iluminação pública.","service":"repair_light",'
-        '"trigger_phrases":["poste apagado","luz piscando"]},{"description":"Registra '
-        'defeitos no pavimento.","service":"repair_road","trigger_phrases":[]}]\n\n'
-        "Use description como a definição principal de cada serviço. trigger_phrases contém "
-        "apenas exemplos de mensagens compatíveis; não trate esses exemplos como lista "
-        "exclusiva nem como garantia de correspondência.\n\n"
-        'Mensagem da pessoa usuária: "o poste da esquina apagou"\n\n'
-        'Devolva {"service": "<nome do serviço>"} se algum atende, ou {"service": null} se '
-        "nenhum atende."
+        "Service catalog as JSON:\n"
+        '[{"description":"Report public streetlight issues.","service":"repair_light",'
+        '"trigger_phrases":["streetlight out","flickering light"]},{"description":"Report '
+        'road-surface issues.","service":"repair_road","trigger_phrases":[]}]\n\n'
+        "Use description as each service's primary definition. trigger_phrases contains only "
+        "examples of compatible messages; do not treat them as an exclusive list or a match "
+        "guarantee.\n\n"
+        'User message: "the streetlight on the corner is out"\n\n'
+        'Return {"service": "<service name>"} if one applies, or {"service": null} if none '
+        "applies."
     )
     assert request.response_schema["properties"]["service"]["enum"] == [
         "repair_light",
@@ -209,14 +216,14 @@ def test_route_request_renders_description_first_and_trigger_phrases_as_examples
 
 def test_extraction_request_preserves_extract_hint_in_closed_response_schema() -> None:
     request = build_extraction_request(
-        "tá tudo escuro",
+        "everything is dark",
         AgentResponse(
-            description="Qual é o defeito?",
+            description="What is the issue?",
             payload_schema={
                 "type": "object",
                 "properties": {
                     "defect": {
-                        "description": "Mapeie escuridão para Off.",
+                        "description": "Map darkness to Off.",
                         "enum": ["Off", "Flashing"],
                     }
                 },
@@ -227,18 +234,18 @@ def test_extraction_request_preserves_extract_hint_in_closed_response_schema() -
 
     assert request.system == DEFAULT_EXTRACTION_SYSTEM_PROMPT
     assert request.prompt == (
-        'Pergunta do sistema: "Qual é o defeito?"\n'
-        'Campos a extrair:\n- "defect": um destes valores EXATOS: ["Off", "Flashing"]\n\n'
-        'Resposta da pessoa usuária: "tá tudo escuro"\n\n'
-        "Regras:\n- Use SOMENTE os valores permitidos nas listas fechadas.\n"
-        "- Devolva apenas o JSON com os campos pedidos."
+        'System question: "What is the issue?"\n'
+        'Fields to extract:\n- "defect": one of these EXACT values: ["Off", "Flashing"]\n\n'
+        'User response: "everything is dark"\n\n'
+        "Rules:\n- Use ONLY permitted values from closed lists.\n"
+        "- Return only JSON with the requested fields."
     )
     assert request.response_schema == {
         "type": "object",
         "additionalProperties": False,
         "properties": {
             "defect": {
-                "description": "Mapeie escuridão para Off.",
+                "description": "Map darkness to Off.",
                 "enum": ["Off", "Flashing"],
             }
         },
@@ -249,7 +256,7 @@ def test_extraction_request_preserves_extract_hint_in_closed_response_schema() -
 def test_default_system_prompts_are_provider_and_deployment_neutral() -> None:
     combined_prompts = f"{DEFAULT_ROUTE_SYSTEM_PROMPT} {DEFAULT_EXTRACTION_SYSTEM_PROMPT}"
 
-    assert "Prefeitura" not in combined_prompts
+    assert "municipality" not in combined_prompts.lower()
     assert "Rio" not in combined_prompts
 
 
@@ -304,10 +311,10 @@ def test_extraction_response_schema_supports_payload_or_correction() -> None:
 
     assert response_schema["additionalProperties"] is False
     assert response_schema["properties"]["defect"] == {"enum": ["off", "flashing"]}
-    assert response_schema["properties"]["correcao"] == {"enum": ["defect", "address"]}
+    assert response_schema["properties"]["correction"] == {"enum": ["defect", "address"]}
     assert {tuple(branch["required"]) for branch in response_schema["oneOf"]} == {
         ("defect",),
-        ("correcao",),
+        ("correction",),
     }
 
 
@@ -324,7 +331,7 @@ def test_extraction_response_schema_does_not_offer_correction_outside_hub() -> N
     )
 
     assert response_schema["required"] == ["defect"]
-    assert "correcao" not in response_schema["properties"]
+    assert "correction" not in response_schema["properties"]
 
 
 def test_gemini_request_uses_json_schema_and_rejects_invalid_provider_output() -> None:
@@ -362,12 +369,16 @@ def _conversational(doc: dict) -> dict:
 
 
 @pytestmark_integration
-def test_gemini_routes_in_and_out(luminaria_doc):
+def test_gemini_routes_in_and_out(streetlight_document):
     from flowspec2.llm import GeminiAgent
 
     agent = GeminiAgent()
-    assert agent.route("a luz da minha rua apagou", [luminaria_doc]) == "reparo_luminaria"
-    assert agent.route("quero pagar meu IPTU atrasado", [luminaria_doc]) != "reparo_luminaria"
+    assert agent.route("the streetlight on my street is out", [streetlight_document]) == (
+        "streetlight_repair"
+    )
+    assert agent.route("I want to pay an overdue tax bill", [streetlight_document]) != (
+        "streetlight_repair"
+    )
 
 
 @pytestmark_integration
@@ -376,51 +387,51 @@ def test_gemini_extracts_closed_token():
 
     agent = GeminiAgent()
     ar = AgentResponse(
-        description="Qual o problema na luminária?",
+        description="What is the streetlight issue?",
         payload_schema={
             "type": "object",
             "properties": {
-                "luminaria_defeito": {
+                "streetlight_issue": {
                     "enum": [
-                        "Apagada",
-                        "Piscando",
-                        "Acesa de dia",
-                        "Pendurada",
-                        "Danificada",
-                        "Com ruído",
+                        "Not working",
+                        "Flickering",
+                        "On during daylight",
+                        "Hanging",
+                        "Damaged",
+                        "Noisy",
                     ]
                 }
             },
-            "required": ["luminaria_defeito"],
+            "required": ["streetlight_issue"],
         },
     )
-    out = agent.extract("tá tudo escuro, a luz não acende faz dias", ar)
-    assert out.get("luminaria_defeito") == "Apagada"
+    out = agent.extract("everything is dark; the light has been out for days", ar)
+    assert out.get("streetlight_issue") == "Not working"
 
 
 @pytestmark_integration
-async def test_gemini_drives_full_conversation(luminaria_doc):
+async def test_gemini_drives_full_conversation(streetlight_document):
     import asyncio
 
     from flowspec2.llm import GeminiAgent
 
     agent = GeminiAgent()
-    rt = FlowRuntime(_conversational(luminaria_doc))
+    rt = FlowRuntime(_conversational(streetlight_document))
     state = rt.new_state("llm-e2e")
     state = await rt.execute(state, {})  # enter -> asks defect
     for msg in [
-        "a luz tá apagada",  # defect -> Apagada
-        "é uma luminária só",  # quantidade -> uma (no intercaladas branch)
-        "fica na rua",  # localizacao -> Rua (quadra gated off)
-        "Rua das Acácias, 50, Centro",  # address
-        "sim, pode confirmar",  # confirm address
-        "perto da escola",  # ponto de referência
-        "prefiro não me identificar",  # anonimo
-        "pode abrir o chamado",  # confirm ticket -> open
+        "the light is out",  # issue -> Not working
+        "it is a single streetlight",  # count -> single (no outage-pattern branch)
+        "it is on the street",  # location -> Street (sports-court gate is closed)
+        "Acacia Street, 50, Downtown",  # address
+        "yes, confirm it",  # confirm address
+        "near the school",  # reference point
+        "I prefer to remain anonymous",  # identification
+        "open the service request",  # confirm ticket -> open
     ]:
         if state.status == "completed":
             break
         payload = await asyncio.to_thread(agent.extract, msg, state.agent_response)
         state = await rt.execute(state, payload)
     assert state.status == "completed"
-    assert state.data.get("protocol_id", "").startswith("SGRC-")
+    assert state.data.get("protocol_id", "").startswith("REQ-")

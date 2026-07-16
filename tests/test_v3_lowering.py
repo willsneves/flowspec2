@@ -19,7 +19,7 @@ EXAMPLES_DIRECTORY = Path(__file__).resolve().parents[1] / "examples"
 
 @pytest.mark.parametrize(
     "example_filename",
-    ["reparo_buraco.flow.json", "reparo_luminaria.flow.json"],
+    ["pothole_repair.flow.json", "streetlight_repair.flow.json"],
 )
 def test_migrated_examples_lower_compile_and_close_the_exact_fixed_point(
     example_filename: str,
@@ -38,9 +38,9 @@ def test_migrated_examples_lower_compile_and_close_the_exact_fixed_point(
 
 
 def test_lowering_is_pure_deterministic_and_report_is_immutable(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    preview_document = migrate_v2_to_v3_preview(streetlight_document)
     preview_snapshot = copy.deepcopy(preview_document)
 
     first_report = lower_v3_preview_to_v2_report(preview_document)
@@ -50,7 +50,7 @@ def test_lowering_is_pure_deterministic_and_report_is_immutable(
     assert first_report == second_report
     mutable_source = first_report.source_document
     mutable_source["flow"] = "changed_by_caller"
-    assert first_report.source_document["flow"] == "reparo_luminaria"
+    assert first_report.source_document["flow"] == "streetlight_repair"
 
 
 def test_authored_lowerable_preview_compiles_without_passthrough() -> None:

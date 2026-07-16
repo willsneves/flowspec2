@@ -1,4 +1,4 @@
-"""Authorability: the buraco example runs, and a brand-new flow authored inline
+"""Authorability: the pothole example runs, and a brand-new flow authored inline
 from a one-line description compiles and runs without touching the library."""
 
 from __future__ import annotations
@@ -8,55 +8,59 @@ from conftest import require_agent_response, step
 from flowspec2 import FlowRuntime, validate_flow
 
 
-async def test_buraco_runs_end_to_end(buraco):
-    st = await step(buraco, None, {"buraco_tipo": "buraco", "buraco_tamanho": "grande"})
-    assert st.data["buraco_tipo"] == "Buraco no asfalto"
-    assert st.data["buraco_tamanho"] == "Grande"
-    st = await step(buraco, st, {"address": "Av. Brasil, 1000"})
-    st = await step(buraco, st, {"confirmacao": "sim"})
-    st = await step(buraco, st, {"identification_method": "anonimo"})
-    assert (require_agent_response(st).interactive or {})["field"] == "confirmacao"
-    st = await step(buraco, st, {"confirmacao": "sim"})
+async def test_pothole_runs_end_to_end(pothole):
+    st = await step(pothole, None, {"pothole_type": "pothole", "pothole_size": "large"})
+    assert st.data["pothole_type"] == "Asphalt pothole"
+    assert st.data["pothole_size"] == "Large"
+    st = await step(pothole, st, {"address": "Main Avenue, 1000"})
+    st = await step(pothole, st, {"confirmation": "yes"})
+    st = await step(pothole, st, {"identification_method": "anonymous"})
+    assert (require_agent_response(st).interactive or {})["field"] == "confirmation"
+    st = await step(pothole, st, {"confirmation": "yes"})
     assert st.status == "completed"
-    assert st.data["protocol_id"].startswith("SGRC-")
+    assert st.data["protocol_id"].startswith("REQ-")
 
 
-# "Citizen reports an abandoned/overgrown vacant lot (mato alto, lixo, or both),
-#  needs the address, optional identification, opens a ticket." — authored as JSON,
+# "Citizen reports an abandoned or overgrown vacant lot, needs the address,
+#  optional identification, and opens a ticket." — authored as JSON,
 #  no Python, no subflow changes: just a domain, two slots, a flat path, two `use`s.
-ABANDONED_LOT_FLOW = {
+VACANT_LOT_FLOW = {
     "schema": "flowspec/2",
-    "flow": "terreno_baldio",
+    "flow": "vacant_lot_report",
     "version": "1.0.0",
     "service": {"id": "27001"},
     "route": {
-        "description": "Denúncia de terreno baldio: mato alto, lixo acumulado ou foco de insetos."
+        "description": "Report an overgrown vacant lot, accumulated waste, or an insect hazard."
     },
     "config": {"address_required": True, "identification_required": False, "max_attempts": 3},
     "domains": {
-        "ProblemaTerreno": {
+        "VacantLotIssue": {
             "type": "categorical",
-            "values": ["Mato alto", "Lixo acumulado", "Ambos"],
+            "values": ["Overgrown vegetation", "Accumulated waste", "Both"],
             "normalize": {
                 "accent_fold": True,
-                "synonyms": {"mato": "Mato alto", "lixo": "Lixo acumulado", "os dois": "Ambos"},
+                "synonyms": {
+                    "overgrown": "Overgrown vegetation",
+                    "waste": "Accumulated waste",
+                    "both issues": "Both",
+                },
             },
         },
-        "SimNao": {"type": "bool", "normalize": {"affirmation": True}},
+        "YesNo": {"type": "bool", "normalize": {"affirmation": True}},
     },
     "slots": {
-        "problema_terreno": {"domain": "ProblemaTerreno", "required": True},
-        "ticket_data_confirmed": {"domain": "SimNao"},
+        "lot_issue": {"domain": "VacantLotIssue", "required": True},
+        "ticket_data_confirmed": {"domain": "YesNo"},
     },
     "path": [
         {
-            "step": "collect_problema",
-            "slot": "problema_terreno",
-            "prompt": {"text": "Qual o problema no terreno?"},
+            "step": "collect_problem",
+            "slot": "lot_issue",
+            "prompt": {"text": "What is the problem with the vacant lot?"},
             "interactive": {
                 "kind": "buttons",
-                "field": "problema_terreno",
-                "from_domain": "ProblemaTerreno",
+                "field": "lot_issue",
+                "from_domain": "VacantLotIssue",
             },
         },
         {"use": "address@1"},
@@ -65,8 +69,8 @@ ABANDONED_LOT_FLOW = {
             "step": "confirm_ticket_data",
             "confirm": "ticket_data_confirmed",
             "correctable": True,
-            "prompt": {"text": "Confirma a denúncia?"},
-            "interactive": {"kind": "buttons", "field": "confirmacao", "from_domain": "SimNao"},
+            "prompt": {"text": "Do you confirm the report?"},
+            "interactive": {"kind": "buttons", "field": "confirmation", "from_domain": "YesNo"},
         },
         {"terminal": True},
     ],
@@ -78,18 +82,18 @@ ABANDONED_LOT_FLOW = {
         "step": "confirm_ticket_data",
         "slot": "ticket_data_confirmed",
         "on_confirm": "open_ticket",
-        "correctable": ["problema_terreno", "address", "cpf", "email", "name"],
+        "correctable": ["lot_issue", "address", "brazilian_tax_id", "email", "name"],
     },
     "terminal": {
         "step": "open_ticket",
-        "tool": "sgrc_open_ticket",
+        "tool": "open_service_request",
         "idempotent": True,
         "input": [
-            {"param": "problema", "slot": "problema_terreno"},
-            {"param": "endereco", "slot": "address"},
-            {"param": "solicitante", "slot": "cpf"},
+            {"param": "problem", "slot": "lot_issue"},
+            {"param": "address", "slot": "address"},
+            {"param": "requester", "slot": "brazilian_tax_id"},
         ],
-        "outputs": {"protocol_id": "result.protocolo"},
+        "outputs": {"protocol_id": "result.protocol_id"},
         "outcomes": {
             "success": {"reset_next": True},
             "retryable": {"preserve_state": True},
@@ -97,24 +101,24 @@ ABANDONED_LOT_FLOW = {
         },
     },
     "capabilities": {
-        "media_in": {"analyze": ["image"], "route_by": "workflow_sugerido"},
+        "media_in": {"analyze": ["image"], "route_by": "suggested_workflow"},
         "session_reset": True,
     },
 }
 
 
 def test_new_flow_validates_against_schema():
-    validate_flow(ABANDONED_LOT_FLOW)
+    validate_flow(VACANT_LOT_FLOW)
 
 
 async def test_new_flow_compiles_and_runs():
-    rt = FlowRuntime(ABANDONED_LOT_FLOW)
-    st = await step(rt, None, {"problema_terreno": "mato"})  # synonym -> "Mato alto"
-    assert st.data["problema_terreno"] == "Mato alto"
-    st = await step(rt, st, {"address": "Rua do Lote, 7"})
-    st = await step(rt, st, {"confirmacao": "sim"})  # confirm address
-    st = await step(rt, st, {"identification_method": "anonimo"})
-    assert (require_agent_response(st).interactive or {})["field"] == "confirmacao"
-    st = await step(rt, st, {"confirmacao": "sim"})  # confirm ticket -> open
+    rt = FlowRuntime(VACANT_LOT_FLOW)
+    st = await step(rt, None, {"lot_issue": "overgrown"})
+    assert st.data["lot_issue"] == "Overgrown vegetation"
+    st = await step(rt, st, {"address": "Vacant Lot Street, 7"})
+    st = await step(rt, st, {"confirmation": "yes"})  # confirm address
+    st = await step(rt, st, {"identification_method": "anonymous"})
+    assert (require_agent_response(st).interactive or {})["field"] == "confirmation"
+    st = await step(rt, st, {"confirmation": "yes"})  # confirm ticket -> open
     assert st.status == "completed"
-    assert st.data["protocol_id"].startswith("SGRC-")
+    assert st.data["protocol_id"].startswith("REQ-")

@@ -32,9 +32,9 @@ def _counting_registry() -> tuple[ToolRegistry, dict]:
 
     async def counting_open(**inputs):
         counter["opens"] += 1
-        return {"status": "success", "protocolo": "SGRC-FIXED-1", "message": "ok"}
+        return {"status": "success", "protocol_id": "REQ-FIXED-1", "message": "ok"}
 
-    reg.register("sgrc_open_ticket", counting_open)
+    reg.register("open_service_request", counting_open)
     return reg, counter
 
 
@@ -55,15 +55,15 @@ class _ReplacementTerminal:
     async def __call__(self, **inputs: Any) -> dict[str, Any]:
         del inputs
         self.call_count += 1
-        return {"status": "success", "protocolo": "MUTATED"}
+        return {"status": "success", "protocol_id": "MUTATED"}
 
 
-async def _drive_buraco_to_open(rt: FlowRuntime, user: str):
-    st = await step(rt, None, {"buraco_tipo": "buraco", "buraco_tamanho": "grande"}, user=user)
-    st = await step(rt, st, {"address": "Rua Y, 50"}, user=user)
-    st = await step(rt, st, {"confirmacao": "sim"}, user=user)
-    st = await step(rt, st, {"identification_method": "anonimo"}, user=user)
-    st = await step(rt, st, {"confirmacao": "sim"}, user=user)
+async def _drive_pothole_to_open(rt: FlowRuntime, user: str):
+    st = await step(rt, None, {"pothole_type": "pothole", "pothole_size": "large"}, user=user)
+    st = await step(rt, st, {"address": "Street Y, 50"}, user=user)
+    st = await step(rt, st, {"confirmation": "yes"}, user=user)
+    st = await step(rt, st, {"identification_method": "anonymous"}, user=user)
+    st = await step(rt, st, {"confirmation": "yes"}, user=user)
     return st
 
 
@@ -83,30 +83,30 @@ def test_runtime_models_reject_unknown_contract_fields(
         model_type(**model_arguments)
 
 
-async def test_terminal_idempotency_replays_on_identical_inputs(buraco_doc):
+async def test_terminal_idempotency_replays_on_identical_inputs(pothole_document):
     reg, counter = _counting_registry()
     # two independent runtimes share the registry (and its replay cache); same
     # user + identical answers => the side effect fires ONCE.
-    rt1 = FlowRuntime(buraco_doc, tools=reg)
-    rt2 = FlowRuntime(buraco_doc, tools=reg)
-    s1 = await _drive_buraco_to_open(rt1, user="dup")
-    s2 = await _drive_buraco_to_open(rt2, user="dup")
+    rt1 = FlowRuntime(pothole_document, tools=reg)
+    rt2 = FlowRuntime(pothole_document, tools=reg)
+    s1 = await _drive_pothole_to_open(rt1, user="dup")
+    s2 = await _drive_pothole_to_open(rt2, user="dup")
     assert s1.status == "completed" and s2.status == "completed"
-    assert s1.data["protocol_id"] == s2.data["protocol_id"] == "SGRC-FIXED-1"
+    assert s1.data["protocol_id"] == s2.data["protocol_id"] == "REQ-FIXED-1"
     assert counter["opens"] == 1  # replayed, not re-fired
 
 
 async def test_terminal_idempotency_namespace_changes_with_flow_revision(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
     registry, counter = _counting_registry()
-    upgraded_document = copy.deepcopy(buraco_doc)
+    upgraded_document = copy.deepcopy(pothole_document)
     upgraded_document["version"] = "1.0.1"
-    first_runtime = FlowRuntime(buraco_doc, tools=registry)
+    first_runtime = FlowRuntime(pothole_document, tools=registry)
     upgraded_runtime = FlowRuntime(upgraded_document, tools=registry)
 
-    first_state = await _drive_buraco_to_open(first_runtime, user="revision-isolation")
-    upgraded_state = await _drive_buraco_to_open(
+    first_state = await _drive_pothole_to_open(first_runtime, user="revision-isolation")
+    upgraded_state = await _drive_pothole_to_open(
         upgraded_runtime,
         user="revision-isolation",
     )
@@ -117,13 +117,13 @@ async def test_terminal_idempotency_namespace_changes_with_flow_revision(
 
 
 async def test_terminal_resolves_every_output_before_committing_state(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    flow_document = copy.deepcopy(buraco_doc)
+    flow_document = copy.deepcopy(pothole_document)
     flow_document["terminal"]["outputs"] = {
-        "protocol_id": "result.protocolo",
-        "duplicate_protocol": "result.protocolo",
+        "protocol_id": "result.protocol_id",
+        "duplicate_protocol": "result.protocol_id",
     }
     original_dig = flow_nodes._dig
     resolved_output_count = 0
@@ -138,7 +138,7 @@ async def test_terminal_resolves_every_output_before_committing_state(
     monkeypatch.setattr(flow_nodes, "_dig", fail_after_first_output)
     runtime = FlowRuntime(flow_document)
 
-    state = await _drive_buraco_to_open(runtime, user="atomic-terminal-output")
+    state = await _drive_pothole_to_open(runtime, user="atomic-terminal-output")
 
     assert state.status == "error"
     assert "protocol_id" not in state.data
@@ -147,20 +147,20 @@ async def test_terminal_resolves_every_output_before_committing_state(
     assert state.agent_response.log_id is not None
 
 
-async def test_as_tool_adapter(buraco_doc):
-    rt = FlowRuntime(buraco_doc)
+async def test_as_tool_adapter(pothole_document):
+    rt = FlowRuntime(pothole_document)
     tool = rt.as_tool()
-    out = await tool("reparo_buraco", "5521000", {"buraco_tipo": "cratera enorme"})
+    out = await tool("pothole_repair", "5521000", {"pothole_type": "large crater"})
     assert out["status"] == "progress"
-    assert "payload_schema" in out and out["payload_schema"]["properties"]  # asks tamanho next
-    assert out["data"]["buraco_tipo"] == "Cratera"
+    assert "payload_schema" in out and out["payload_schema"]["properties"]  # asks size next
+    assert out["data"]["pothole_type"] == "Crater"
 
 
 async def test_as_tool_serializes_load_execute_save_for_one_user_without_lock_leaks(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
     first_tool = runtime.as_tool()
     second_tool = runtime.as_tool()
     first_call_started = asyncio.Event()
@@ -199,10 +199,10 @@ async def test_as_tool_serializes_load_execute_save_for_one_user_without_lock_le
 
 
 async def test_as_tool_does_not_serialize_different_users_globally(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
     tool = runtime.as_tool()
     blocked_user_started = asyncio.Event()
     release_blocked_user = asyncio.Event()
@@ -237,9 +237,9 @@ async def test_as_tool_does_not_serialize_different_users_globally(
 
 
 async def test_as_tool_rejects_a_service_name_from_another_flow(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
 
     with pytest.raises(ValueError, match="does not match runtime flow"):
         await runtime.as_tool()("another_flow", "wrong-service", {})
@@ -248,8 +248,8 @@ async def test_as_tool_rejects_a_service_name_from_another_flow(
     assert runtime._user_execution_locks == {}
 
 
-async def test_as_tool_returns_owned_deep_copies(buraco_doc: dict[str, Any]) -> None:
-    runtime = FlowRuntime(buraco_doc)
+async def test_as_tool_returns_owned_deep_copies(pothole_document: dict[str, Any]) -> None:
+    runtime = FlowRuntime(pothole_document)
     user_id = "owned-output"
 
     tool_output = await runtime.as_tool()(runtime.flow, user_id, {})
@@ -260,7 +260,7 @@ async def test_as_tool_returns_owned_deep_copies(buraco_doc: dict[str, Any]) -> 
     stored_interactive = copy.deepcopy(stored_state.agent_response.interactive)
 
     tool_output["data"]["service"]["id"] = "caller-mutation"
-    tool_output["payload_schema"]["properties"]["buraco_tipo"]["description"] = "caller-mutation"
+    tool_output["payload_schema"]["properties"]["pothole_type"]["description"] = "caller-mutation"
     tool_output["interactive"]["sections"][0]["rows"][0]["title"] = "caller-mutation"
 
     assert stored_state.data == stored_data
@@ -269,35 +269,35 @@ async def test_as_tool_returns_owned_deep_copies(buraco_doc: dict[str, Any]) -> 
 
 
 def test_new_state_validates_normalizes_and_owns_declared_slot_seeds(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
     caller_data: dict[str, Any] = {
-        "buraco_tipo": "cratera enorme",
+        "pothole_type": "large crater",
         "host_metadata": {"labels": ["restored"]},
     }
 
     state = runtime.new_state("normalized-seed", caller_data)
     caller_data["host_metadata"]["labels"].append("caller-mutation")
 
-    assert state.data["buraco_tipo"] == "Cratera"
+    assert state.data["pothole_type"] == "Crater"
     assert state.data["host_metadata"] == {"labels": ["restored"]}
 
     with pytest.raises(ValueError) as validation_error:
-        runtime.new_state("invalid-seed", {"buraco_tipo": {"unexpected": True}})
-    assert "buraco_tipo" in str(validation_error.value)
+        runtime.new_state("invalid-seed", {"pothole_type": {"unexpected": True}})
+    assert "pothole_type" in str(validation_error.value)
 
 
 def test_new_state_places_declared_slot_seeds_in_their_partition(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    internal_slot_document = copy.deepcopy(buraco_doc)
+    internal_slot_document = copy.deepcopy(pothole_document)
     internal_slot_document["slots"]["ticket_data_confirmed"]["persist"] = "internal"
     runtime = FlowRuntime(internal_slot_document)
 
     state = runtime.new_state(
         "internal-seed",
-        {"ticket_data_confirmed": "sim", "host_metadata": {"restored": True}},
+        {"ticket_data_confirmed": "yes", "host_metadata": {"restored": True}},
     )
 
     assert "ticket_data_confirmed" not in state.data
@@ -306,62 +306,62 @@ def test_new_state_places_declared_slot_seeds_in_their_partition(
 
 
 def test_new_state_validates_profile_exposed_slot_seeds(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
 
     state = runtime.new_state(
         "valid-exposed-seed",
         {
             "address": {
-                "logradouro": "Rua da Assembleia",
-                "kind": "logradouro",
-                "bairro": "Centro",
-                "municipio": "Rio de Janeiro",
+                "street": "Street da Assembleia",
+                "kind": "street",
+                "district": "Centro",
+                "city": "Rio de Janeiro",
             }
         },
     )
 
-    assert state.data["address"]["bairro"] == "Centro"
+    assert state.data["address"]["district"] == "Centro"
     with pytest.raises(ValueError, match=r"address.*not valid"):
         runtime.new_state("invalid-exposed-seed", {"address": "invalid"})
     with pytest.raises(ValueError, match=r"address"):
         runtime.new_state("empty-exposed-seed", {"address": {}})
     with pytest.raises(ValueError, match=r"address"):
-        runtime.new_state("blank-exposed-seed", {"address": {"logradouro": ""}})
+        runtime.new_state("blank-exposed-seed", {"address": {"street": ""}})
 
 
 @pytest.mark.parametrize("invalid_host_value", [object(), {"not-json"}, math.nan])
 def test_new_state_rejects_non_json_host_values(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
     invalid_host_value: object,
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
 
     with pytest.raises(ValueError, match=r"host_metadata"):
         runtime.new_state("invalid-host-json", {"host_metadata": invalid_host_value})
 
 
 async def test_execute_rejects_invalid_restored_slot_before_running_flow(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
     state = runtime.new_state("invalid-restored-state")
-    state.data["buraco_tipo"] = "not-a-domain-value"
+    state.data["pothole_type"] = "not-a-domain-value"
 
-    restored_state = await runtime.execute(state, {"buraco_tamanho": "Grande"})
+    restored_state = await runtime.execute(state, {"pothole_size": "Large"})
 
     agent_response = require_agent_response(restored_state)
     assert restored_state.status == "error"
-    assert "buraco_tipo" in (agent_response.error_message or "")
+    assert "pothole_type" in (agent_response.error_message or "")
     assert agent_response.log_id is not None
-    assert "buraco_tamanho" not in restored_state.data
+    assert "pothole_size" not in restored_state.data
 
 
 async def test_execute_rejects_non_json_turn_payload_before_graph_effects(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
 
     state = await runtime.execute(
         runtime.new_state("invalid-turn-json"),
@@ -376,11 +376,11 @@ async def test_execute_rejects_non_json_turn_payload_before_graph_effects(
 
 
 async def test_execute_rejects_restored_slot_in_the_wrong_partition(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
     state = runtime.new_state("mispartitioned-restored-state")
-    state.internal["buraco_tipo"] = "Cratera"
+    state.internal["pothole_type"] = "Crater"
 
     restored_state = await runtime.execute(state, {})
 
@@ -391,9 +391,9 @@ async def test_execute_rejects_restored_slot_in_the_wrong_partition(
 
 
 async def test_execute_rejects_invalid_restored_profile_exposed_slot(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
     state = runtime.new_state("invalid-restored-exposed-state")
     state.data["address"] = "invalid"
     state.internal["address_completed"] = True
@@ -408,13 +408,13 @@ async def test_execute_rejects_invalid_restored_profile_exposed_slot(
 
 @pytest.mark.parametrize("partition_name", ["internal", "payload"])
 async def test_execute_rejects_profile_exposed_slot_in_non_data_partition(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
     partition_name: str,
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
     state = runtime.new_state(f"mispartitioned-exposed-{partition_name}")
     getattr(state, partition_name)["address"] = {
-        "logradouro": "Rua da Assembleia",
+        "street": "Assembly Street",
     }
 
     restored_state = await runtime.execute(state, {})
@@ -426,24 +426,24 @@ async def test_execute_rejects_profile_exposed_slot_in_non_data_partition(
 
 
 async def test_failed_restore_validation_does_not_partially_normalize_state(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
     state = runtime.new_state("atomic-restored-validation")
-    state.data["buraco_tipo"] = "cratera enorme"
+    state.data["pothole_type"] = "large crater"
     state.data["address"] = {}
 
     restored_state = await runtime.execute(state, {})
 
     assert restored_state.status == "error"
-    assert restored_state.data["buraco_tipo"] == "cratera enorme"
+    assert restored_state.data["pothole_type"] == "large crater"
     assert restored_state.data["address"] == {}
 
 
 async def test_execute_rejects_state_from_another_flow_contract(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    runtime = FlowRuntime(buraco_doc)
+    runtime = FlowRuntime(pothole_document)
     state = runtime.new_state("stale-flow-contract")
     state.metadata.flow_ir_digest = "0" * 64
 
@@ -456,13 +456,13 @@ async def test_execute_rejects_state_from_another_flow_contract(
 
 
 async def test_execute_rejects_state_when_profile_catalog_changes(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    original_runtime = FlowRuntime(buraco_doc)
+    original_runtime = FlowRuntime(pothole_document)
     state = original_runtime.new_state("compatible-expanded-profile")
     expanded_registry = default_tool_registry()
     expanded_registry.register("unused_profile_tool", _unused_successful_tool)
-    expanded_runtime = FlowRuntime(buraco_doc, tools=expanded_registry)
+    expanded_runtime = FlowRuntime(pothole_document, tools=expanded_registry)
 
     restored_state = await expanded_runtime.execute(state, {})
 
@@ -473,16 +473,16 @@ async def test_execute_rejects_state_when_profile_catalog_changes(
 
 
 async def test_execute_rejects_mutated_used_tool_binding_before_effects(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
     registry = default_tool_registry()
-    runtime = FlowRuntime(buraco_doc, tools=registry)
+    runtime = FlowRuntime(pothole_document, tools=registry)
     state = runtime.new_state("mutated-tool-binding")
     replacement_terminal = _ReplacementTerminal()
-    registry.register("sgrc_open_ticket", replacement_terminal)
+    registry.register("open_service_request", replacement_terminal)
     state = await runtime.execute(
         state,
-        {"buraco_tipo": "buraco"},
+        {"pothole_type": "pothole"},
     )
 
     assert state.status == "error"
@@ -492,12 +492,12 @@ async def test_execute_rejects_mutated_used_tool_binding_before_effects(
 
 
 async def test_non_blocking_entry_failure_is_logged_and_flow_continues(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     registry = default_tool_registry()
     registry.register("hub_search", _failing_entry_tool)
-    runtime = FlowRuntime(luminaria_doc, tools=registry)
+    runtime = FlowRuntime(streetlight_document, tools=registry)
 
     with caplog.at_level(logging.WARNING, logger="flowspec2.nodes"):
         state = await runtime.execute(
@@ -518,19 +518,19 @@ async def test_non_blocking_entry_failure_is_logged_and_flow_continues(
 
 
 async def test_error_response_and_tool_adapter_propagate_the_log_id(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     generator = SnowflakeIdGenerator(
         worker_id=21,
         clock_milliseconds=lambda: SNOWFLAKE_EPOCH_MILLISECONDS + 500,
     )
-    runtime = FlowRuntime(buraco_doc, log_id_generator=generator)
+    runtime = FlowRuntime(pothole_document, log_id_generator=generator)
 
     with caplog.at_level(logging.WARNING, logger="flowspec2.runtime"):
         state = await runtime.execute(
             runtime.new_state("correlated-error"),
-            {"buraco_tipo": "fora do domínio"},
+            {"pothole_type": "outside the domain"},
         )
 
     agent_response = require_agent_response(state)
@@ -542,40 +542,40 @@ async def test_error_response_and_tool_adapter_propagate_the_log_id(
     )
 
     tool_output = await runtime.as_tool()(
-        "reparo_buraco",
+        "pothole_repair",
         "correlated-tool-error",
-        {"buraco_tipo": "também fora do domínio"},
+        {"pothole_type": "also outside the domain"},
     )
     assert tool_output["error_message"]
     assert str(tool_output["log_id"]).isdigit()
 
 
 async def test_runtime_uses_the_injected_clock_for_state_creation_and_touch(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
     created_at = datetime(2026, 7, 13, 12, 0, tzinfo=timezone.utc)
     updated_at = created_at + timedelta(minutes=5)
     clock_timestamps = iter((created_at, updated_at))
-    runtime = FlowRuntime(buraco_doc, clock=clock_timestamps.__next__)
+    runtime = FlowRuntime(pothole_document, clock=clock_timestamps.__next__)
 
     state = runtime.new_state("metadata-clock")
 
     assert state.metadata.created_at == created_at
     assert state.metadata.updated_at == created_at
 
-    state = await runtime.execute(state, {"buraco_tipo": "buraco"})
+    state = await runtime.execute(state, {"pothole_type": "pothole"})
 
     assert state.metadata.created_at == created_at
     assert state.metadata.updated_at == updated_at
 
 
 async def test_auto_flow_uses_the_injected_clock_when_it_saves_state(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
     created_at = datetime(2026, 7, 13, 13, 0, tzinfo=timezone.utc)
     updated_at = created_at + timedelta(minutes=2)
     clock_timestamps = iter((created_at, updated_at))
-    runtime = FlowRuntime(luminaria_doc, clock=clock_timestamps.__next__)
+    runtime = FlowRuntime(streetlight_document, clock=clock_timestamps.__next__)
 
     state = await runtime.execute(runtime.new_state("auto-flow-clock"), {})
 
@@ -585,10 +585,10 @@ async def test_auto_flow_uses_the_injected_clock_when_it_saves_state(
 
 
 def test_runtime_rejects_an_injected_clock_without_timezone(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
     naive_timestamp = datetime(2026, 7, 13, 14, 0)
-    runtime = FlowRuntime(buraco_doc, clock=lambda: naive_timestamp)
+    runtime = FlowRuntime(pothole_document, clock=lambda: naive_timestamp)
 
     with pytest.raises(ValueError, match="timezone-aware"):
         runtime.new_state("naive-metadata-clock")

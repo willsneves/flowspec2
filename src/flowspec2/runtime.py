@@ -262,7 +262,7 @@ class FlowRuntime:
         token = _encode_prefill_token(prefill)
         envelope = build_flow(
             flow_id=af["meta_flow_ref"],
-            body="Para agilizar, preencha o formulário abaixo. 📋",
+            body="To continue, complete the form below. 📋",
             flow_token=token,
         )
         recovery = cast(dict[str, Any], af["recovery"])
@@ -279,7 +279,7 @@ class FlowRuntime:
         state.payload = {}
         state.agent_response = AgentResponse(
             service_name=self.flow,
-            description="Enviei um formulário para você preencher. 📋",
+            description="I sent you a form to complete. 📋",
             interactive={
                 "flow": True,
                 "envelope": envelope,
@@ -303,7 +303,7 @@ class FlowRuntime:
         state.status = "progress"
         state.agent_response = AgentResponse(
             service_name=self.flow,
-            description="Estou aguardando o formulário que enviei. 📋",
+            description="I am waiting for the form I sent. 📋",
             payload_schema={
                 "type": "object",
                 "additionalProperties": False,
@@ -358,9 +358,7 @@ class FlowRuntime:
         state.agent_response = AgentResponse(
             service_name=self.flow,
             description=(
-                "O formulário foi cancelado."
-                if event == "cancel"
-                else "O prazo do formulário terminou."
+                "The form was canceled." if event == "cancel" else "The form deadline expired."
             ),
             data=state.data,
         )
@@ -794,7 +792,7 @@ class FlowRuntime:
             )
             state.status = "error"
             state.agent_response = AgentResponse(
-                description="Não consegui restaurar o estado deste atendimento.",
+                description="I could not restore this service session.",
                 error_message=str(exc),
                 log_id=log_id,
             )
@@ -815,7 +813,7 @@ class FlowRuntime:
             )
             state.status = "error"
             state.agent_response = AgentResponse(
-                description="Não consegui validar os dados enviados neste turno.",
+                description="I could not validate the data submitted in this turn.",
                 error_message=str(exc),
                 log_id=log_id,
             )
@@ -838,7 +836,7 @@ class FlowRuntime:
             )
             state.status = "error"
             state.agent_response = AgentResponse(
-                description="Não consegui processar o retorno da ação externa.",
+                description="I could not process the external action result.",
                 error_message=str(exc),
                 log_id=log_id,
             )
@@ -904,7 +902,7 @@ class FlowRuntime:
                 )
                 state.status = "error"
                 state.agent_response = AgentResponse(
-                    description="Não consegui processar a ação do formulário.",
+                    description="I could not process the form action.",
                     error_message=str(exc),
                     log_id=log_id,
                 )
@@ -940,7 +938,7 @@ class FlowRuntime:
                 )
                 state.status = "error"
                 state.agent_response = AgentResponse(
-                    description="Não consegui validar o formulário enviado.",
+                    description="I could not validate the submitted form.",
                     error_message=str(exc),
                     log_id=log_id,
                 )
@@ -962,7 +960,7 @@ class FlowRuntime:
             final.status = "completed"
             final.agent_response = AgentResponse(
                 service_name=self.flow,
-                description="Serviço concluído com sucesso.",
+                description="Service completed successfully.",
                 data=final.data,
             )
 

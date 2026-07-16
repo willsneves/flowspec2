@@ -75,7 +75,7 @@ async def test_corpus_executes_validation_diagnostic_ir_and_trace_oracles() -> N
     assert terminal_trace[-1]["data"] == {
         "_reset_on_next_call": True,
         "problem_description": "Broken signal cabinet",
-        "protocol_id": "SGRC-72E4E60B8E",
+        "protocol_id": "REQ-F76922174F",
     }
     subflow_contract = report_by_identifier["address_subflow_runtime"]
     subflow_trace = cast(list[dict[str, Any]], subflow_contract["runtime_trace"])
@@ -101,7 +101,7 @@ async def test_corpus_executes_validation_diagnostic_ir_and_trace_oracles() -> N
             "issue_category": "Pothole",
             "issue_detail": "Small",
         },
-        "agent_response": {"description": "Serviço concluído com sucesso."},
+        "agent_response": {"description": "Service completed successfully."},
     }
 
     case_by_identifier = {
@@ -123,7 +123,7 @@ async def test_corpus_executes_validation_diagnostic_ir_and_trace_oracles() -> N
             "backend_classification": "STREET_OBSTRUCTION",
             "issue_category": "Obstruction",
         },
-        "agent_response": {"description": "Serviço concluído com sucesso."},
+        "agent_response": {"description": "Service completed successfully."},
     }
 
     default_case = case_by_identifier["gated_derivation_default_runtime"]
@@ -144,7 +144,7 @@ async def test_corpus_executes_validation_diagnostic_ir_and_trace_oracles() -> N
             "issue_category": "Pothole",
             "issue_detail": "Large",
         },
-        "agent_response": {"description": "Serviço concluído com sucesso."},
+        "agent_response": {"description": "Service completed successfully."},
     }
 
 

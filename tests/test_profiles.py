@@ -39,9 +39,9 @@ async def _contract_tool(**inputs: Any) -> dict[str, Any]:
 
 
 def test_reference_profile_resolves_default_subflow_exposures(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    report = check_flow(luminaria_doc, compile_document=False)
+    report = check_flow(streetlight_document, compile_document=False)
 
     assert report.is_valid
     assert report.diagnostics == ()
@@ -49,10 +49,10 @@ def test_reference_profile_resolves_default_subflow_exposures(
 
 @pytest.mark.asyncio
 async def test_reference_subflow_tools_link_and_execute_end_to_end(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    report = check_flow(luminaria_doc, compile_document=False)
-    runtime = FlowRuntime(luminaria_doc)
+    report = check_flow(streetlight_document, compile_document=False)
+    runtime = FlowRuntime(streetlight_document)
 
     updated_state = await runtime.execute(
         runtime.new_state(user_id="transitive-tools-user"),
@@ -64,9 +64,9 @@ async def test_reference_subflow_tools_link_and_execute_end_to_end(
 
 
 def test_profile_reports_all_unavailable_tools_and_subflows(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["entry"] = {"tool": "missing_entry"}
     invalid_flow["terminal"]["tool"] = "missing_terminal"
     empty_reference_profile = reference_profile()
@@ -88,9 +88,9 @@ def test_profile_reports_all_unavailable_tools_and_subflows(
 
 
 def test_profile_rejects_subflow_configuration_before_compilation(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["uses"][0]["with"]["service_id"] = "not-an-address-option"
 
     report = check_flow(invalid_flow, compile_document=False)
@@ -101,9 +101,9 @@ def test_profile_rejects_subflow_configuration_before_compilation(
 
 
 def test_profile_enforces_subflow_configuration_formats(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["uses"].append(
         {"ref": "configuration_format@1", "with": {"email": "not-an-email"}}
     )
@@ -142,12 +142,12 @@ def test_profile_enforces_subflow_configuration_formats(
 
 
 def test_profile_rejects_missing_transitive_subflow_tool(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
     empty_tools = ToolRegistry()
 
     report = check_flow(
-        buraco_doc,
+        pothole_document,
         compile_document=False,
         profile=reference_profile(tools=empty_tools),
     )
@@ -160,7 +160,7 @@ def test_profile_rejects_missing_transitive_subflow_tool(
 
 
 def test_profile_rejects_wrong_transitive_subflow_tool_version(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
     wrong_version_tools = ToolRegistry()
     wrong_version_tools.register(
@@ -176,7 +176,7 @@ def test_profile_rejects_wrong_transitive_subflow_tool_version(
     )
 
     report = check_flow(
-        buraco_doc,
+        pothole_document,
         compile_document=False,
         profile=reference_profile(tools=wrong_version_tools),
     )
@@ -187,11 +187,11 @@ def test_profile_rejects_wrong_transitive_subflow_tool_version(
 
 
 def test_profile_rejects_authored_writer_for_subflow_owned_auxiliary_state(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["slots"]["address_completed"] = {
-        "domain": "SimNao",
+        "domain": "YesNo",
         "required": False,
     }
 
@@ -205,30 +205,30 @@ def test_profile_rejects_authored_writer_for_subflow_owned_auxiliary_state(
 
 
 def test_profile_rejects_derive_entry_and_terminal_subflow_state_collisions(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
     collision_documents: list[tuple[dict[str, Any], str]] = []
 
-    derive_collision = copy.deepcopy(buraco_doc)
+    derive_collision = copy.deepcopy(pothole_document)
     derive_collision["derive"] = [
         {
             "writes": "address_completed",
-            "from": ["buraco_tipo"],
-            "after": "collect_tipo",
-            "lookup": {"Buraco no asfalto": "completed"},
+            "from": ["pothole_type"],
+            "after": "collect_type",
+            "lookup": {"Asphalt pothole": "completed"},
             "default": "pending",
         }
     ]
     collision_documents.append((derive_collision, "/derive/0/writes"))
 
-    entry_collision = copy.deepcopy(buraco_doc)
+    entry_collision = copy.deepcopy(pothole_document)
     entry_collision["entry"] = {
         "tool": "hub_search",
         "writes": "address_completed",
     }
     collision_documents.append((entry_collision, "/entry/writes"))
 
-    terminal_collision = copy.deepcopy(buraco_doc)
+    terminal_collision = copy.deepcopy(pothole_document)
     terminal_collision["terminal"]["outputs"]["address_completed"] = "result.status"
     collision_documents.append((terminal_collision, "/terminal/outputs/address_completed"))
 
@@ -243,9 +243,9 @@ def test_profile_rejects_derive_entry_and_terminal_subflow_state_collisions(
 
 
 def test_legacy_subflow_provenance_is_explicit_and_requires_profile_opt_in(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(buraco_doc)
+    flow_document = copy.deepcopy(pothole_document)
     terminal_index = next(
         index for index, path_step in enumerate(flow_document["path"]) if "terminal" in path_step
     )
@@ -286,9 +286,9 @@ def test_legacy_subflow_provenance_is_explicit_and_requires_profile_opt_in(
 
 
 def test_legacy_tool_provenance_requires_profile_opt_in(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(buraco_doc)
+    flow_document = copy.deepcopy(pothole_document)
     flow_document["terminal"]["tool"] = "legacy_terminal"
     tools = default_tool_registry()
     tools.register("legacy_terminal", _contract_tool)
@@ -323,9 +323,9 @@ def test_legacy_tool_provenance_requires_profile_opt_in(
 
 
 def test_legacy_await_contract_requires_profile_opt_in(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     flow_document["capabilities"]["await_external"].pop("resume")
     reference = reference_profile()
 

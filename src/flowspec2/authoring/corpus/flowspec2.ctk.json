@@ -16,36 +16,38 @@
           "flow": "linear_maintenance_request",
           "version": "1.0.0",
           "source_digest": "8d0fc6b9e48ed28092d670b9ae0fd3fadc8dfbc17f73c2f3104ef64a55af343f",
-          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "profile_digest": "23a6b3f9d68730770f2eeef4ea80ab3fd9bfe526cbf47117240c1f526987174a",
           "dependency_digest": "fedc868783841382d0969ddb2c3d84a886bba6406e2d978cf64185bb16e013ec",
           "digest": "b829dd1981d2d11cac40de240753e65ecbe2fde16333a57d32e1270b93945b8a",
           "canonical_document_digest": "7ef8e510c22e58c1746488adade9c17da2a127bab62c37acc9c6c7d73afb2acf",
           "canonical_execution_ir_digest": "43c3708bf68b342bc5da9dd9a6f8c28876cbc3fb8babb98a0471bc109d663c95",
-          "canonical_ir_digest": "352b8502c5b6e35a65782305ff552431666b2a3f7d90aaa3cfce91a1eb08b3cf"
+          "canonical_ir_digest": "34fe81e3c3511b54d3b6bb30f934c42e47fbab24f6b225665dd7f8d3fe618bbf"
         }
       },
       "turns": [
         {
           "payload": {},
           "expected_trace": {
-            "status": "progress",
-            "data": {},
             "agent_response": {
               "description": "Describe the maintenance request.",
               "payload_schema": {
-                "type": "object",
-                "title": "Slot_request_description",
                 "properties": {
                   "request_description": {
-                    "type": "string",
-                    "title": "Request Description",
                     "description": "Set request_description to only the text inside `ZETA=[...]`; ignore `ALPHA=[...]`.",
-                    "minLength": 1
+                    "minLength": 1,
+                    "title": "Request Description",
+                    "type": "string"
                   }
                 },
-                "required": ["request_description"]
+                "required": [
+                  "request_description"
+                ],
+                "title": "Slot_request_description",
+                "type": "object"
               }
-            }
+            },
+            "data": {},
+            "status": "progress"
           }
         },
         {
@@ -53,13 +55,13 @@
             "request_description": "Broken streetlight cover"
           },
           "expected_trace": {
-            "status": "completed",
+            "agent_response": {
+              "description": "Service completed successfully."
+            },
             "data": {
               "request_description": "Broken streetlight cover"
             },
-            "agent_response": {
-              "description": "Serviço concluído com sucesso."
-            }
+            "status": "completed"
           }
         }
       ]
@@ -118,37 +120,39 @@
           "ir_format": "flowspec2/ir@1",
           "flow": "terminal_ticket_fulfillment",
           "version": "1.0.0",
-          "source_digest": "38ffd29ef03a100bfb60dd02a468069c34c3b0f3341cc3263f2984a100f91c25",
-          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
-          "dependency_digest": "543ff96d165fe3f6236418afe8c1d476459f9ef78579a483390f768e74956001",
-          "digest": "f99b8fb616bcba2977255484f0fed2c839042aefd56d8264a0d69cc3d8f96880",
-          "canonical_document_digest": "fbd7378b3da7eb120809d48486558ae2e5845e47bd37426ee188a3d26a7eb062",
-          "canonical_execution_ir_digest": "3be69b8ce2f492becb522ffd43381d0fa7010f870779278fcdbfb696ccea5e2f",
-          "canonical_ir_digest": "e4df419e19211cd4bd65dff3fb904b49bdcef765e927ec98cb953d08eae4fb33"
+          "source_digest": "83e568f2a863896f682ff5735b909c0e648f18b71f5676238f1e0ead2e9c61a2",
+          "profile_digest": "23a6b3f9d68730770f2eeef4ea80ab3fd9bfe526cbf47117240c1f526987174a",
+          "dependency_digest": "28d277364117b2aa6aff8e6a5672d20e2d5dd738eab5181965abc4cdd8240ff2",
+          "digest": "a5b339137a821e49076f231fa10616614d4a905f0fffc3849b8ca63aa5c488d5",
+          "canonical_document_digest": "3b845b53c8a28d2ae81193ab9514beea0f42b04557fad83a492fbad1f4ccc53c",
+          "canonical_execution_ir_digest": "29c6f454aedf586eb26e64c7c837196f68c61bba1f1f2081ac876c5fceddfd73",
+          "canonical_ir_digest": "4cf2d33c77f20578082ade701de1365c4108ad4331a654bb7765b4072a461d78"
         }
       },
       "turns": [
         {
           "payload": {},
           "expected_trace": {
-            "status": "progress",
-            "data": {},
             "agent_response": {
               "description": "Describe the service problem.",
               "payload_schema": {
-                "type": "object",
-                "title": "Slot_problem_description",
                 "properties": {
                   "problem_description": {
-                    "type": "string",
+                    "description": "Value for problem_description.",
+                    "minLength": 1,
                     "title": "Problem Description",
-                    "description": "Valor para problem_description.",
-                    "minLength": 1
+                    "type": "string"
                   }
                 },
-                "required": ["problem_description"]
+                "required": [
+                  "problem_description"
+                ],
+                "title": "Slot_problem_description",
+                "type": "object"
               }
-            }
+            },
+            "data": {},
+            "status": "progress"
           }
         },
         {
@@ -156,15 +160,15 @@
             "problem_description": "Broken signal cabinet"
           },
           "expected_trace": {
-            "status": "completed",
+            "agent_response": {
+              "description": "Service request opened successfully."
+            },
             "data": {
               "_reset_on_next_call": true,
               "problem_description": "Broken signal cabinet",
-              "protocol_id": "SGRC-72E4E60B8E"
+              "protocol_id": "REQ-F76922174F"
             },
-            "agent_response": {
-              "description": "Chamado aberto com sucesso."
-            }
+            "status": "completed"
           }
         }
       ]
@@ -183,35 +187,40 @@
           "flow": "address_collection",
           "version": "1.0.0",
           "source_digest": "01822a8b6076ebf5ff3700bf514e7ffeaf23145d622b433ab3a9ddfc3d785476",
-          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
-          "dependency_digest": "2a5e13ddc386838768d287db3b116ae9ab80dcbee648214cdad92e8f59df226e",
-          "digest": "20096ab6965694baf91f6c687a01fac3f00544228a223ce2e7cc1eba37cd87ce",
+          "profile_digest": "23a6b3f9d68730770f2eeef4ea80ab3fd9bfe526cbf47117240c1f526987174a",
+          "dependency_digest": "384884639482b9b9f5e41eeb838de89c87c746ef256527a767f365cb331e77fc",
+          "digest": "6e23e4bcb3b90bca2e1f1702ee712d7b95ce62f2568d6766ad8d4c114ced225d",
           "canonical_document_digest": "e27e8450d91c841314af83b3b2a3e27bfa8a868ec476b3e6f62beaaa5d449c65",
-          "canonical_execution_ir_digest": "ae34386b654dc20f19609e27b21273576e30631f9b4dbe9819aac89d48fc33fd",
-          "canonical_ir_digest": "68c9c5966193ff9f35c3e46e37e3ce50d47a3055f807d8ccaf79a404a96efc01"
+          "canonical_execution_ir_digest": "8f57129781114ef317a9e1007a5ddb957ff0bd7a92a2484aacc1b4115549da04",
+          "canonical_ir_digest": "cb416119846d9cf7e13f8159a151fd3f0ed70aaa16a9a89753c9a08d2a7dcd22"
         }
       },
       "turns": [
         {
           "payload": {},
           "expected_trace": {
-            "status": "progress",
-            "data": {},
             "agent_response": {
               "description": "Add an optional nearby reference point.",
               "payload_schema": {
-                "type": "object",
-                "title": "Slot_reference_note",
                 "properties": {
                   "reference_note": {
-                    "type": ["string", "null"],
+                    "description": "Value for reference_note. Use null when the citizen chooses not to provide this optional value.",
                     "title": "Reference Note",
-                    "description": "Valor para reference_note. Use null when the citizen chooses not to provide this optional value."
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   }
                 },
-                "required": ["reference_note"]
+                "required": [
+                  "reference_note"
+                ],
+                "title": "Slot_reference_note",
+                "type": "object"
               }
-            }
+            },
+            "data": {},
+            "status": "progress"
           }
         },
         {
@@ -219,67 +228,69 @@
             "reference_note": "Near the public school"
           },
           "expected_trace": {
-            "status": "progress",
+            "agent_response": {
+              "description": "What is the complete address (street, number, and district)?",
+              "payload_schema": {
+                "properties": {
+                  "address": {
+                    "description": "Complete address: street, number, and district.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "address"
+                ],
+                "type": "object"
+              }
+            },
             "data": {
               "reference_note": "Near the public school"
             },
-            "agent_response": {
-              "description": "Qual o endereço completo (rua, número, bairro)?",
-              "payload_schema": {
-                "type": "object",
-                "properties": {
-                  "address": {
-                    "type": "string",
-                    "description": "Endereço completo: rua/avenida, número e bairro."
-                  }
-                },
-                "required": ["address"]
-              }
-            }
+            "status": "progress"
           }
         },
         {
           "payload": {
-            "address": "Rua das Flores, 100"
+            "address": "Flower Street, 100"
           },
           "expected_trace": {
-            "status": "progress",
-            "data": {
-              "reference_note": "Near the public school",
-              "address": {
-                "logradouro": "Rua das Flores, 100",
-                "kind": "rua",
-                "bairro": "Centro",
-                "municipio": "Rio de Janeiro"
-              },
-              "address_needs_confirmation": true
+            "agent_response": {
+              "description": "Do you confirm the address: Flower Street, 100, Downtown?"
             },
-            "agent_response": {
-              "description": "Confirma o endereço: Rua das Flores, 100, Centro?"
-            }
-          }
-        },
-        {
-          "payload": {
-            "confirmacao": "sim"
-          },
-          "expected_trace": {
-            "status": "completed",
             "data": {
-              "reference_note": "Near the public school",
               "address": {
-                "logradouro": "Rua das Flores, 100",
-                "kind": "rua",
-                "bairro": "Centro",
-                "municipio": "Rio de Janeiro"
+                "city": "Example City",
+                "district": "Downtown",
+                "kind": "street",
+                "street": "Flower Street, 100"
               },
               "address_needs_confirmation": true,
-              "address_completed": true,
-              "address_confirmed": true
+              "reference_note": "Near the public school"
             },
+            "status": "progress"
+          }
+        },
+        {
+          "payload": {
+            "confirmation": "yes"
+          },
+          "expected_trace": {
             "agent_response": {
-              "description": "Serviço concluído com sucesso."
-            }
+              "description": "Service completed successfully."
+            },
+            "data": {
+              "address": {
+                "city": "Example City",
+                "district": "Downtown",
+                "kind": "street",
+                "street": "Flower Street, 100"
+              },
+              "address_completed": true,
+              "address_confirmed": true,
+              "address_needs_confirmation": true,
+              "reference_note": "Near the public school"
+            },
+            "status": "completed"
           }
         }
       ]
@@ -297,37 +308,39 @@
           "ir_format": "flowspec2/ir@1",
           "flow": "authenticated_correctable_request",
           "version": "1.0.0",
-          "source_digest": "13d9347648706cc0d74420654f71bf67a48095d726a327a2c8aeeb9613e6e7e0",
-          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
-          "dependency_digest": "64ad91b8566f667e847b7619efe803faafe5af2d5cb12818446659950b680cee",
-          "digest": "5777b9242482efae9c33a5fc516da97e719a763fd9e5a32d3d1706570ac61e14",
-          "canonical_document_digest": "824ae8c33b774fa6761f5ffd3fe68d03eb57244d009c16d8cddf7dd702a76a81",
-          "canonical_execution_ir_digest": "07fe38929e2d923009b2e8a3cbf77c0c8aedb66b6d52f816cb3dc02058bcf4f0",
-          "canonical_ir_digest": "3583ece9c14ea8029b37cc49ca14ac81c9e14baedc7072079f9dbe1463455ff8"
+          "source_digest": "5c25b971365e8b220920a336bdfc6799381aa626b40ba2475545a402cccd2581",
+          "profile_digest": "23a6b3f9d68730770f2eeef4ea80ab3fd9bfe526cbf47117240c1f526987174a",
+          "dependency_digest": "9ec5cc56324901ee4dcd252d3184357c6cdecc164396d486dbe86fe79a6c9f78",
+          "digest": "b33cc512d2b41f120e658ddd785db6c94df54c32477acf931af0b44270395a0b",
+          "canonical_document_digest": "05aab89f0959881f79b49bedc0211043a27ec5922b83b7988521c3d4701f6e56",
+          "canonical_execution_ir_digest": "dfa0caab1ec1a07e7d608c492e9e99fdbf8b5a0a5e4d5e52c224233846b017ff",
+          "canonical_ir_digest": "947e147ce19e390ab0172d6270c7c8d13aa1cd34d07ebd4e3835a094ae19b5d2"
         }
       },
       "turns": [
         {
           "payload": {},
           "expected_trace": {
-            "status": "progress",
-            "data": {},
             "agent_response": {
               "description": "Describe your request.",
               "payload_schema": {
-                "type": "object",
-                "title": "Slot_request_description",
                 "properties": {
                   "request_description": {
-                    "type": "string",
+                    "description": "Value for request_description.",
+                    "minLength": 1,
                     "title": "Request Description",
-                    "description": "Valor para request_description.",
-                    "minLength": 1
+                    "type": "string"
                   }
                 },
-                "required": ["request_description"]
+                "required": [
+                  "request_description"
+                ],
+                "title": "Slot_request_description",
+                "type": "object"
               }
-            }
+            },
+            "data": {},
+            "status": "progress"
           }
         },
         {
@@ -335,131 +348,139 @@
             "request_description": "Broken accessibility ramp"
           },
           "expected_trace": {
-            "status": "progress",
-            "data": {
-              "request_description": "Broken accessibility ramp"
-            },
             "agent_response": {
               "description": "Authenticate to continue.",
               "interactive": {
-                "kind": "cta_url",
                 "field": "authentication_token",
-                "out_of_band": true,
+                "kind": "cta_url",
                 "next_step": "authenticate_requester",
+                "out_of_band": true,
                 "out_of_band_sent": true,
                 "resume_contract": {
-                  "version": "1",
-                  "digest": "9efba3c00a7e48626356abcf9b871620ae284dec067f437f33b5c4b67294ce0a",
-                  "correlation": "$token.cpf",
+                  "correlation": "$token.brazilian_tax_id",
                   "deadline": "2025-01-01T00:15:00+00:00",
+                  "digest": "387fb72570a25e5de4f5ff1ff259b05aabb3cac8e3a7c77d976dfbf276e14eba",
                   "duplicate": "ignore",
-                  "late": "reject"
+                  "late": "reject",
+                  "version": "1"
                 }
               }
-            }
+            },
+            "data": {
+              "request_description": "Broken accessibility ramp"
+            },
+            "status": "progress"
           }
         },
         {
           "payload": {
             "authentication_token": {
-              "cpf": "12345678909"
+              "brazilian_tax_id": "12345678909"
             }
           },
           "expected_trace": {
-            "status": "progress",
-            "data": {
-              "request_description": "Broken accessibility ramp"
-            },
             "agent_response": {
               "description": "Do you confirm the request details?",
-              "payload_schema": {
-                "type": "object",
-                "title": "Slot_ticket_data_confirmed",
-                "properties": {
-                  "ticket_data_confirmed": {
-                    "type": "boolean",
-                    "title": "Ticket Data Confirmed",
-                    "description": "Interprete como booleano: true para sim/afirmativo, false para não."
-                  }
-                },
-                "required": ["ticket_data_confirmed"],
-                "x-flowspec2-correction-targets": ["request_description"]
-              },
               "interactive": {
                 "body": "Do you confirm the request details?",
-                "field": "ticket_data_confirmed",
                 "buttons": [
                   {
                     "id": "true",
-                    "title": "Sim"
+                    "title": "Yes"
                   },
                   {
                     "id": "false",
-                    "title": "Não"
+                    "title": "No"
                   }
+                ],
+                "field": "ticket_data_confirmed"
+              },
+              "payload_schema": {
+                "properties": {
+                  "ticket_data_confirmed": {
+                    "description": "Interpret as a boolean: true for yes/affirmative, false for no/negative.",
+                    "title": "Ticket Data Confirmed",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ticket_data_confirmed"
+                ],
+                "title": "Slot_ticket_data_confirmed",
+                "type": "object",
+                "x-flowspec2-correction-targets": [
+                  "request_description"
                 ]
               }
-            }
+            },
+            "data": {
+              "request_description": "Broken accessibility ramp"
+            },
+            "status": "progress"
           }
         },
         {
           "payload": {
             "authentication_token": {
-              "cpf": "12345678909"
+              "brazilian_tax_id": "12345678909"
             }
           },
           "expected_trace": {
-            "status": "progress",
-            "data": {
-              "request_description": "Broken accessibility ramp"
-            },
             "agent_response": {
               "description": "Do you confirm the request details?",
-              "payload_schema": {
-                "type": "object",
-                "title": "Slot_ticket_data_confirmed",
-                "properties": {
-                  "ticket_data_confirmed": {
-                    "type": "boolean",
-                    "title": "Ticket Data Confirmed",
-                    "description": "Interprete como booleano: true para sim/afirmativo, false para não."
-                  }
-                },
-                "required": ["ticket_data_confirmed"],
-                "x-flowspec2-correction-targets": ["request_description"]
-              },
               "interactive": {
                 "body": "Do you confirm the request details?",
-                "field": "ticket_data_confirmed",
                 "buttons": [
                   {
                     "id": "true",
-                    "title": "Sim"
+                    "title": "Yes"
                   },
                   {
                     "id": "false",
-                    "title": "Não"
+                    "title": "No"
                   }
+                ],
+                "field": "ticket_data_confirmed"
+              },
+              "payload_schema": {
+                "properties": {
+                  "ticket_data_confirmed": {
+                    "description": "Interpret as a boolean: true for yes/affirmative, false for no/negative.",
+                    "title": "Ticket Data Confirmed",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ticket_data_confirmed"
+                ],
+                "title": "Slot_ticket_data_confirmed",
+                "type": "object",
+                "x-flowspec2-correction-targets": [
+                  "request_description"
                 ]
               }
-            }
+            },
+            "data": {
+              "request_description": "Broken accessibility ramp"
+            },
+            "status": "progress"
           }
         },
         {
           "payload": {
             "authentication_token": {
-              "cpf": "98765432100"
+              "brazilian_tax_id": "98765432100"
             }
           },
           "expected_trace": {
-            "status": "error",
-            "data": {
-              "request_description": "Broken accessibility ramp"
-            },
             "agent_response": {
               "description": "",
               "error_message": "await_external 'authenticate_requester' rejected late resume delivery"
-            }
+            },
+            "data": {
+              "request_description": "Broken accessibility ramp"
+            },
+            "status": "error"
           }
         }
       ]
@@ -478,36 +499,41 @@
           "flow": "gated_issue_classification",
           "version": "1.0.0",
           "source_digest": "bef43034d203f38584eff3548e3773f5b5bb4604a2706a61ce5334ba3d67de34",
-          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "profile_digest": "23a6b3f9d68730770f2eeef4ea80ab3fd9bfe526cbf47117240c1f526987174a",
           "dependency_digest": "a5c83f35e8179f308288eea31dcc88d17e4ac772bbaad5ddea5cc74d150e56bb",
           "digest": "6a547da9a5f979988ed9c1f6110c8396020e39bbb091e9f65fbd1c457e563f45",
           "canonical_document_digest": "3f4aeaf54a2d3e5069384d8d12905322f85599de19e3ea2116f4d60daa7a480b",
           "canonical_execution_ir_digest": "a05696459b4c46e24d681b6b48f53ef69b974166771beaec174e3b300cc134b7",
-          "canonical_ir_digest": "fe0ec808005bae7b3141c5fe59cbcca4a537219e927b7e6b9dc406db9ff7f382"
+          "canonical_ir_digest": "9e65c746f797b8fad8b18a1aa02e8ec6b6380f413aed2ffde2daed28c58d74e3"
         }
       },
       "turns": [
         {
           "payload": {},
           "expected_trace": {
-            "status": "progress",
-            "data": {},
             "agent_response": {
               "description": "Which type of issue are you reporting?",
               "payload_schema": {
-                "type": "object",
-                "title": "Slot_issue_category",
                 "properties": {
                   "issue_category": {
-                    "type": "string",
+                    "description": "Interpret the user's input and return ONLY one closed value: Pothole, Obstruction.",
+                    "enum": [
+                      "Pothole",
+                      "Obstruction"
+                    ],
                     "title": "Issue Category",
-                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Pothole, Obstruction.",
-                    "enum": ["Pothole", "Obstruction"]
+                    "type": "string"
                   }
                 },
-                "required": ["issue_category"]
+                "required": [
+                  "issue_category"
+                ],
+                "title": "Slot_issue_category",
+                "type": "object"
               }
-            }
+            },
+            "data": {},
+            "status": "progress"
           }
         },
         {
@@ -515,26 +541,31 @@
             "issue_category": "Pothole"
           },
           "expected_trace": {
-            "status": "progress",
-            "data": {
-              "issue_category": "Pothole"
-            },
             "agent_response": {
               "description": "How large is the pothole?",
               "payload_schema": {
-                "type": "object",
-                "title": "Slot_issue_detail",
                 "properties": {
                   "issue_detail": {
-                    "type": "string",
+                    "description": "Interpret the user's input and return ONLY one closed value: Small, Large.",
+                    "enum": [
+                      "Small",
+                      "Large"
+                    ],
                     "title": "Issue Detail",
-                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Small, Large.",
-                    "enum": ["Small", "Large"]
+                    "type": "string"
                   }
                 },
-                "required": ["issue_detail"]
+                "required": [
+                  "issue_detail"
+                ],
+                "title": "Slot_issue_detail",
+                "type": "object"
               }
-            }
+            },
+            "data": {
+              "issue_category": "Pothole"
+            },
+            "status": "progress"
           }
         },
         {
@@ -542,15 +573,15 @@
             "issue_detail": "Small"
           },
           "expected_trace": {
-            "status": "completed",
-            "data": {
-              "issue_category": "Pothole",
-              "issue_detail": "Small",
-              "backend_classification": "POTHOLE_SMALL"
-            },
             "agent_response": {
-              "description": "Serviço concluído com sucesso."
-            }
+              "description": "Service completed successfully."
+            },
+            "data": {
+              "backend_classification": "POTHOLE_SMALL",
+              "issue_category": "Pothole",
+              "issue_detail": "Small"
+            },
+            "status": "completed"
           }
         }
       ]
@@ -569,36 +600,41 @@
           "flow": "gated_issue_classification",
           "version": "1.0.0",
           "source_digest": "bef43034d203f38584eff3548e3773f5b5bb4604a2706a61ce5334ba3d67de34",
-          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "profile_digest": "23a6b3f9d68730770f2eeef4ea80ab3fd9bfe526cbf47117240c1f526987174a",
           "dependency_digest": "a5c83f35e8179f308288eea31dcc88d17e4ac772bbaad5ddea5cc74d150e56bb",
           "digest": "6a547da9a5f979988ed9c1f6110c8396020e39bbb091e9f65fbd1c457e563f45",
           "canonical_document_digest": "3f4aeaf54a2d3e5069384d8d12905322f85599de19e3ea2116f4d60daa7a480b",
           "canonical_execution_ir_digest": "a05696459b4c46e24d681b6b48f53ef69b974166771beaec174e3b300cc134b7",
-          "canonical_ir_digest": "fe0ec808005bae7b3141c5fe59cbcca4a537219e927b7e6b9dc406db9ff7f382"
+          "canonical_ir_digest": "9e65c746f797b8fad8b18a1aa02e8ec6b6380f413aed2ffde2daed28c58d74e3"
         }
       },
       "turns": [
         {
           "payload": {},
           "expected_trace": {
-            "status": "progress",
-            "data": {},
             "agent_response": {
               "description": "Which type of issue are you reporting?",
               "payload_schema": {
-                "type": "object",
-                "title": "Slot_issue_category",
                 "properties": {
                   "issue_category": {
-                    "type": "string",
+                    "description": "Interpret the user's input and return ONLY one closed value: Pothole, Obstruction.",
+                    "enum": [
+                      "Pothole",
+                      "Obstruction"
+                    ],
                     "title": "Issue Category",
-                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Pothole, Obstruction.",
-                    "enum": ["Pothole", "Obstruction"]
+                    "type": "string"
                   }
                 },
-                "required": ["issue_category"]
+                "required": [
+                  "issue_category"
+                ],
+                "title": "Slot_issue_category",
+                "type": "object"
               }
-            }
+            },
+            "data": {},
+            "status": "progress"
           }
         },
         {
@@ -607,14 +643,14 @@
             "issue_detail": "Large"
           },
           "expected_trace": {
-            "status": "completed",
-            "data": {
-              "issue_category": "Obstruction",
-              "backend_classification": "STREET_OBSTRUCTION"
-            },
             "agent_response": {
-              "description": "Serviço concluído com sucesso."
-            }
+              "description": "Service completed successfully."
+            },
+            "data": {
+              "backend_classification": "STREET_OBSTRUCTION",
+              "issue_category": "Obstruction"
+            },
+            "status": "completed"
           }
         }
       ]
@@ -642,36 +678,41 @@
           "flow": "gated_issue_classification",
           "version": "1.0.0",
           "source_digest": "6bf8f544a993d5f06651ef4b4190fe2b384969a831866d7bb3b172a0f8ae8cae",
-          "profile_digest": "205f448f8114465175c52f1f77756582aca01c593983ed175f04cd079bc764a3",
+          "profile_digest": "23a6b3f9d68730770f2eeef4ea80ab3fd9bfe526cbf47117240c1f526987174a",
           "dependency_digest": "a5c83f35e8179f308288eea31dcc88d17e4ac772bbaad5ddea5cc74d150e56bb",
           "digest": "91ceb9abc69411c8be54e56440bf7bee7550d9bafc1dcdd16bb17c0df2442ee6",
           "canonical_document_digest": "9d5a899c4f5f3a972e9be0da27bb766c7e2c10d5736c0a91930f926521379528",
           "canonical_execution_ir_digest": "615efc119955760b7659361600c855f7909cf07e764222e14845c583d48c3f64",
-          "canonical_ir_digest": "20825f53c0ec31f3efb6be8dd996c78aaed12f988d0ae5c127db8a5fefe41956"
+          "canonical_ir_digest": "7d551ab1a0754a5b58edcde44ebea49a1de9b9ac4bce0f9e1b73592c81219800"
         }
       },
       "turns": [
         {
           "payload": {},
           "expected_trace": {
-            "status": "progress",
-            "data": {},
             "agent_response": {
               "description": "Which type of issue are you reporting?",
               "payload_schema": {
-                "type": "object",
-                "title": "Slot_issue_category",
                 "properties": {
                   "issue_category": {
-                    "type": "string",
+                    "description": "Interpret the user's input and return ONLY one closed value: Pothole, Obstruction.",
+                    "enum": [
+                      "Pothole",
+                      "Obstruction"
+                    ],
                     "title": "Issue Category",
-                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Pothole, Obstruction.",
-                    "enum": ["Pothole", "Obstruction"]
+                    "type": "string"
                   }
                 },
-                "required": ["issue_category"]
+                "required": [
+                  "issue_category"
+                ],
+                "title": "Slot_issue_category",
+                "type": "object"
               }
-            }
+            },
+            "data": {},
+            "status": "progress"
           }
         },
         {
@@ -679,26 +720,31 @@
             "issue_category": "Pothole"
           },
           "expected_trace": {
-            "status": "progress",
-            "data": {
-              "issue_category": "Pothole"
-            },
             "agent_response": {
               "description": "How large is the pothole?",
               "payload_schema": {
-                "type": "object",
-                "title": "Slot_issue_detail",
                 "properties": {
                   "issue_detail": {
-                    "type": "string",
+                    "description": "Interpret the user's input and return ONLY one closed value: Small, Large.",
+                    "enum": [
+                      "Small",
+                      "Large"
+                    ],
                     "title": "Issue Detail",
-                    "description": "Interprete a fala do usuário e devolva SOMENTE um valor fechado: Small, Large.",
-                    "enum": ["Small", "Large"]
+                    "type": "string"
                   }
                 },
-                "required": ["issue_detail"]
+                "required": [
+                  "issue_detail"
+                ],
+                "title": "Slot_issue_detail",
+                "type": "object"
               }
-            }
+            },
+            "data": {
+              "issue_category": "Pothole"
+            },
+            "status": "progress"
           }
         },
         {
@@ -706,15 +752,15 @@
             "issue_detail": "Large"
           },
           "expected_trace": {
-            "status": "completed",
-            "data": {
-              "issue_category": "Pothole",
-              "issue_detail": "Large",
-              "backend_classification": "Pothole"
-            },
             "agent_response": {
-              "description": "Serviço concluído com sucesso."
-            }
+              "description": "Service completed successfully."
+            },
+            "data": {
+              "backend_classification": "Pothole",
+              "issue_category": "Pothole",
+              "issue_detail": "Large"
+            },
+            "status": "completed"
           }
         }
       ]

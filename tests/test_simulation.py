@@ -26,9 +26,9 @@ def test_simulation_script_runs_all_scenarios():
     # all six tickets opened
     for n in range(481, 487):
         assert f"RLU-2026-000{n}" in out
-    # scenario 5: SGRC went down then recovered (two calls)
-    assert "temporariamente indisponível" in out
-    assert "chamadas ao SGRC: 2" in out
+    # scenario 5: ticketing system went down then recovered (two calls)
+    assert "temporarily unavailable" in out
+    assert "ticketing calls: 2" in out
     # scenario 6: duplicate submission fired the side effect exactly once
-    assert "chamadas reais ao SGRC: 1" in out
-    assert "todas as simulações concluídas" in out
+    assert "actual ticketing calls: 1" in out
+    assert "all simulations completed" in out

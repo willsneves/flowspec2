@@ -12,7 +12,7 @@ import pytest
 from flowspec2.cli import main
 from flowspec2.compat.yaml import load_yaml_mapping
 
-LUM = str(Path(__file__).resolve().parents[1] / "examples" / "reparo_luminaria.flow.json")
+LUM = str(Path(__file__).resolve().parents[1] / "examples" / "streetlight_repair.flow.json")
 FIXTURE_DIRECTORY = Path(__file__).with_name("fixtures")
 OPEN_WORKFLOW_PORTABLE_FLOW = FIXTURE_DIRECTORY / "open_workflow" / "portable.flow.json"
 ARBITRARY_OPEN_WORKFLOW = FIXTURE_DIRECTORY / "open_workflow" / "arbitrary.workflow.json"

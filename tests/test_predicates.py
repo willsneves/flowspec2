@@ -13,15 +13,15 @@ def _state(**data) -> ServiceState:
 
 
 def test_in():
-    st = _state(luminaria_defeito="Apagada")
-    assert evaluate({"in": ["slots.luminaria_defeito", ["Apagada", "Piscando"]]}, st, {})
-    assert not evaluate({"in": ["slots.luminaria_defeito", ["Pendurada"]]}, st, {})
+    st = _state(streetlight_issue="Not working")
+    assert evaluate({"in": ["slots.streetlight_issue", ["Not working", "Flickering"]]}, st, {})
+    assert not evaluate({"in": ["slots.streetlight_issue", ["Hanging"]]}, st, {})
 
 
 def test_eq_ne_with_literal_and_ref():
-    st = _state(q="grupo")
-    assert evaluate({"eq": ["slots.q", "grupo"]}, st, {})
-    assert evaluate({"ne": ["slots.q", "uma"]}, st, {})
+    st = _state(q="group")
+    assert evaluate({"eq": ["slots.q", "group"]}, st, {})
+    assert evaluate({"ne": ["slots.q", "single"]}, st, {})
 
 
 def test_is_present():
@@ -40,8 +40,8 @@ def test_and_or_not():
 
 
 def test_config_and_address_namespaces():
-    st = _state(address={"kind": "praca"})
-    assert evaluate({"eq": ["address.kind", "praca"]}, st, {})
+    st = _state(address={"kind": "square"})
+    assert evaluate({"eq": ["address.kind", "square"]}, st, {})
     assert evaluate({"eq": ["config.flag", True]}, st, {"flag": True})
 
 

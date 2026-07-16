@@ -20,13 +20,13 @@ def _govbr_resume_contract() -> dict[str, Any]:
             "type": "object",
             "additionalProperties": False,
             "properties": {
-                "cpf": {"type": "string", "pattern": "^[0-9]{11}$"},
-                "nome": {"type": "string", "minLength": 2},
+                "brazilian_tax_id": {"type": "string", "pattern": "^[0-9]{11}$"},
+                "name": {"type": "string", "minLength": 2},
                 "email": {"type": "string", "format": "email"},
             },
-            "required": ["cpf"],
+            "required": ["brazilian_tax_id"],
         },
-        "correlation": "$token.cpf",
+        "correlation": "$token.brazilian_tax_id",
         "duplicate": "ignore",
         "late": "reject",
     }
@@ -51,7 +51,7 @@ def _identification_flow_document(
                 "ref": "identification@2",
                 "with": {
                     "required": required,
-                    "methods": methods or ["cpf", "govbr", "anonimo"],
+                    "methods": methods or ["brazilian_tax_id", "govbr", "anonymous"],
                     "max_attempts": max_attempts,
                     "on_exhaust": on_exhaust,
                 },
@@ -61,49 +61,49 @@ def _identification_flow_document(
 
 
 def test_is_skip_matches_exact_tokens_only() -> None:
-    # explicit skip words (accent/case-insensitive)
-    assert _is_skip("pular")
-    assert _is_skip("PULAR")
-    assert _is_skip("não")  # normalizes to "nao"
-    assert _is_skip("nenhum")
-    assert _is_skip("passar")
+    # Explicit skip words are case-insensitive.
+    assert _is_skip("skip")
+    assert _is_skip("SKIP")
+    assert _is_skip("no")
+    assert _is_skip("none")
+    assert _is_skip("pass")
 
 
 def test_is_skip_never_triggers_on_substrings() -> None:
     # a real value that merely *contains* a skip token must NOT be read as a skip
     assert not _is_skip("skipper@example.com")  # contains "skip"
-    assert not _is_skip("ana@nenhum.com")  # contains "nenhum"
-    assert not _is_skip("Maria Aparecida")
+    assert not _is_skip("none@example.com")  # contains "none"
+    assert not _is_skip("Mary Smith")
     assert not _is_skip("11144477735")
 
 
-async def test_pular_skips_optional_email_and_name(luminaria: FlowRuntime) -> None:
-    st = await step(luminaria, None, {})  # flow_sent
+async def test_skip_omits_optional_email_and_name(streetlight: FlowRuntime) -> None:
+    st = await step(streetlight, None, {})  # flow_sent
     st = await step(
-        luminaria,
+        streetlight,
         st,
         {
             "_source": "whatsapp_flow",
-            "defect_type": "Apagada",
-            "qty_pattern": "uma",
-            "location": "Rua",
+            "defect_type": "Not working",
+            "qty_pattern": "single",
+            "location": "Street",
         },
     )
-    st = await step(luminaria, st, {"address": "Rua das Flores, 100, Centro"})
-    st = await step(luminaria, st, {"confirmacao": "sim"})  # confirm address
-    st = await step(luminaria, st, {"ponto_referencia": "em frente à padaria"})
-    st = await step(luminaria, st, {"identification_method": "cpf"})
-    st = await step(luminaria, st, {"cpf": "11144477735"})
+    st = await step(streetlight, st, {"address": "Flower Street, 100, Downtown"})
+    st = await step(streetlight, st, {"confirmation": "yes"})  # confirm address
+    st = await step(streetlight, st, {"reference_point": "across from the bakery"})
+    st = await step(streetlight, st, {"identification_method": "brazilian_tax_id"})
+    st = await step(streetlight, st, {"brazilian_tax_id": "11144477735"})
 
-    # at the e-mail step: "pular" must skip it deterministically, not validate
-    assert "e-mail" in require_agent_response(st).description.lower()
-    st = await step(luminaria, st, {"email": "pular"})
+    # At the email step, "skip" omits it deterministically instead of validating it.
+    assert "email" in require_agent_response(st).description.lower()
+    st = await step(streetlight, st, {"email": "skip"})
     assert st.data.get("email_processed") is True
     assert "email" not in st.data  # nothing stored on skip
 
     # and the name step likewise
-    assert "nome" in require_agent_response(st).description.lower()
-    st = await step(luminaria, st, {"name": "pular"})
+    assert "name" in require_agent_response(st).description.lower()
+    st = await step(streetlight, st, {"name": "skip"})
     assert st.data.get("name_processed") is True
     assert "name" not in st.data
 
@@ -119,7 +119,7 @@ async def test_reask_exhaustion_resets_method_attempt_budget() -> None:
     assert state.status == "progress"
     assert "_attempts_method" not in state.data
     assert require_agent_response(state).error_message == (
-        "máximo de tentativas — vamos tentar de novo"
+        "maximum attempts reached; let us try again"
     )
 
 
@@ -130,7 +130,7 @@ async def test_required_identification_rejects_anonymous_method() -> None:
 
     state = await runtime.execute(
         runtime.new_state("required-identification"),
-        {"identification_method": "anonimo"},
+        {"identification_method": "anonymous"},
     )
 
     assert state.status == "progress"
@@ -138,7 +138,10 @@ async def test_required_identification_rejects_anonymous_method() -> None:
     assert state.data["_attempts_method"] == 1
     response = require_agent_response(state)
     assert response.interactive is not None
-    assert {button["id"] for button in response.interactive["buttons"]} == {"cpf", "govbr"}
+    assert {button["id"] for button in response.interactive["buttons"]} == {
+        "brazilian_tax_id",
+        "govbr",
+    }
 
 
 async def test_skip_exhaustion_resolves_to_anonymous() -> None:
@@ -150,8 +153,8 @@ async def test_skip_exhaustion_resolves_to_anonymous() -> None:
     )
 
     assert state.status == "completed"
-    assert state.data["identification_method"] == "anonimo"
-    assert state.data["identificacao_pulada"] is True
+    assert state.data["identification_method"] == "anonymous"
+    assert state.data["identification_skipped"] is True
     assert "_attempts_method" not in state.data
 
 
@@ -164,56 +167,52 @@ async def test_default_exhaustion_uses_the_first_configured_method() -> None:
     )
 
     assert state.status == "progress"
-    assert state.data["identification_method"] == "cpf"
-    assert "identificacao_pulada" not in state.data
-    assert "cpf" in require_agent_response(state).description.lower()
+    assert state.data["identification_method"] == "brazilian_tax_id"
+    assert "identification_skipped" not in state.data
+    assert "brazilian tax id" in require_agent_response(state).description.lower()
 
 
-async def test_default_exhaustion_resolves_invalid_cpf_to_anonymous() -> None:
+async def test_default_exhaustion_resolves_invalid_brazilian_tax_id_to_anonymous() -> None:
     runtime = FlowRuntime(_identification_flow_document(required=False, on_exhaust="default"))
     state = await runtime.execute(
-        runtime.new_state("identification-cpf-default"),
-        {"identification_method": "cpf"},
+        runtime.new_state("identification-brazilian_tax_id-default"),
+        {"identification_method": "brazilian_tax_id"},
     )
 
-    state = await runtime.execute(state, {"cpf": "invalid"})
+    state = await runtime.execute(state, {"brazilian_tax_id": "invalid"})
 
     assert state.status == "completed"
-    assert state.data["identification_method"] == "anonimo"
-    assert state.data["identificacao_pulada"] is True
+    assert state.data["identification_method"] == "anonymous"
+    assert state.data["identification_skipped"] is True
 
 
-async def test_handoff_exhaustion_pauses_cpf_collection() -> None:
+async def test_handoff_exhaustion_pauses_brazilian_tax_id_collection() -> None:
     runtime = FlowRuntime(_identification_flow_document(on_exhaust="handoff"))
     state = await runtime.execute(
-        runtime.new_state("identification-cpf-handoff"),
-        {"identification_method": "cpf"},
+        runtime.new_state("identification-brazilian_tax_id-handoff"),
+        {"identification_method": "brazilian_tax_id"},
     )
 
-    state = await runtime.execute(state, {"cpf": "invalid"})
+    state = await runtime.execute(state, {"brazilian_tax_id": "invalid"})
 
     assert state.status == "progress"
-    assert require_agent_response(state).description == (
-        "Vou te encaminhar para um atendente da Central 1746."
-    )
-    assert state.data["identification_method"] == "cpf"
-    assert "identificacao_pulada" not in state.data
+    assert require_agent_response(state).description == ("I will transfer you to a support agent.")
+    assert state.data["identification_method"] == "brazilian_tax_id"
+    assert "identification_skipped" not in state.data
 
 
 async def test_handoff_exhaustion_pauses_optional_contact_collection() -> None:
     runtime = FlowRuntime(_identification_flow_document(on_exhaust="handoff"))
     state = await runtime.execute(
         runtime.new_state("identification-email-handoff"),
-        {"identification_method": "cpf"},
+        {"identification_method": "brazilian_tax_id"},
     )
-    state = await runtime.execute(state, {"cpf": "52998224725"})
+    state = await runtime.execute(state, {"brazilian_tax_id": "52998224725"})
 
     state = await runtime.execute(state, {"email": "invalid"})
 
     assert state.status == "progress"
-    assert require_agent_response(state).description == (
-        "Vou te encaminhar para um atendente da Central 1746."
-    )
+    assert require_agent_response(state).description == ("I will transfer you to a support agent.")
     assert "email_processed" not in state.data
 
 
@@ -231,9 +230,7 @@ async def test_end_exhaustion_completes_with_a_correlated_warning(
     assert state.status == "completed"
     response = require_agent_response(state)
     assert response.log_id is not None
-    assert (
-        response.description == "Não consegui concluir a identificação. Tente novamente mais tarde."
-    )
+    assert response.description == "I could not complete identification. Try again later."
     matching_records = [
         record
         for record in caplog.records
@@ -243,11 +240,13 @@ async def test_end_exhaustion_completes_with_a_correlated_warning(
     assert getattr(matching_records[0], "log_id", None) == response.log_id
 
 
-async def test_correcting_cpf_invalidates_contacts_derived_from_the_prior_lookup() -> None:
+async def test_correcting_brazilian_tax_id_invalidates_contacts_derived_from_the_prior_lookup() -> (
+    None
+):
     registry = default_tool_registry()
 
-    async def cpf_lookup(cpf: str) -> dict[str, Any]:
-        if cpf == "52998224725":
+    async def brazilian_tax_id_lookup(brazilian_tax_id: str) -> dict[str, Any]:
+        if brazilian_tax_id == "52998224725":
             return {
                 "status": "ok",
                 "email": "registry@example.com",
@@ -256,37 +255,37 @@ async def test_correcting_cpf_invalidates_contacts_derived_from_the_prior_lookup
             }
         return {"status": "ok", "email": "", "name": "", "phones": []}
 
-    registry.register("cpf_lookup", cpf_lookup)
+    registry.register("brazilian_tax_id_lookup", brazilian_tax_id_lookup)
     runtime = FlowRuntime(_identification_flow_document(), tools=registry)
     state = await runtime.execute(
         runtime.new_state("derived-contact-correction"),
-        {"identification_method": "cpf"},
+        {"identification_method": "brazilian_tax_id"},
     )
-    state = await runtime.execute(state, {"cpf": "52998224725"})
+    state = await runtime.execute(state, {"brazilian_tax_id": "52998224725"})
 
     assert state.data["email"] == "registry@example.com"
     assert state.data["name"] == "Registry Citizen"
-    assert state.internal["_cpf_lookup_derived:email"] is True
-    assert state.internal["_cpf_lookup_derived:name"] is True
+    assert state.internal["_brazilian_tax_id_lookup_derived:email"] is True
+    assert state.internal["_brazilian_tax_id_lookup_derived:name"] is True
 
-    state.internal[CORRECTION_REQUESTED_INTERNAL_KEY] = "cpf"
-    state = await runtime.execute(state, {"cpf": "11144477735"})
+    state.internal[CORRECTION_REQUESTED_INTERNAL_KEY] = "brazilian_tax_id"
+    state = await runtime.execute(state, {"brazilian_tax_id": "11144477735"})
 
-    assert state.data["cpf"] == "11144477735"
+    assert state.data["brazilian_tax_id"] == "11144477735"
     assert "email" not in state.data
     assert "email_processed" not in state.data
     assert "name" not in state.data
     assert "name_processed" not in state.data
-    assert "_cpf_lookup_derived:email" not in state.internal
-    assert "_cpf_lookup_derived:name" not in state.internal
-    assert "e-mail" in require_agent_response(state).description.lower()
+    assert "_brazilian_tax_id_lookup_derived:email" not in state.internal
+    assert "_brazilian_tax_id_lookup_derived:name" not in state.internal
+    assert "email" in require_agent_response(state).description.lower()
 
 
-async def test_correcting_cpf_preserves_contacts_supplied_by_the_citizen() -> None:
+async def test_correcting_brazilian_tax_id_preserves_contacts_supplied_by_the_citizen() -> None:
     registry = default_tool_registry()
 
-    async def cpf_lookup(cpf: str) -> dict[str, Any]:
-        if cpf == "11144477735":
+    async def brazilian_tax_id_lookup(brazilian_tax_id: str) -> dict[str, Any]:
+        if brazilian_tax_id == "11144477735":
             return {
                 "status": "ok",
                 "email": "replacement@example.com",
@@ -295,34 +294,34 @@ async def test_correcting_cpf_preserves_contacts_supplied_by_the_citizen() -> No
             }
         return {"status": "ok", "email": "", "name": "", "phones": []}
 
-    registry.register("cpf_lookup", cpf_lookup)
+    registry.register("brazilian_tax_id_lookup", brazilian_tax_id_lookup)
     runtime = FlowRuntime(_identification_flow_document(), tools=registry)
     state = await runtime.execute(
         runtime.new_state("citizen-contact-correction"),
-        {"identification_method": "cpf"},
+        {"identification_method": "brazilian_tax_id"},
     )
-    state = await runtime.execute(state, {"cpf": "52998224725"})
+    state = await runtime.execute(state, {"brazilian_tax_id": "52998224725"})
     state = await runtime.execute(state, {"email": "citizen@example.com"})
     state = await runtime.execute(state, {"name": "Citizen Provided"})
 
-    state.internal[CORRECTION_REQUESTED_INTERNAL_KEY] = "cpf"
-    state = await runtime.execute(state, {"cpf": "11144477735"})
+    state.internal[CORRECTION_REQUESTED_INTERNAL_KEY] = "brazilian_tax_id"
+    state = await runtime.execute(state, {"brazilian_tax_id": "11144477735"})
 
-    assert state.data["cpf"] == "11144477735"
+    assert state.data["brazilian_tax_id"] == "11144477735"
     assert state.data["email"] == "citizen@example.com"
     assert state.data["email_processed"] is True
     assert state.data["name"] == "Citizen Provided"
     assert state.data["name_processed"] is True
-    assert "_cpf_lookup_derived:email" not in state.internal
-    assert "_cpf_lookup_derived:name" not in state.internal
+    assert "_brazilian_tax_id_lookup_derived:email" not in state.internal
+    assert "_brazilian_tax_id_lookup_derived:name" not in state.internal
 
 
 @pytest.mark.parametrize(
     "invalid_token",
     [
-        {"cpf": "invalid", "nome": "Citizen Name", "email": "citizen@example.com"},
-        {"cpf": "52998224725", "nome": "A", "email": "citizen@example.com"},
-        {"cpf": "52998224725", "nome": "Citizen Name", "email": "invalid"},
+        {"brazilian_tax_id": "invalid", "name": "Citizen Name", "email": "citizen@example.com"},
+        {"brazilian_tax_id": "52998224725", "name": "A", "email": "citizen@example.com"},
+        {"brazilian_tax_id": "52998224725", "name": "Citizen Name", "email": "invalid"},
     ],
 )
 async def test_legacy_govbr_token_validates_every_identity_before_atomic_commit(
@@ -331,10 +330,10 @@ async def test_legacy_govbr_token_validates_every_identity_before_atomic_commit(
     registry = default_tool_registry()
     enrichment_calls = 0
 
-    async def get_user_info(cpf: str) -> dict[str, Any]:
+    async def get_user_info(brazilian_tax_id: str) -> dict[str, Any]:
         nonlocal enrichment_calls
         enrichment_calls += 1
-        return {"status": "ok", "phones": [cpf]}
+        return {"status": "ok", "phones": [brazilian_tax_id]}
 
     registry.register("get_user_info", get_user_info)
     runtime = FlowRuntime(_identification_flow_document(), tools=registry)
@@ -346,17 +345,17 @@ async def test_legacy_govbr_token_validates_every_identity_before_atomic_commit(
     state = await runtime.execute(state, {"govbr_token": invalid_token})
 
     assert state.status == "progress"
-    assert state.data["identification_method"] == "cpf"
+    assert state.data["identification_method"] == "brazilian_tax_id"
     assert enrichment_calls == 0
-    assert "cpf" not in state.data
+    assert "brazilian_tax_id" not in state.data
     assert "name" not in state.data
     assert "email" not in state.data
     assert "govbr_authenticated" not in state.data
     assert require_agent_response(state).log_id is not None
 
-    state = await runtime.execute(state, {"cpf": "52998224725"})
+    state = await runtime.execute(state, {"brazilian_tax_id": "52998224725"})
 
-    assert state.data["cpf"] == "52998224725"
+    assert state.data["brazilian_tax_id"] == "52998224725"
     assert state.status == "progress"
 
 
@@ -371,21 +370,21 @@ async def test_legacy_govbr_token_commits_normalized_identity_together() -> None
         state,
         {
             "govbr_token": {
-                "cpf": "529.982.247-25",
-                "nome": "  Citizen Name  ",
+                "brazilian_tax_id": "529.982.247-25",
+                "name": "  Citizen Name  ",
                 "email": "  CITIZEN@EXAMPLE.COM  ",
             }
         },
     )
 
     assert state.status == "completed"
-    assert state.data["cpf"] == "52998224725"
+    assert state.data["brazilian_tax_id"] == "52998224725"
     assert state.data["name"] == "Citizen Name"
     assert state.data["email"] == "citizen@example.com"
     assert state.data["name_processed"] is True
     assert state.data["email_processed"] is True
     assert state.data["govbr_authenticated"] is True
-    assert state.data["cadastro_verificado"] is True
+    assert state.data["identity_verified"] is True
 
 
 @pytest.mark.parametrize(
@@ -399,7 +398,7 @@ async def test_legacy_govbr_token_commits_normalized_identity_together() -> None
         ),
     ],
 )
-async def test_cpf_lookup_validates_each_optional_contact_before_commit(
+async def test_brazilian_tax_id_lookup_validates_each_optional_contact_before_commit(
     lookup_contacts: dict[str, str],
     accepted_slot: str,
     accepted_value: str,
@@ -408,34 +407,34 @@ async def test_cpf_lookup_validates_each_optional_contact_before_commit(
 ) -> None:
     registry = default_tool_registry()
 
-    async def cpf_lookup(cpf: str) -> dict[str, Any]:
-        del cpf
+    async def brazilian_tax_id_lookup(brazilian_tax_id: str) -> dict[str, Any]:
+        del brazilian_tax_id
         return {
             "status": "ok",
             "phones": [],
             **lookup_contacts,
         }
 
-    registry.register("cpf_lookup", cpf_lookup)
+    registry.register("brazilian_tax_id_lookup", brazilian_tax_id_lookup)
     runtime = FlowRuntime(_identification_flow_document(), tools=registry)
     state = await runtime.execute(
         runtime.new_state("lookup-contact-validation"),
-        {"identification_method": "cpf"},
+        {"identification_method": "brazilian_tax_id"},
     )
 
     with caplog.at_level(logging.WARNING, logger="flowspec2.subflows.identification"):
-        state = await runtime.execute(state, {"cpf": "52998224725"})
+        state = await runtime.execute(state, {"brazilian_tax_id": "52998224725"})
 
-    assert state.data["cpf"] == "52998224725"
+    assert state.data["brazilian_tax_id"] == "52998224725"
     assert state.data[accepted_slot] == accepted_value
     assert state.data[f"{accepted_slot}_processed"] is True
     assert rejected_slot not in state.data
     assert f"{rejected_slot}_processed" not in state.data
-    assert state.data["cadastro_verificado"] is True
+    assert state.data["identity_verified"] is True
     matching_records = [
         log_record
         for log_record in caplog.records
-        if log_record.message == "CPF lookup contact failed slot validation"
+        if log_record.message == "Brazilian tax ID lookup contact failed slot validation"
         and getattr(log_record, "slot", None) == rejected_slot
     ]
     assert len(matching_records) == 1
@@ -445,7 +444,7 @@ async def test_cpf_lookup_validates_each_optional_contact_before_commit(
 def test_required_identification_rejects_anonymous_only_default_configuration() -> None:
     flow_document = _identification_flow_document(
         required=False,
-        methods=["anonimo"],
+        methods=["anonymous"],
         on_exhaust="default",
     )
     flow_document["config"] = {"identification_required": True}
@@ -459,7 +458,7 @@ async def test_optional_identification_without_anonymous_method_never_selects_it
     runtime = FlowRuntime(
         _identification_flow_document(
             required=False,
-            methods=["govbr", "cpf"],
+            methods=["govbr", "brazilian_tax_id"],
             on_exhaust="default",
         )
     )
@@ -470,18 +469,18 @@ async def test_optional_identification_without_anonymous_method_never_selects_it
     assert response.interactive is not None
     assert {button["id"] for button in response.interactive["buttons"]} == {
         "govbr",
-        "cpf",
+        "brazilian_tax_id",
     }
     assert "identification_method" not in state.data
 
-    state = await runtime.execute(state, {"identification_method": "anonimo"})
+    state = await runtime.execute(state, {"identification_method": "anonymous"})
 
     assert state.data["identification_method"] == "govbr"
-    assert "identificacao_pulada" not in state.data
+    assert "identification_skipped" not in state.data
     assert (require_agent_response(state).interactive or {}).get("out_of_band_sent") is True
 
 
-async def test_legacy_invalid_govbr_token_without_cpf_method_retries_govbr() -> None:
+async def test_legacy_invalid_govbr_token_without_brazilian_tax_id_method_retries_govbr() -> None:
     runtime = FlowRuntime(
         _identification_flow_document(
             methods=["govbr"],
@@ -495,16 +494,16 @@ async def test_legacy_invalid_govbr_token_without_cpf_method_retries_govbr() -> 
 
     state = await runtime.execute(
         state,
-        {"govbr_token": {"cpf": "invalid", "nome": "Citizen Name"}},
+        {"govbr_token": {"brazilian_tax_id": "invalid", "name": "Citizen Name"}},
     )
 
     assert state.status == "progress"
     assert state.data["identification_method"] == "govbr"
-    assert "cpf" not in state.data
-    assert "identificacao_pulada" not in state.data
+    assert "brazilian_tax_id" not in state.data
+    assert "identification_skipped" not in state.data
     response = require_agent_response(state)
     assert response.log_id is not None
-    assert "tente novamente" in response.description.lower()
+    assert "try again" in response.description.lower()
 
     state = await runtime.execute(state, {})
 
@@ -512,7 +511,7 @@ async def test_legacy_invalid_govbr_token_without_cpf_method_retries_govbr() -> 
     assert (require_agent_response(state).interactive or {}).get("out_of_band_sent") is True
 
 
-async def test_legacy_cpf_request_is_rejected_when_method_is_disabled() -> None:
+async def test_legacy_brazilian_tax_id_request_is_rejected_when_method_is_disabled() -> None:
     runtime = FlowRuntime(
         _identification_flow_document(
             methods=["govbr"],
@@ -525,37 +524,37 @@ async def test_legacy_cpf_request_is_rejected_when_method_is_disabled() -> None:
         {"identification_method": "govbr"},
     )
 
-    state = await runtime.execute(state, {"message": "prefiro cpf"})
+    state = await runtime.execute(state, {"message": "I prefer brazilian_tax_id"})
 
     assert state.data["identification_method"] == "govbr"
-    assert "cpf" not in state.data
+    assert "brazilian_tax_id" not in state.data
     response = require_agent_response(state)
     assert response.interactive is not None
     assert [button["id"] for button in response.interactive["buttons"]] == ["govbr"]
 
 
-async def test_cpf_skip_without_anonymous_method_uses_configured_default() -> None:
+async def test_brazilian_tax_id_skip_without_anonymous_method_uses_configured_default() -> None:
     runtime = FlowRuntime(
         _identification_flow_document(
             required=False,
-            methods=["govbr", "cpf"],
+            methods=["govbr", "brazilian_tax_id"],
             on_exhaust="default",
         )
     )
     state = await runtime.execute(
-        runtime.new_state("cpf-skip-without-anonymous"),
-        {"identification_method": "cpf"},
+        runtime.new_state("brazilian_tax_id-skip-without-anonymous"),
+        {"identification_method": "brazilian_tax_id"},
     )
 
-    state = await runtime.execute(state, {"cpf": "pular"})
+    state = await runtime.execute(state, {"brazilian_tax_id": "skip"})
 
     assert state.data["identification_method"] == "govbr"
-    assert "identificacao_pulada" not in state.data
-    assert "cpf" not in state.data
+    assert "identification_skipped" not in state.data
+    assert "brazilian_tax_id" not in state.data
     assert (require_agent_response(state).interactive or {}).get("out_of_band_sent") is True
 
 
-def test_await_recovery_rejects_disabled_cpf_target() -> None:
+def test_await_recovery_rejects_disabled_brazilian_tax_id_target() -> None:
     flow_document = _identification_flow_document(methods=["govbr"])
     flow_document["capabilities"] = {
         "await_external": {
@@ -564,16 +563,16 @@ def test_await_recovery_rejects_disabled_cpf_target() -> None:
             "resume_on": "govbr_token",
             "resume": _govbr_resume_contract(),
             "recovery": {
-                "switch": {"goto": "collect_cpf"},
+                "switch": {"goto": "collect_tax_id"},
             },
         }
     }
 
-    with pytest.raises(ValueError, match="routes to disabled method 'cpf'"):
+    with pytest.raises(ValueError, match="routes to disabled method 'brazilian_tax_id'"):
         FlowRuntime(flow_document)
 
 
-async def test_await_recovery_without_cpf_can_return_to_method_selection() -> None:
+async def test_await_recovery_without_brazilian_tax_id_can_return_to_method_selection() -> None:
     flow_document = _identification_flow_document(methods=["govbr"])
     flow_document["capabilities"] = {
         "await_external": {
@@ -592,10 +591,10 @@ async def test_await_recovery_without_cpf_can_return_to_method_selection() -> No
         {"identification_method": "govbr"},
     )
 
-    state = await runtime.execute(state, {"govbr_token": {"nome": "Untrusted"}})
+    state = await runtime.execute(state, {"govbr_token": {"name": "Untrusted"}})
 
     assert "identification_method" not in state.data
-    assert "cpf" not in state.data
+    assert "brazilian_tax_id" not in state.data
     response = require_agent_response(state)
     assert response.interactive is not None
     assert [button["id"] for button in response.interactive["buttons"]] == ["govbr"]

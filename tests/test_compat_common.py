@@ -65,11 +65,11 @@ def test_yaml_loader_requires_non_empty_mapping(document: str) -> None:
 
 
 def test_yaml_dump_is_unicode_preserving_and_stable() -> None:
-    dumped = dumps_yaml_mapping({"flows": {"iluminacao": {"description": "Luminária"}}})
+    dumped = dumps_yaml_mapping({"flows": {"lighting": {"description": "Streetlight"}}})
 
     assert dumped.startswith("flows:\n")
-    assert "Luminária" in dumped
-    assert loads_yaml_mapping(dumped)["flows"]["iluminacao"]["description"] == "Luminária"
+    assert "Streetlight" in dumped
+    assert loads_yaml_mapping(dumped)["flows"]["lighting"]["description"] == "Streetlight"
 
 
 def test_yaml_loader_uses_yaml_1_2_boolean_tokens() -> None:

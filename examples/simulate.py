@@ -1,7 +1,7 @@
-"""Real end-to-end simulations of the reparo_luminaria flow.
+"""Real end-to-end simulations of the streetlight_repair flow.
 
 Drives the compiled LangGraph flow as realistic citizen conversations, over the
-REAL HTTP backends (a deterministic geocoder + SGRC stub via httpx.MockTransport
+REAL HTTP backends (a deterministic geocoder + ticketing system stub via httpx.MockTransport
 — no network), printing a turn-by-turn transcript.
 
 Run:  uv run python examples/simulate.py
@@ -18,12 +18,12 @@ import httpx
 from flowspec2 import FlowRuntime, load_flow
 from flowspec2.backends import BackendConfig, make_registry
 
-DOC = load_flow(str(Path(__file__).with_name("reparo_luminaria.flow.json")))
+DOC = load_flow(str(Path(__file__).with_name("streetlight_repair.flow.json")))
 CONFIG = BackendConfig(
     geocode_url="https://services.example/geocode",
-    cpf_lookup_url="https://services.example/cpf",
+    brazilian_tax_id_lookup_url="https://services.example/brazilian_tax_id",
     govbr_enrich_url="https://services.example/govbr",
-    sgrc_url="https://services.example/sgrc",
+    ticketing_url="https://services.example/requests",
     api_key="demo-token",
 )
 
@@ -35,7 +35,7 @@ YELLOW = "\033[33m"
 CYAN = "\033[36m"
 
 
-def make_transport(sgrc) -> httpx.MockTransport:
+def make_transport(ticketing_handler) -> httpx.MockTransport:
     """A deterministic stand-in for a civic-service backend."""
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -43,21 +43,23 @@ def make_transport(sgrc) -> httpx.MockTransport:
         if path.endswith("/geocode"):
             address = json.loads(request.content or b"{}").get("address", "")
             return httpx.Response(
-                200, json={"logradouro": address, "bairro": "Centro", "municipio": "Rio de Janeiro"}
+                200, json={"street": address, "district": "Downtown", "city": "Example City"}
             )
-        if path.endswith("/cpf"):
+        if path.endswith("/brazilian_tax_id"):
             return httpx.Response(200, json={"name": "", "email": "", "phones": []})
         if path.endswith("/govbr"):
             return httpx.Response(200, json={"phones": ["5521988887777"]})
-        if path.endswith("/sgrc"):
-            return sgrc(request)
+        if path.endswith("/requests"):
+            return ticketing_handler(request)
         return httpx.Response(404)
 
     return httpx.MockTransport(handler)
 
 
-def runtime(sgrc) -> FlowRuntime:
-    return FlowRuntime(DOC, tools=make_registry(CONFIG, transport=make_transport(sgrc)))
+def runtime(ticketing_handler) -> FlowRuntime:
+    return FlowRuntime(
+        DOC, tools=make_registry(CONFIG, transport=make_transport(ticketing_handler))
+    )
 
 
 def _render(state) -> None:
@@ -65,21 +67,21 @@ def _render(state) -> None:
     iv = ar.interactive or {}
     print(f"  {CYAN}🤖{RESET} {ar.description}")
     if iv.get("status") == "flow_sent":
-        print(f"     {DIM}↳ [enviou o formulário WhatsApp Flow para preenchimento]{RESET}")
+        print(f"     {DIM}↳ [sent the WhatsApp Flow form for completion]{RESET}")
     elif iv.get("out_of_band_sent"):
-        print(f"     {DIM}↳ [enviou o botão de login gov.br — aguardando autenticação]{RESET}")
+        print(f"     {DIM}↳ [sent the gov.br login button; awaiting authentication]{RESET}")
     elif iv.get("buttons"):
-        print(f"     {DIM}↳ botões: {' · '.join(b['title'] for b in iv['buttons'])}{RESET}")
+        print(f"     {DIM}↳ buttons: {' · '.join(b['title'] for b in iv['buttons'])}{RESET}")
     elif iv.get("sections"):
         rows = [r["title"] for s in iv["sections"] for r in s["rows"]]
-        print(f"     {DIM}↳ lista: {' · '.join(rows)}{RESET}")
+        print(f"     {DIM}↳ list: {' · '.join(rows)}{RESET}")
     if state.status == "completed" and state.data.get("protocol_id"):
-        print(f"     {GREEN}✅ chamado aberto — protocolo {state.data['protocol_id']}{RESET}")
+        print(f"     {GREEN}✅ request opened — protocol_id {state.data['protocol_id']}{RESET}")
     elif state.status == "error":
         print(f"     {YELLOW}⚠️  {ar.error_message}{RESET}")
 
 
-class Sim:
+class Conversation:
     def __init__(self, rt: FlowRuntime, user: str = "5521999990000") -> None:
         self.rt = rt
         self.user = user
@@ -97,184 +99,198 @@ def banner(title: str) -> None:
 
 
 async def scenario_flow_happy():
-    banner("Cenário 1 — caminho de produção (WhatsApp Flow), cidadão anônimo")
-    sim = Sim(runtime(lambda r: httpx.Response(201, json={"protocolo": "RLU-2026-000481"})))
-    await sim.say("a luz da minha rua tá apagada faz dias", {})
-    await sim.say(
-        "[preenche o formulário]",
+    banner("Scenario 1 — production path (WhatsApp Flow), anonymous user")
+    conversation = Conversation(
+        runtime(lambda r: httpx.Response(201, json={"protocol_id": "RLU-2026-000481"}))
+    )
+    await conversation.say("the streetlight on my street has been out for days", {})
+    await conversation.say(
+        "[completes the form]",
         {
             "_source": "whatsapp_flow",
-            "defect_type": "Apagada",
-            "qty_pattern": "bloco",
-            "location": "Rua",
+            "defect_type": "Not working",
+            "qty_pattern": "block",
+            "location": "Street",
         },
     )
-    await sim.say("Rua das Laranjeiras, 300", {"address": "Rua das Laranjeiras, 300"})
-    await sim.say("isso, pode confirmar", {"confirmacao": "sim"})
-    await sim.say("em frente ao mercadinho", {"ponto_referencia": "em frente ao mercadinho"})
-    await sim.say("prefiro não me identificar", {"identification_method": "anonimo"})
-    await sim.say("pode abrir 👍", {"confirmacao": "sim"})
+    await conversation.say("Orange Tree Street, 300", {"address": "Orange Tree Street, 300"})
+    await conversation.say("yes, confirm it", {"confirmation": "yes"})
+    await conversation.say("across from the market", {"reference_point": "across from the market"})
+    await conversation.say("I prefer to remain anonymous", {"identification_method": "anonymous"})
+    await conversation.say("open it 👍", {"confirmation": "yes"})
 
 
 async def scenario_correction():
-    banner("Cenário 2 — cidadão corrige o endereço na confirmação")
-    sim = Sim(runtime(lambda r: httpx.Response(201, json={"protocolo": "RLU-2026-000482"})))
-    await sim.say("o poste tá piscando", {})
-    await sim.say(
-        "[preenche o formulário]",
+    banner("Scenario 2 — user corrects the address during confirmation")
+    conversation = Conversation(
+        runtime(lambda r: httpx.Response(201, json={"protocol_id": "RLU-2026-000482"}))
+    )
+    await conversation.say("the streetlight keeps flickering", {})
+    await conversation.say(
+        "[completes the form]",
         {
             "_source": "whatsapp_flow",
-            "defect_type": "Piscando",
-            "qty_pattern": "uma",
-            "location": "Rua",
+            "defect_type": "Flickering",
+            "qty_pattern": "single",
+            "location": "Street",
         },
     )
-    await sim.say("Rua Barata Ribeiro, 200", {"address": "Rua Barata Ribeiro, 200"})
-    await sim.say("sim", {"confirmacao": "sim"})
-    await sim.say("perto da farmácia", {"ponto_referencia": "perto da farmácia"})
-    await sim.say("anônimo", {"identification_method": "anonimo"})
-    await sim.say("não, o endereço está errado", {"correcao": "address"})
-    await sim.say("é na Rua Tonelero, 150", {"address": "Rua Tonelero, 150"})
-    await sim.say("agora sim", {"confirmacao": "sim"})
-    await sim.say(
-        "na esquina com a Siqueira Campos", {"ponto_referencia": "esquina com a Siqueira Campos"}
+    await conversation.say("Oak Street, 200", {"address": "Oak Street, 200"})
+    await conversation.say("yes", {"confirmation": "yes"})
+    await conversation.say("near the pharmacy", {"reference_point": "near the pharmacy"})
+    await conversation.say("anonymous", {"identification_method": "anonymous"})
+    await conversation.say("no, the address is wrong", {"correction": "address"})
+    await conversation.say("it is on Pine Street, 150", {"address": "Pine Street, 150"})
+    await conversation.say("now it is correct", {"confirmation": "yes"})
+    await conversation.say(
+        "at the corner of Main Street", {"reference_point": "at the corner of Main Street"}
     )
-    await sim.say("pode abrir", {"confirmacao": "sim"})
+    await conversation.say("open it", {"confirmation": "yes"})
 
 
 async def scenario_govbr():
-    banner("Cenário 3 — identificação via gov.br (out-of-band)")
-    sim = Sim(runtime(lambda r: httpx.Response(201, json={"protocolo": "RLU-2026-000483"})))
-    await sim.say("luminária danificada na minha rua", {})
-    await sim.say(
-        "[preenche o formulário]",
-        {"_source": "whatsapp_flow", "defect_type": "Danificada", "location": "Rua"},
+    banner("Scenario 3 — identification through gov.br (out of band)")
+    conversation = Conversation(
+        runtime(lambda r: httpx.Response(201, json={"protocol_id": "RLU-2026-000483"}))
     )
-    await sim.say("Av. Atlântica, 1700", {"address": "Av. Atlântica, 1700"})
-    await sim.say("sim", {"confirmacao": "sim"})
-    await sim.say("ao lado do quiosque", {"ponto_referencia": "ao lado do quiosque"})
-    await sim.say("quero usar o gov.br", {"identification_method": "govbr"})
-    await sim.say(
-        "[faz login no gov.br e volta]",
+    await conversation.say("damaged streetlight on my street", {})
+    await conversation.say(
+        "[completes the form]",
+        {"_source": "whatsapp_flow", "defect_type": "Damaged", "location": "Street"},
+    )
+    await conversation.say("Ocean Avenue, 1700", {"address": "Ocean Avenue, 1700"})
+    await conversation.say("yes", {"confirmation": "yes"})
+    await conversation.say("beside the kiosk", {"reference_point": "beside the kiosk"})
+    await conversation.say("I want to use gov.br", {"identification_method": "govbr"})
+    await conversation.say(
+        "[logs in to gov.br and returns]",
         {
             "govbr_token": {
-                "cpf": "52998224725",
-                "nome": "Joana Ribeiro",
-                "email": "joana@example.com",
+                "brazilian_tax_id": "52998224725",
+                "name": "Jane Smith",
+                "email": "jane@example.com",
             }
         },
     )
-    await sim.say("pode confirmar", {"confirmacao": "sim"})
+    await conversation.say("confirm it", {"confirmation": "yes"})
 
 
-async def scenario_praca_quadra():
-    banner("Cenário 4 — endereço em praça abre a pergunta de quadra de esportes")
-    sim = Sim(runtime(lambda r: httpx.Response(201, json={"protocolo": "RLU-2026-000484"})))
-    await sim.say("as luzes da praça estão apagadas", {})
-    await sim.say(
-        "[preenche o formulário]",
+async def scenario_square_sports_court():
+    banner("Scenario 4 — a public-square address opens the sports-court question")
+    conversation = Conversation(
+        runtime(lambda r: httpx.Response(201, json={"protocol_id": "RLU-2026-000484"}))
+    )
+    await conversation.say("the public-square lights are out", {})
+    await conversation.say(
+        "[completes the form]",
         {
             "_source": "whatsapp_flow",
-            "defect_type": "Apagada",
-            "qty_pattern": "intercaladas",
-            "location": "Praça",
+            "defect_type": "Not working",
+            "qty_pattern": "alternating",
+            "location": "Public square",
         },
     )
-    await sim.say("Praça General Osório", {"address": "Praça General Osório"})
-    await sim.say("sim", {"confirmacao": "sim"})
-    await sim.say("sim, é dentro da quadra", {"reparo_luminaria_quadra_esportes": "sim"})
-    await sim.say("perto da rede de vôlei", {"ponto_referencia": "perto da rede de vôlei"})
-    await sim.say("anônimo", {"identification_method": "anonimo"})
-    await sim.say("pode abrir", {"confirmacao": "sim"})
+    await conversation.say("Central Square", {"address": "Central Square"})
+    await conversation.say("yes", {"confirmation": "yes"})
+    await conversation.say("yes, it is near the sports court", {"near_sports_court": "yes"})
+    await conversation.say(
+        "near the volleyball net", {"reference_point": "near the volleyball net"}
+    )
+    await conversation.say("anonymous", {"identification_method": "anonymous"})
+    await conversation.say("open it", {"confirmation": "yes"})
 
 
-async def scenario_sgrc_retry():
-    banner("Cenário 5 — SGRC fora do ar (503 → retryable) e depois recupera")
+async def scenario_ticketing_retry():
+    banner("Scenario 5 — ticketing outage (503 → retryable), followed by recovery")
     calls = {"n": 0}
 
     def flaky(_request):
         calls["n"] += 1
         if calls["n"] == 1:
-            return httpx.Response(503, text="SGRC indisponível")
-        return httpx.Response(201, json={"protocolo": "RLU-2026-000485"})
+            return httpx.Response(503, text="ticketing system unavailable")
+        return httpx.Response(201, json={"protocol_id": "RLU-2026-000485"})
 
-    sim = Sim(runtime(flaky))
-    await sim.say("luz apagada na rua", {})
-    await sim.say(
-        "[preenche o formulário]",
+    conversation = Conversation(runtime(flaky))
+    await conversation.say("streetlight is not working", {})
+    await conversation.say(
+        "[completes the form]",
         {
             "_source": "whatsapp_flow",
-            "defect_type": "Apagada",
-            "qty_pattern": "uma",
-            "location": "Rua",
+            "defect_type": "Not working",
+            "qty_pattern": "single",
+            "location": "Street",
         },
     )
-    await sim.say("Rua Sá Ferreira, 40", {"address": "Rua Sá Ferreira, 40"})
-    await sim.say("sim", {"confirmacao": "sim"})
-    await sim.say("perto do ponto de ônibus", {"ponto_referencia": "perto do ponto de ônibus"})
-    await sim.say("anônimo", {"identification_method": "anonimo"})
-    await sim.say("pode abrir", {"confirmacao": "sim"})  # 1st open -> 503 retryable
-    await sim.say(
-        "tenta de novo por favor", {"confirmacao": "sim"}
+    await conversation.say("Maple Street, 40", {"address": "Maple Street, 40"})
+    await conversation.say("yes", {"confirmation": "yes"})
+    await conversation.say("near the bus stop", {"reference_point": "near the bus stop"})
+    await conversation.say("anonymous", {"identification_method": "anonymous"})
+    await conversation.say("open it", {"confirmation": "yes"})  # first open -> 503 retryable
+    await conversation.say(
+        "try again, please", {"confirmation": "yes"}
     )  # retry -> success, state preserved
     print(
-        f"  {DIM}(chamadas ao SGRC: {calls['n']} — estado preservado entre a falha e o retry){RESET}\n"
+        f"  {DIM}(ticketing calls: {calls['n']}; state preserved between failure and retry){RESET}\n"
     )
 
 
 async def scenario_idempotency():
-    banner("Cenário 6 — idempotência: reenvio duplicado não abre 2 chamados")
+    banner("Scenario 6 — idempotency: duplicate delivery does not open two requests")
     calls = {"n": 0}
 
     def counting(_request):
         calls["n"] += 1
-        return httpx.Response(201, json={"protocolo": "RLU-2026-000486"})
+        return httpx.Response(201, json={"protocol_id": "RLU-2026-000486"})
 
     rt = runtime(counting)  # one runtime/registry => shared replay cache
     answers = [
-        ("luz apagada", {}),
+        ("streetlight is not working", {}),
         (
-            "[formulário]",
+            "[form]",
             {
                 "_source": "whatsapp_flow",
-                "defect_type": "Apagada",
-                "qty_pattern": "uma",
-                "location": "Rua",
+                "defect_type": "Not working",
+                "qty_pattern": "single",
+                "location": "Street",
             },
         ),
-        ("Rua Pompeu Loureiro, 5", {"address": "Rua Pompeu Loureiro, 5"}),
-        ("sim", {"confirmacao": "sim"}),
-        ("perto da escola", {"ponto_referencia": "perto da escola"}),
-        ("anônimo", {"identification_method": "anonimo"}),
-        ("pode abrir", {"confirmacao": "sim"}),
+        ("Elm Street, 5", {"address": "Elm Street, 5"}),
+        ("yes", {"confirmation": "yes"}),
+        ("near the school", {"reference_point": "near the school"}),
+        ("anonymous", {"identification_method": "anonymous"}),
+        ("open it", {"confirmation": "yes"}),
     ]
-    print(f"  {DIM}— primeira conversa —{RESET}")
-    sim1 = Sim(rt, user="5521900000001")
+    print(f"  {DIM}— first conversation —{RESET}")
+    conversation_one = Conversation(rt, user="5521900000001")
     for _, payload in answers:
-        sim1.state = await rt.execute(sim1.state, payload)
-    print(f"  👤 (conversa completa) → {GREEN}protocolo {sim1.state.data['protocol_id']}{RESET}")
-
-    print(f"  {DIM}— mesmo cidadão, MESMAS respostas (reenvio duplicado) —{RESET}")
-    sim2 = Sim(rt, user="5521900000001")
-    for _, payload in answers:
-        sim2.state = await rt.execute(sim2.state, payload)
-    print(f"  👤 (conversa completa) → {GREEN}protocolo {sim2.state.data['protocol_id']}{RESET}")
+        conversation_one.state = await rt.execute(conversation_one.state, payload)
     print(
-        f"  {BOLD}→ chamadas reais ao SGRC: {calls['n']} (idempotência: o 2º reusa o protocolo){RESET}\n"
+        f"  👤 (complete conversation) → {GREEN}protocol_id {conversation_one.state.data['protocol_id']}{RESET}"
+    )
+
+    print(f"  {DIM}— same user, same answers (duplicate delivery) —{RESET}")
+    conversation_two = Conversation(rt, user="5521900000001")
+    for _, payload in answers:
+        conversation_two.state = await rt.execute(conversation_two.state, payload)
+    print(
+        f"  👤 (complete conversation) → {GREEN}protocol_id {conversation_two.state.data['protocol_id']}{RESET}"
+    )
+    print(
+        f"  {BOLD}→ actual ticketing calls: {calls['n']} (idempotency reuses the protocol ID){RESET}\n"
     )
 
 
 async def main():
     print(
-        f"{BOLD}flowspec2 · simulações reais — reparo_luminaria sobre backends HTTP (MockTransport){RESET}"
+        f"{BOLD}flowspec2 · end-to-end simulations — streetlight_repair over HTTP backends (MockTransport){RESET}"
     )
     await scenario_flow_happy()
     await scenario_correction()
     await scenario_govbr()
-    await scenario_praca_quadra()
-    await scenario_sgrc_retry()
+    await scenario_square_sports_court()
+    await scenario_ticketing_retry()
     await scenario_idempotency()
-    print(f"{GREEN}{BOLD}✓ todas as simulações concluídas{RESET}")
+    print(f"{GREEN}{BOLD}✓ all simulations completed{RESET}")
 
 
 if __name__ == "__main__":

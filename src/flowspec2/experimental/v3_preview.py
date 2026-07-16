@@ -1671,9 +1671,9 @@ def _migrate_options(
     preview_options: list[dict[str, Any]] = []
     for option_value in option_values:
         option_label = (
-            "Sim"
+            "Yes"
             if option_value is True
-            else "Não"
+            else "No"
             if option_value is False
             else ""
             if option_value is None

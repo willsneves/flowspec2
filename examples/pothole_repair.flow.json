@@ -1,0 +1,53 @@
+{
+  "schema": "flowspec/2",
+  "flow": "pothole_repair",
+  "version": "1.0.0",
+  "service": { "id": "pothole-repair", "service_code": "pothole-repair" },
+  "route": {
+    "description": "Repair a pothole, crater, or depression on a public road or sidewalk.",
+    "trigger_phrases": ["pothole in the street", "crater in the road", "damaged asphalt", "sunken sidewalk"]
+  },
+  "config": { "address_required": true, "identification_required": false, "max_attempts": 3 },
+  "domains": {
+    "PotholeType": { "type": "categorical", "values": ["Asphalt pothole", "Crater", "Depression", "Damaged sidewalk"], "normalize": { "accent_fold": true, "synonyms": { "pothole": "Asphalt pothole", "large crater": "Crater", "broken sidewalk": "Damaged sidewalk" } } },
+    "Size": { "type": "categorical", "values": ["Small", "Medium", "Large"], "normalize": { "number_words": true, "accent_fold": true, "synonyms": { "huge": "Large", "tiny": "Small" } } },
+    "YesNo": { "type": "bool", "normalize": { "affirmation": true } }
+  },
+  "slots": {
+    "pothole_type": { "domain": "PotholeType", "persist": "data", "required": true },
+    "pothole_size": { "domain": "Size", "persist": "data", "required": true },
+    "ticket_data_confirmed": { "domain": "YesNo", "persist": "data" }
+  },
+  "path": [
+    { "step": "collect_type", "slot": "pothole_type", "prompt": { "text": "What type of road damage is present?", "extract_hint": "infer from a supplied photo" }, "interactive": { "kind": "list", "field": "pothole_type", "from_domain": "PotholeType" } },
+    { "step": "collect_size", "slot": "pothole_size", "prompt": { "text": "What is the approximate size?" }, "interactive": { "kind": "buttons", "field": "pothole_size", "from_domain": "Size" } },
+    { "use": "address@1" },
+    { "use": "identification@2" },
+    { "step": "confirm_ticket_data", "confirm": "ticket_data_confirmed", "correctable": true, "prompt": { "text": "Do you confirm opening the service request?" }, "interactive": { "kind": "buttons", "field": "confirmation", "from_domain": "YesNo" } },
+    { "terminal": true }
+  ],
+  "uses": [
+    { "ref": "address@1", "with": { "required": true, "needs_confirmation": true } },
+    { "ref": "identification@2", "with": { "required": false } }
+  ],
+  "confirm": {
+    "step": "confirm_ticket_data",
+    "slot": "ticket_data_confirmed",
+    "on_confirm": "open_ticket",
+    "correctable": ["pothole_type", "pothole_size", "address", "brazilian_tax_id", "email", "name"]
+  },
+  "terminal": {
+    "step": "open_ticket",
+    "tool": "open_service_request",
+    "idempotent": true,
+    "input": [ { "param": "potholeType", "slot": "pothole_type" }, { "param": "size", "slot": "pothole_size" }, { "param": "address", "slot": "address" }, { "param": "requester", "slot": "brazilian_tax_id" } ],
+    "outputs": { "protocol_id": "result.protocol_id" },
+    "outcomes": { "success": { "reset_next": true }, "retryable": { "preserve_state": true }, "fatal": { "reset_next": true } }
+  },
+  "capabilities": {
+    "media_in": { "analyze": ["image"], "route_by": "suggested_workflow" },
+    "media_out": ["location"],
+    "handoff": { "target": "support" },
+    "session_reset": true
+  }
+}

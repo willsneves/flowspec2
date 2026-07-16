@@ -52,9 +52,9 @@ def test_diagnostic_contract_is_immutable_and_machine_readable() -> None:
 
 
 def test_structural_check_aggregates_every_schema_error_deterministically(
-    luminaria_doc: dict[str, object],
+    streetlight_document: dict[str, object],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["flow"] = "Invalid Flow"
     invalid_flow["version"] = "2"
     invalid_flow["unknown"] = True
@@ -94,9 +94,9 @@ def test_structural_errors_skip_the_compiler(
 
 
 def test_structurally_valid_semantic_failure_skips_compilation(
-    luminaria_doc: dict[str, object],
+    streetlight_document: dict[str, object],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["path"][0] = {"use": "missing@1"}  # type: ignore[index]
 
     flow_report = check_flow(invalid_flow)
@@ -110,10 +110,10 @@ def test_structurally_valid_semantic_failure_skips_compilation(
 
 
 def test_valid_flow_compiles_and_serialized_json_matches_object_check(
-    luminaria_doc: dict[str, object],
+    streetlight_document: dict[str, object],
 ) -> None:
-    object_report = check_flow(luminaria_doc)
-    serialized_report = check_json(json.dumps(luminaria_doc))
+    object_report = check_flow(streetlight_document)
+    serialized_report = check_json(json.dumps(streetlight_document))
 
     assert object_report == serialized_report
     assert object_report.is_valid
@@ -121,7 +121,7 @@ def test_valid_flow_compiles_and_serialized_json_matches_object_check(
 
 
 def test_semantically_valid_compilation_failure_is_reported(
-    luminaria_doc: dict[str, object],
+    streetlight_document: dict[str, object],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def reject_compilation(*args: object, **kwargs: object) -> None:
@@ -130,7 +130,7 @@ def test_semantically_valid_compilation_failure_is_reported(
 
     monkeypatch.setattr("flowspec2.checker.compile_flow", reject_compilation)
 
-    flow_report = check_flow(luminaria_doc)
+    flow_report = check_flow(streetlight_document)
 
     assert flow_report.compilation == "failed"
     assert [diagnostic.code for diagnostic in flow_report.diagnostics] == [
@@ -171,12 +171,12 @@ def test_nonstandard_or_ambiguous_json_is_rejected_at_parse_boundary(
     ],
 )
 def test_object_check_rejects_non_json_values_before_semantic_linking(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
     invalid_value: object,
     expected_path: str,
     expected_detail: str,
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["domains"]["Distance"] = {
         "type": "number",
         "minimum": invalid_value,

@@ -13,7 +13,7 @@ from .tools import ToolRegistry, default_tool_registry
 
 REFERENCE_PROFILE_ID: Final[str] = "flowspec2/reference@2"
 REFERENCE_DOMAIN_TYPES: Final[frozenset[str]] = frozenset(
-    {"categorical", "bool", "free_text", "cpf", "email", "name", "integer", "number"}
+    {"categorical", "bool", "free_text", "brazilian_tax_id", "email", "name", "integer", "number"}
 )
 REFERENCE_CAPABILITIES: Final[frozenset[str]] = frozenset(
     {

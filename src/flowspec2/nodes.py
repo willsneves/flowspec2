@@ -396,7 +396,7 @@ def make_await_external_node(
     ctx.await_external_nodes.add(node_id)
     resume_on = capability["resume_on"]
     prompt = step.get("prompt") or capability.get("prompt") or {}
-    description = prompt.get("text", "Conclua a ação externa para continuar.")
+    description = prompt.get("text", "Complete the external action to continue.")
     interactive = step.get("interactive") or capability.get("interactive") or {}
     on_resume = capability.get("on_resume") or {}
     token_bindings = on_resume.get("set") or {}
@@ -630,9 +630,9 @@ def make_await_external_node(
                     state.status = "completed"
                     state.agent_response = AgentResponse(
                         description={
-                            "abort": "A ação externa foi cancelada.",
-                            "timeout": "O prazo para concluir a ação externa terminou.",
-                        }.get(external_event, "A ação externa foi encerrada.")
+                            "abort": "The external action was canceled.",
+                            "timeout": "The external action deadline expired.",
+                        }.get(external_event, "The external action ended.")
                     )
                 else:
                     state.status = "progress"
@@ -882,7 +882,7 @@ def make_collect_node(
     slot = step["slot"]
     slot_cfg = ctx.slots[slot]
     model = ctx.model_for(slot)
-    prompt = (step.get("prompt") or {}).get("text", f"Informe {slot}.")
+    prompt = (step.get("prompt") or {}).get("text", f"Provide {slot}.")
     extract_hint = (step.get("prompt") or {}).get("extract_hint")
     if extract_hint:  # bake the hint into the schema description
         ctx.slot_models[slot] = make_slot_model(
@@ -947,7 +947,7 @@ def make_collect_node(
             state.agent_response = None
         elif on_exhaust == "handoff":
             state.agent_response = AgentResponse(
-                description="Vou te encaminhar para um atendente da Central 1746."
+                description="I will transfer you to a support agent."
             )
         elif on_exhaust == "END":
             mark_flow_finished(state, reset_next=True)
@@ -961,11 +961,11 @@ def make_collect_node(
                 context={"flow": state.service_name, "slot": slot},
             )
             state.agent_response = AgentResponse(
-                description="Não consegui prosseguir. Tente novamente mais tarde.",
+                description="I could not continue. Try again later.",
                 log_id=log_id,
             )
         else:  # reask
-            state.agent_response = ask(state, error="máximo de tentativas — vamos tentar de novo")
+            state.agent_response = ask(state, error="maximum attempts reached; let us try again")
             reset_attempts(state, slot)
         return state
 
@@ -1134,9 +1134,7 @@ def _confirmation_failure_action(
     if policy.on_exhaust == "default":
         return "default", cast(bool, policy.default)
     if policy.on_exhaust == "handoff":
-        state.agent_response = AgentResponse(
-            description="Vou te encaminhar para um atendente da Central 1746."
-        )
+        state.agent_response = AgentResponse(description="I will transfer you to a support agent.")
         return "pause", None
     if policy.on_exhaust == "END":
         mark_flow_finished(state, reset_next=True)
@@ -1150,7 +1148,7 @@ def _confirmation_failure_action(
             context={"flow": state.service_name, "slot": slot},
         )
         state.agent_response = AgentResponse(
-            description="Não consegui prosseguir. Tente novamente mais tarde.",
+            description="I could not continue. Try again later.",
             log_id=log_id,
         )
         return "pause", None
@@ -1163,9 +1161,9 @@ def make_summary_confirm_node(ctx: FlowContext, step: dict[str, Any]) -> NodeDes
     model = ctx.model_for(slot)
     field = (step.get("interactive") or {}).get("field", slot)
     interactive = step.get("interactive")
-    prompt = (step.get("prompt") or {}).get("text", "Confirma?")
+    prompt = (step.get("prompt") or {}).get("text", "Do you confirm?")
     skip_when = step.get("skip_when")
-    reject_msg = (step.get("on_reject") or {}).get("end", "Tudo bem, não vou prosseguir.")
+    reject_msg = (step.get("on_reject") or {}).get("end", "Understood. I will not continue.")
     policy = _confirmation_policy(ctx, slot, model)
 
     def ask(state: ServiceState, error: str | None = None) -> AgentResponse:
@@ -1253,7 +1251,7 @@ def make_bool_confirm_node(
     model = ctx.model_for(slot)
     field = (step.get("interactive") or {}).get("field", slot)
     interactive = step.get("interactive")
-    prompt = (step.get("prompt") or {}).get("text", "Confirma?")
+    prompt = (step.get("prompt") or {}).get("text", "Do you confirm?")
     policy = _confirmation_policy(ctx, slot, model)
 
     def ask(state: ServiceState, error: Optional[str] = None) -> AgentResponse:
@@ -1325,9 +1323,9 @@ def make_hub_confirm_node(ctx: FlowContext, confirm: dict[str, Any]) -> NodeDesc
     node_id = confirm["step"]
     slot = confirm["slot"]
     model = ctx.model_for(slot)
-    field = (confirm.get("interactive") or {}).get("field", "confirmacao")
+    field = (confirm.get("interactive") or {}).get("field", "confirmation")
     interactive = confirm.get("interactive")
-    prompt = (confirm.get("prompt") or {}).get("text", "Confirma os dados?")
+    prompt = (confirm.get("prompt") or {}).get("text", "Do you confirm the information?")
     correctable = confirm["correctable"]
     on_confirm = cast(str | None, confirm.get("on_confirm"))
     policy = _confirmation_policy(ctx, slot, model)
@@ -1362,7 +1360,7 @@ def make_hub_confirm_node(ctx: FlowContext, confirm: dict[str, Any]) -> NodeDesc
                 return state
             payload = state.payload or {}
             payload_has_slot, raw = _payload_slot_input(state, slot, field)
-            correction_target = payload.get("correcao")
+            correction_target = payload.get("correction")
             if correction_target is not None:
                 if isinstance(correction_target, str) and correction_target in correctable:
                     target = correction_target
@@ -1370,12 +1368,12 @@ def make_hub_confirm_node(ctx: FlowContext, confirm: dict[str, Any]) -> NodeDesc
                     state.internal[CORRECTION_REQUESTED_INTERNAL_KEY] = target
                     _clear_slot(state, slot, clear_payload=True)
                     _clear_payload_slot_input(state, slot, field)
-                    state.payload.pop("correcao", None)
+                    state.payload.pop("correction", None)
                     state.agent_response = None
                     return state
                 state.agent_response = ask(
                     state,
-                    description="O que você gostaria de corrigir? (" + ", ".join(correctable) + ")",
+                    description="What would you like to correct? (" + ", ".join(correctable) + ")",
                 )
                 return state
             if payload_has_slot and raw is not None:
@@ -1409,14 +1407,14 @@ def make_hub_confirm_node(ctx: FlowContext, confirm: dict[str, Any]) -> NodeDesc
                 _store_slot(state, slot, False, ctx)
                 state.agent_response = ask(
                     state,
-                    description="O que você gostaria de corrigir? (" + ", ".join(correctable) + ")",
+                    description="What would you like to correct? (" + ", ".join(correctable) + ")",
                 )
                 return state
             state.agent_response = ask(
                 state,
                 description=(
-                    f"O campo {unavailable_correction!r} não se aplica às respostas atuais. "
-                    "Confirme os dados ou escolha outro campo para corrigir."
+                    f"The field {unavailable_correction!r} does not apply to the current answers. "
+                    "Confirm the information or choose another field to correct."
                     if unavailable_correction is not None
                     else None
                 ),
@@ -1494,7 +1492,7 @@ def make_terminal_node(ctx: FlowContext, terminal: dict[str, Any]) -> NodeDesc:
                 state.status = "completed"
                 protocol = state.data.get("protocol_id", "")
                 state.agent_response = AgentResponse(
-                    description=result.get("message", f"✅ Pronto! Protocolo: {protocol}")
+                    description=result.get("message", f"✅ Done! Protocol: {protocol}")
                 )
             elif status == "retryable":
                 # Preserve by default so the next turn re-fires this node. When
@@ -1512,7 +1510,7 @@ def make_terminal_node(ctx: FlowContext, terminal: dict[str, Any]) -> NodeDesc:
                     context={"flow": state.service_name, "tool": tool},
                 )
                 state.agent_response = AgentResponse(
-                    description="O sistema está temporariamente indisponível. Pode tentar de novo em instantes?",
+                    description="The system is temporarily unavailable. Try again shortly.",
                     error_message=result.get("error"),
                     log_id=log_id,
                 )
@@ -1528,7 +1526,7 @@ def make_terminal_node(ctx: FlowContext, terminal: dict[str, Any]) -> NodeDesc:
                     context={"flow": state.service_name, "tool": tool},
                 )
                 state.agent_response = AgentResponse(
-                    description=result.get("message", "Não foi possível concluir agora."),
+                    description=result.get("message", "The request could not be completed now."),
                     error_message=result.get("error"),
                     log_id=log_id,
                 )

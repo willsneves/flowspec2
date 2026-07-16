@@ -43,7 +43,7 @@ def _loss_entries_by_path(preview_document: dict[str, Any]) -> dict[str, dict[st
 
 @pytest.mark.parametrize(
     "example_filename",
-    ["reparo_buraco.flow.json", "reparo_luminaria.flow.json"],
+    ["pothole_repair.flow.json", "streetlight_repair.flow.json"],
 )
 def test_real_v2_examples_migrate_to_schema_valid_previews(example_filename: str) -> None:
     source_document = load_flow(EXAMPLES_DIRECTORY / example_filename)
@@ -58,18 +58,18 @@ def test_real_v2_examples_migrate_to_schema_valid_previews(example_filename: str
 
 
 def test_migration_is_pure_deterministic_and_report_is_immutable(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    source_snapshot = copy.deepcopy(luminaria_doc)
+    source_snapshot = copy.deepcopy(streetlight_document)
 
-    first_report = migrate_v2_to_v3_preview_report(luminaria_doc)
-    second_report = migrate_v2_to_v3_preview_report(luminaria_doc)
+    first_report = migrate_v2_to_v3_preview_report(streetlight_document)
+    second_report = migrate_v2_to_v3_preview_report(streetlight_document)
 
-    assert luminaria_doc == source_snapshot
+    assert streetlight_document == source_snapshot
     assert first_report == second_report
     mutable_preview = first_report.preview_document
     mutable_preview["flow"] = "changed_by_caller"
-    assert first_report.preview_document["flow"] == "reparo_luminaria"
+    assert first_report.preview_document["flow"] == "streetlight_repair"
     mutable_fragment = first_report.loss_entries[0].source_fragment
     assert isinstance(mutable_fragment, dict)
     mutable_fragment["changed_by_caller"] = True
@@ -77,38 +77,38 @@ def test_migration_is_pure_deterministic_and_report_is_immutable(
 
 
 def test_migration_inlines_stable_options_and_typed_references(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    preview_document = migrate_v2_to_v3_preview(streetlight_document)
     collect_defect = next(
         preview_step
         for preview_step in preview_document["steps"]
-        if preview_step.get("collect") == "luminaria_defeito"
+        if preview_step.get("collect") == "streetlight_issue"
     )
-    apagada_option = next(
+    not_working_option = next(
         domain_option
         for domain_option in collect_defect["domain"]["options"]
-        if domain_option["value"] == "Apagada"
+        if domain_option["value"] == "Not working"
     )
     derive_step = _step_with_kind(preview_document, "derive")
     submit_step = _step_with_kind(preview_document, "submit")
 
-    assert apagada_option == {
-        "value": "Apagada",
-        "label": "Apagada",
-        "aliases": ["nao acende", "queimada", "sem luz"],
-        "description": "A luminária não acende / está sem luz",
+    assert not_working_option == {
+        "value": "Not working",
+        "label": "Not working",
+        "aliases": ["burned out", "does not turn on", "no light"],
+        "description": "The streetlight does not turn on",
     }
-    assert derive_step["from"][0] == {"$slot": "luminaria_defeito"}
-    assert derive_step["default"] == {"$slot": "luminaria_defeito"}
-    assert submit_step["input"]["defeitoLuminaria"] == {"$derive": "luminaria_defeito_classificado"}
-    assert submit_step["outputs"]["protocol_id"] == {"$result": "protocolo"}
+    assert derive_step["from"][0] == {"$slot": "streetlight_issue"}
+    assert derive_step["default"] == {"$slot": "streetlight_issue"}
+    assert submit_step["input"]["streetlightIssue"] == {"$derive": "classified_streetlight_issue"}
+    assert submit_step["outputs"]["protocol_id"] == {"$result": "protocol_id"}
 
 
 def test_migration_localizes_subflow_confirmation_derive_and_submit(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    preview_document = migrate_v2_to_v3_preview(streetlight_document)
     preview_steps = preview_document["steps"]
     address_use = next(
         preview_step for preview_step in preview_steps if preview_step.get("use") == "address@1"
@@ -126,7 +126,7 @@ def test_migration_localizes_subflow_confirmation_derive_and_submit(
     localization_index = next(
         step_index
         for step_index, preview_step in enumerate(preview_steps)
-        if preview_step.get("collect") == "luminaria_localizacao"
+        if preview_step.get("collect") == "streetlight_location"
     )
 
     assert address_use["with"] == {
@@ -134,16 +134,16 @@ def test_migration_localizes_subflow_confirmation_derive_and_submit(
         "needs_confirmation": True,
         "max_attempts": 3,
     }
-    assert confirmation_hub["correctable"][0] == {"$slot": "luminaria_defeito"}
+    assert confirmation_hub["correctable"][0] == {"$slot": "streetlight_issue"}
     assert confirmation_hub["on_confirm"] == {"$step": "open_ticket"}
     assert derive_index == localization_index + 1
-    assert preview_steps[-1]["submit"] == "sgrc_open_ticket"
+    assert preview_steps[-1]["submit"] == "open_service_request"
 
 
 def test_non_native_v2_fragments_are_preserved_and_reported(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    migration_report = migrate_v2_to_v3_preview_report(luminaria_doc)
+    migration_report = migrate_v2_to_v3_preview_report(streetlight_document)
     preview_document = migration_report.preview_document
     loss_entries = _loss_entries_by_path(preview_document)
     report_entries = {
@@ -156,13 +156,13 @@ def test_non_native_v2_fragments_are_preserved_and_reported(
         report_entries["/capabilities/await_external"].category
         is V3PreviewLossCategory.IMPLICIT_AWAIT_CAPABILITY
     )
-    assert loss_entries["/entry"]["source_fragment"] == luminaria_doc["entry"]
-    assert loss_entries["/auto_flow"]["source_fragment"] == luminaria_doc["auto_flow"]
+    assert loss_entries["/entry"]["source_fragment"] == streetlight_document["entry"]
+    assert loss_entries["/auto_flow"]["source_fragment"] == streetlight_document["auto_flow"]
     assert (
         loss_entries["/capabilities/await_external"]["source_fragment"]
-        == (luminaria_doc["capabilities"]["await_external"])
+        == (streetlight_document["capabilities"]["await_external"])
     )
-    for capability_name, capability_definition in luminaria_doc["capabilities"].items():
+    for capability_name, capability_definition in streetlight_document["capabilities"].items():
         capability_path = f"/capabilities/{capability_name}"
         if capability_name == "await_external":
             continue
@@ -185,12 +185,12 @@ def test_non_native_v2_fragments_are_preserved_and_reported(
 
 
 def test_compact_byte_report_is_neutral_measurement(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    migration_report = migrate_v2_to_v3_preview_report(luminaria_doc)
+    migration_report = migrate_v2_to_v3_preview_report(streetlight_document)
     compact_measurements = migration_report.compact_bytes
 
-    assert compact_measurements.source_bytes == compact_json_bytes(luminaria_doc)
+    assert compact_measurements.source_bytes == compact_json_bytes(streetlight_document)
     assert compact_measurements.preview_bytes == compact_json_bytes(
         migration_report.preview_document
     )
@@ -254,11 +254,11 @@ def test_shadowed_await_presentation_is_classified_for_rehydration() -> None:
 
 
 def test_mismatched_interactive_domain_is_classified_as_excluded(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    luminaria_doc["path"][1]["interactive"]["from_domain"] = "SimNao"
+    streetlight_document["path"][1]["interactive"]["from_domain"] = "YesNo"
 
-    migration_report = migrate_v2_to_v3_preview_report(luminaria_doc)
+    migration_report = migrate_v2_to_v3_preview_report(streetlight_document)
     mismatch_entry = next(
         loss_entry
         for loss_entry in migration_report.loss_entries
@@ -377,13 +377,13 @@ def test_legacy_interactive_gate_is_loss_accounted_not_promoted() -> None:
 
 
 def test_preview_schema_is_closed_and_references_are_single_key(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    preview_document = migrate_v2_to_v3_preview(streetlight_document)
     unexpected_top_level = copy.deepcopy(preview_document)
     unexpected_top_level["capabilities"] = {}
     unexpected_step_field = copy.deepcopy(preview_document)
-    unexpected_step_field["steps"][1]["domain_name"] = "LuminariaDefeito"
+    unexpected_step_field["steps"][1]["domain_name"] = "StreetlightIssue"
     malformed_reference = copy.deepcopy(preview_document)
     derive_step = _step_with_kind(malformed_reference, "derive")
     derive_step["from"][0]["label"] = "ambiguous"
@@ -397,9 +397,9 @@ def test_preview_schema_is_closed_and_references_are_single_key(
 
 
 def test_preview_boolean_domain_requires_canonical_option_values(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    preview_document = migrate_v2_to_v3_preview(streetlight_document)
     confirmation_step = next(
         preview_step
         for preview_step in preview_document["steps"]
@@ -437,9 +437,9 @@ def test_loss_policy_is_closed_and_matches_public_enums() -> None:
 
 
 def test_authored_preview_rejects_migration_loss_accounting(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    preview_document = migrate_v2_to_v3_preview(streetlight_document)
 
     with pytest.raises(V3PreviewValidationError) as validation_error:
         validate_v3_preview(preview_document)
@@ -465,9 +465,9 @@ def test_preview_validation_rejects_unknown_document_mode(validation_function: A
     ],
 )
 def test_migration_loss_accounting_enforces_policy_and_canonical_order(
-    luminaria_doc: dict[str, Any], mutation: str, expected_code: str
+    streetlight_document: dict[str, Any], mutation: str, expected_code: str
 ) -> None:
-    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    preview_document = migrate_v2_to_v3_preview(streetlight_document)
     loss_entries = preview_document["v2_passthrough"]["entries"]
     if mutation == "unknown_category":
         loss_entries[0]["category"] = "unknown_category"
@@ -492,8 +492,10 @@ def test_migration_loss_accounting_enforces_policy_and_canonical_order(
     assert expected_code in diagnostic_codes
 
 
-def test_migration_loss_entries_are_ordered_and_unique(luminaria_doc: dict[str, Any]) -> None:
-    migration_report = migrate_v2_to_v3_preview_report(luminaria_doc)
+def test_migration_loss_entries_are_ordered_and_unique(
+    streetlight_document: dict[str, Any],
+) -> None:
+    migration_report = migrate_v2_to_v3_preview_report(streetlight_document)
     source_paths = [loss_entry.source_path for loss_entry in migration_report.loss_entries]
 
     assert source_paths == sorted(source_paths)
@@ -504,11 +506,11 @@ def test_migration_loss_entries_are_ordered_and_unique(luminaria_doc: dict[str, 
     ]
 
 
-def test_migration_rejects_a_non_v2_source(luminaria_doc: dict[str, Any]) -> None:
-    luminaria_doc["schema"] = "flowspec/3-draft"
+def test_migration_rejects_a_non_v2_source(streetlight_document: dict[str, Any]) -> None:
+    streetlight_document["schema"] = "flowspec/3-draft"
 
     with pytest.raises(V3PreviewMigrationError, match="source schema must be"):
-        migrate_v2_to_v3_preview(luminaria_doc)
+        migrate_v2_to_v3_preview(streetlight_document)
 
 
 @pytest.mark.parametrize("domain_type", ["integer", "number"])
@@ -594,11 +596,11 @@ def test_nested_terminal_literals_preserve_dollar_prefixed_keys() -> None:
 
 
 def test_migration_materializes_implicit_confirmation_target(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    del luminaria_doc["confirm"]["on_confirm"]
+    del streetlight_document["confirm"]["on_confirm"]
 
-    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    preview_document = migrate_v2_to_v3_preview(streetlight_document)
     confirmation_step = next(
         preview_step
         for preview_step in preview_document["steps"]
@@ -609,13 +611,13 @@ def test_migration_materializes_implicit_confirmation_target(
 
 
 def test_migration_separates_nullable_acceptance_from_rendered_options(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    preview_document = migrate_v2_to_v3_preview(luminaria_doc)
+    preview_document = migrate_v2_to_v3_preview(streetlight_document)
     location_step = next(
         preview_step
         for preview_step in preview_document["steps"]
-        if preview_step.get("collect") == "luminaria_localizacao"
+        if preview_step.get("collect") == "streetlight_location"
     )
 
     assert location_step["domain"]["accepts_null"] is True
@@ -642,28 +644,28 @@ def test_migration_materializes_number_aliases_when_null_is_not_rendered() -> No
     preview_document = migrate_v2_to_v3_preview(source_document)
     domain = preview_document["steps"][0]["domain"]
 
-    assert domain["options"][0]["aliases"] == ["1", "um", "uma"]
-    assert domain["null_aliases"] == ["2", "dois", "duas"]
-    assert domain["options"][1]["aliases"] == ["3", "tres"]
+    assert domain["options"][0]["aliases"] == ["1", "one"]
+    assert domain["null_aliases"] == ["2", "two"]
+    assert domain["options"][1]["aliases"] == ["3", "three"]
     assert "normalize" not in domain
 
 
 def test_migration_requires_semantically_linked_v2_source(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    luminaria_doc["confirm"]["on_confirm"] = "missing_step"
+    streetlight_document["confirm"]["on_confirm"] = "missing_step"
 
     with pytest.raises(V3PreviewMigrationError, match="not semantically linked"):
-        migrate_v2_to_v3_preview(luminaria_doc)
+        migrate_v2_to_v3_preview(streetlight_document)
 
 
 def test_migration_rejects_ephemeral_collected_slot_persistence(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    luminaria_doc["slots"]["luminaria_defeito"]["persist"] = "payload"
+    streetlight_document["slots"]["streetlight_issue"]["persist"] = "payload"
 
     with pytest.raises(V3PreviewMigrationError, match="cannot survive a conversational pause"):
-        migrate_v2_to_v3_preview(luminaria_doc)
+        migrate_v2_to_v3_preview(streetlight_document)
 
 
 @pytest.mark.parametrize(
@@ -913,7 +915,7 @@ def test_check_v3_preview_reports_cross_step_and_value_contracts(
             "type": "bool",
             "options": [
                 {"value": True, "label": "Yes"},
-                {"value": False, "label": "No", "aliases": ["sim"]},
+                {"value": False, "label": "No", "aliases": ["yes"]},
             ],
             "normalize": {"affirmation": True},
         }

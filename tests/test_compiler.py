@@ -40,22 +40,22 @@ class _BrokenExposureSubflow:
 
 
 def test_compiler_discovers_slots_exposed_by_subflows(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    compiled_flow = compile_flow(luminaria_doc)
+    compiled_flow = compile_flow(streetlight_document)
 
     assert {
         "address": "collect_address",
-        "cpf": "collect_cpf",
+        "brazilian_tax_id": "collect_tax_id",
         "email": "collect_email",
         "name": "collect_name",
     }.items() <= compiled_flow.ctx.node_for_slot.items()
 
 
 def test_compiler_rejects_unknown_native_path_slot(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["path"][1]["slot"] = "unknown_slot"
 
     with pytest.raises(FlowLinkError, match="FLOWSPEC_SEMANTIC_UNKNOWN_NATIVE_PATH_SLOT"):
@@ -63,19 +63,19 @@ def test_compiler_rejects_unknown_native_path_slot(
 
 
 def test_compiler_rejects_unknown_required_slot(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
-    invalid_flow["slots"]["ponto_referencia"]["requires"] = ["unknown_slot"]
+    invalid_flow = copy.deepcopy(streetlight_document)
+    invalid_flow["slots"]["reference_point"]["requires"] = ["unknown_slot"]
 
     with pytest.raises(FlowLinkError, match="FLOWSPEC_SEMANTIC_UNKNOWN_REQUIRED_SLOT"):
         compile_flow(invalid_flow)
 
 
 def test_compiler_rejects_unknown_derive_source(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["derive"][0]["from"][0] = "unknown_slot"
 
     with pytest.raises(FlowLinkError, match="FLOWSPEC_SEMANTIC_UNKNOWN_DERIVE_SOURCE"):
@@ -83,9 +83,9 @@ def test_compiler_rejects_unknown_derive_source(
 
 
 def test_compiler_rejects_unknown_correctable_slot(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["confirm"]["correctable"][2] = "unknown_slot"
 
     with pytest.raises(FlowLinkError, match="FLOWSPEC_SEMANTIC_UNKNOWN_CORRECTABLE_SLOT"):
@@ -93,9 +93,9 @@ def test_compiler_rejects_unknown_correctable_slot(
 
 
 def test_compiler_rejects_unknown_terminal_input(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["terminal"]["input"][1]["slot"] = "unknown_slot"
 
     with pytest.raises(FlowLinkError, match="FLOWSPEC_SEMANTIC_UNKNOWN_TERMINAL_INPUT"):
@@ -103,9 +103,9 @@ def test_compiler_rejects_unknown_terminal_input(
 
 
 def test_compiler_rejects_conflicting_correctable_confirmation_definitions(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["confirm"]["interactive"]["field"] = "different_confirmation"
 
     with pytest.raises(
@@ -142,9 +142,9 @@ def test_compiler_rejects_subflow_exposure_bound_to_unknown_node() -> None:
 
 
 def test_compiler_requires_confirm_block_for_correctable_path(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow.pop("confirm")
 
     with pytest.raises(ValueError, match="requires the top-level confirm block"):
@@ -152,9 +152,9 @@ def test_compiler_requires_confirm_block_for_correctable_path(
 
 
 def test_compiler_rejects_unknown_override_gate(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["overrides"]["gates"]["missing_step"] = {"eq": ["slots.x", True]}
 
     with pytest.raises(FlowLinkError, match="FLOWSPEC_SEMANTIC_UNKNOWN_GATE_STEP"):
@@ -162,9 +162,9 @@ def test_compiler_rejects_unknown_override_gate(
 
 
 def test_compiler_rejects_unknown_derive_anchor(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["derive"][0]["after"] = "missing_step"
 
     with pytest.raises(FlowLinkError, match="FLOWSPEC_SEMANTIC_UNKNOWN_DERIVE_ANCHOR"):
@@ -172,50 +172,50 @@ def test_compiler_rejects_unknown_derive_anchor(
 
 
 def test_compiler_rejects_duplicate_inline_and_override_gate(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    invalid_flow["path"][0]["ask_when"] = {"is_present": "slots.buraco_tamanho"}
-    invalid_flow["overrides"] = {"gates": {"collect_tipo": {"is_present": "slots.buraco_tamanho"}}}
+    invalid_flow = copy.deepcopy(pothole_document)
+    invalid_flow["path"][0]["ask_when"] = {"is_present": "slots.pothole_size"}
+    invalid_flow["overrides"] = {"gates": {"collect_type": {"is_present": "slots.pothole_size"}}}
 
     with pytest.raises(FlowLinkError, match="FLOWSPEC_SEMANTIC_DUPLICATE_GATE_SOURCE"):
         compile_flow(invalid_flow)
 
 
 def test_compiler_preserves_declaration_order_for_shared_derive_anchor(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     flow_document["derive"].append(
         {
             "writes": "second_classification",
-            "from": ["luminaria_defeito"],
-            "after": "collect_localizacao",
-            "lookup": {"Apagada": "secondary"},
+            "from": ["streetlight_issue"],
+            "after": "collect_location",
+            "lookup": {"Not working": "secondary"},
             "default": "$from[0]",
         }
     )
 
     graph_node_ids = list(compile_flow(flow_document).graph.get_graph().nodes)
 
-    first_derive_index = graph_node_ids.index("derive_luminaria_defeito_classificado")
+    first_derive_index = graph_node_ids.index("derive_classified_streetlight_issue")
     second_derive_index = graph_node_ids.index("derive_second_classification")
     assert first_derive_index < second_derive_index
 
 
 def test_compiler_honors_custom_path_derive_step_id(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    flow_document = copy.deepcopy(luminaria_doc)
+    flow_document = copy.deepcopy(streetlight_document)
     flow_document["path"].insert(
         -1,
-        {"step": "custom_classification", "derive": "luminaria_defeito_classificado"},
+        {"step": "custom_classification", "derive": "classified_streetlight_issue"},
     )
 
     compiled_flow = compile_flow(flow_document)
 
     assert "custom_classification" in compiled_flow.graph.get_graph().nodes
-    assert "derive_luminaria_defeito_classificado" not in compiled_flow.graph.get_graph().nodes
+    assert "derive_classified_streetlight_issue" not in compiled_flow.graph.get_graph().nodes
 
 
 def test_compiler_rejects_derive_before_its_derived_source() -> None:
@@ -272,24 +272,24 @@ def test_compiler_builds_transitive_derive_invalidation_index() -> None:
 
 
 def test_compiler_rejects_non_boolean_confirmation_domain(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    invalid_flow["slots"]["ticket_data_confirmed"]["domain"] = "Tamanho"
+    invalid_flow = copy.deepcopy(pothole_document)
+    invalid_flow["slots"]["ticket_data_confirmed"]["domain"] = "Size"
 
     with pytest.raises(ValueError, match="must use a bool domain"):
         compile_flow(invalid_flow)
 
 
 def test_compiler_rejects_non_renderable_interactive_domain(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    invalid_flow["domains"]["Tamanho"] = {"type": "integer"}
+    invalid_flow = copy.deepcopy(pothole_document)
+    invalid_flow["domains"]["Size"] = {"type": "integer"}
     invalid_flow["terminal"]["input"] = [
         input_binding
         for input_binding in invalid_flow["terminal"]["input"]
-        if input_binding["slot"] != "buraco_tamanho"
+        if input_binding["slot"] != "pothole_size"
     ]
 
     with pytest.raises(
@@ -300,9 +300,9 @@ def test_compiler_rejects_non_renderable_interactive_domain(
 
 
 def test_compiler_validates_embedded_entry_args_schema(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["route"]["entry_args_schema"] = {"type": 42}
 
     with pytest.raises(ValueError, match="not a valid Draft 2020-12 schema"):

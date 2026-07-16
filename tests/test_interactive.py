@@ -30,8 +30,8 @@ INTERACTIVE_FIXTURES = Path(__file__).with_name("fixtures") / "interactive"
 CONDITIONAL_OPTIONS_FLOW = INTERACTIVE_FIXTURES / "conditional_options.flow.json"
 BOOLEAN_OPTIONS_FLOW = INTERACTIVE_FIXTURES / "boolean_options.flow.json"
 BOOLEAN_BUTTONS = [
-    {"id": "true", "title": "Sim"},
-    {"id": "false", "title": "Não"},
+    {"id": "true", "title": "Yes"},
+    {"id": "false", "title": "No"},
 ]
 
 
@@ -110,7 +110,7 @@ async def test_boolean_options_when_uses_boolean_domain_tokens() -> None:
     state = await runtime.execute(runtime.new_state("boolean-visibility"), {})
 
     assert state.agent_response is not None
-    assert _buttons(state.agent_response.interactive) == [{"id": "true", "title": "Sim"}]
+    assert _buttons(state.agent_response.interactive) == [{"id": "true", "title": "Yes"}]
 
 
 async def test_summary_without_interactive_exposes_and_enforces_boolean_schema() -> None:
@@ -155,10 +155,10 @@ async def test_hub_without_interactive_offers_exclusive_boolean_or_correction_sc
     assert state.agent_response.payload_schema is not None
     assert state.agent_response.payload_schema[CORRECTION_TARGETS_SCHEMA_KEY] == ["boolean_choice"]
     response_schema = _extraction_response_schema(state.agent_response)
-    assert response_schema["properties"]["correcao"] == {"enum": ["boolean_choice"]}
+    assert response_schema["properties"]["correction"] == {"enum": ["boolean_choice"]}
     assert {tuple(branch["required"]) for branch in response_schema["oneOf"]} == {
         ("hub_confirmed",),
-        ("correcao",),
+        ("correction",),
     }
 
 
@@ -174,13 +174,13 @@ async def test_correction_hub_rejects_fuzzy_target_and_accepts_exact_slot_id() -
     )
     state.metadata.saved = True
 
-    state = await runtime.execute(state, {"correcao": "choice"})
+    state = await runtime.execute(state, {"correction": "choice"})
 
     assert state.agent_response is not None
     assert state.data["boolean_choice"] is True
     assert CORRECTION_REQUESTED_INTERNAL_KEY not in state.internal
 
-    state = await runtime.execute(state, {"correcao": "boolean_choice"})
+    state = await runtime.execute(state, {"correction": "boolean_choice"})
 
     assert state.agent_response is not None
     assert "boolean_choice" not in state.data
@@ -249,16 +249,16 @@ async def test_conflicting_slot_and_interactive_payload_fields_fail_with_log_id(
 
 
 def test_button_builder_preserves_unicode_at_limits_and_never_truncates() -> None:
-    body = "á" * BODY_MAX
-    title = "ç" * BUTTON_TITLE_MAX
+    body = "★" * BODY_MAX
+    title = "●" * BUTTON_TITLE_MAX
 
     envelope = build_buttons(body, [{"id": "choice", "title": title}])
 
     assert envelope["status"] == "ok"
     assert envelope["interactive"]["body"]["text"] == body
     assert envelope["interactive"]["action"]["buttons"][0]["reply"]["title"] == title
-    assert build_buttons(f"{body}á", [{"id": "choice", "title": title}])["status"] == ("error")
-    assert build_buttons(body, [{"id": "choice", "title": f"{title}ç"}])["status"] == ("error")
+    assert build_buttons(f"{body}★", [{"id": "choice", "title": title}])["status"] == ("error")
+    assert build_buttons(body, [{"id": "choice", "title": f"{title}●"}])["status"] == ("error")
 
 
 @pytest.mark.parametrize("invalid_identifier", ["", "   ", "x" * (BUTTON_ID_MAX + 1)])
@@ -281,12 +281,12 @@ def test_button_builder_rejects_duplicate_identifiers() -> None:
 
 
 def test_list_builder_preserves_unicode_at_limits_and_never_truncates() -> None:
-    body = "á" * BODY_MAX
-    title = "ç" * ROW_TITLE_MAX
-    description = "ê" * ROW_DESC_MAX
+    body = "★" * BODY_MAX
+    title = "●" * ROW_TITLE_MAX
+    description = "◆" * ROW_DESC_MAX
     sections = [
         {
-            "title": "Opções",
+            "title": "Options",
             "rows": [{"id": "choice", "title": title, "description": description}],
         }
     ]
@@ -297,10 +297,10 @@ def test_list_builder_preserves_unicode_at_limits_and_never_truncates() -> None:
     assert envelope["interactive"]["body"]["text"] == body
     assert envelope["interactive"]["action"]["sections"] == sections
     overlong_title = copy.deepcopy(sections)
-    overlong_title[0]["rows"][0]["title"] += "ç"
+    overlong_title[0]["rows"][0]["title"] += "●"
     assert build_list(body, overlong_title)["status"] == "error"
     overlong_description = copy.deepcopy(sections)
-    overlong_description[0]["rows"][0]["description"] += "ê"
+    overlong_description[0]["rows"][0]["description"] += "◆"
     assert build_list(body, overlong_description)["status"] == "error"
 
 
@@ -365,11 +365,11 @@ def test_compiler_validates_unicode_list_row_title_and_description_lengths() -> 
     boundary_interactive.pop("options_when")
     boundary_document["domains"]["IdentificationChoice"] = {
         "type": "categorical",
-        "values": ["á" * ROW_TITLE_MAX],
+        "values": ["★" * ROW_TITLE_MAX],
         "rows": [
             {
-                "value": "á" * ROW_TITLE_MAX,
-                "description": "ç" * ROW_DESC_MAX,
+                "value": "★" * ROW_TITLE_MAX,
+                "description": "●" * ROW_DESC_MAX,
             }
         ],
     }
@@ -378,9 +378,9 @@ def test_compiler_validates_unicode_list_row_title_and_description_lengths() -> 
 
     overlong_title_document = copy.deepcopy(boundary_document)
     overlong_title_document["domains"]["IdentificationChoice"]["values"] = [
-        "á" * (ROW_TITLE_MAX + 1)
+        "★" * (ROW_TITLE_MAX + 1)
     ]
-    overlong_title_document["domains"]["IdentificationChoice"]["rows"][0]["value"] = "á" * (
+    overlong_title_document["domains"]["IdentificationChoice"]["rows"][0]["value"] = "★" * (
         ROW_TITLE_MAX + 1
     )
     with pytest.raises(ValueError, match="list row title that is too long"):
@@ -388,7 +388,7 @@ def test_compiler_validates_unicode_list_row_title_and_description_lengths() -> 
 
     overlong_description_document = copy.deepcopy(boundary_document)
     overlong_description_document["domains"]["IdentificationChoice"]["rows"][0]["description"] += (
-        "ç"
+        "●"
     )
     with pytest.raises(ValueError, match="list row description that is too long"):
         compile_flow(overlong_description_document)

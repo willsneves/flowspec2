@@ -14,10 +14,10 @@
       "description": "RAIL. First-class service-identity metadata, decoupled from executable nodes. Carries service catalog codes, slugs, and knowledge identifiers; authors declare these values here instead of synthesizing an initialization node.",
       "type": "object", "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "description": "SGRC/1746 service id, e.g. '18131'." },
-        "codigo_servico_1746": { "type": "string" },
+        "id": { "type": "string", "description": "ticketing system/1746 service id, e.g. '18131'." },
+        "service_code": { "type": "string" },
         "knowledge_service_id": { "type": "string", "description": "Knowledge-hub id for best-effort context load." },
-        "identificacao_obrigatoria_1746": { "type": "boolean", "default": false },
+        "identification_required": { "type": "boolean", "default": false },
         "slugs": { "type": "array", "items": { "type": "string" }, "description": "RAIL. Catalog/service-detail slug(s) this flow serves. A host app auto-exposes the guided flow for any service whose slug is listed here, so adding a guided flow is just dropping a JSON with its slug(s) — no host code change. Several slugs may point at one flow." }
       }
     },
@@ -49,7 +49,7 @@
       }
     },
     "domains": {
-      "description": "RAIL + the SPINE. The closed value-domain registry materializes the Pydantic before-validator, AgentResponse.payload_schema, interactive button titles, and interactive list rows. Categorical options come from values/rows; bool options expose true/false with Sim/Não titles. Declaring a domain once is the entire structure/execution boundary: values are the rail and free-text-to-token extraction is LLM work. The validator prevents widening the domain. normalize is the only LLM-facing hint and is still deterministically enforced.",
+      "description": "RAIL + the SPINE. The closed value-domain registry materializes the Pydantic before-validator, AgentResponse.payload_schema, interactive button titles, and interactive list rows. Categorical options come from values/rows; bool options expose true/false with Yes/No titles. Declaring a domain once is the entire structure/execution boundary: values are the rail and free-text-to-token extraction is LLM work. The validator prevents widening the domain. normalize is the only LLM-facing hint and is still deterministically enforced.",
       "type": "object", "minProperties": 1,
       "propertyNames": { "$ref": "#/$defs/domainIdentifier" },
       "additionalProperties": {
@@ -109,9 +109,9 @@
             }
           },
           {
-            "title": "CPF domain",
+            "title": "Brazilian tax ID domain",
             "type": "object", "additionalProperties": false, "required": ["type"],
-            "properties": { "type": { "const": "cpf" } }
+            "properties": { "type": { "const": "brazilian_tax_id" } }
           },
           {
             "title": "Email domain",
@@ -503,7 +503,7 @@
       }
     },
     "deriveDef": {
-      "description": "RAIL. A computed value. Lookup table keyed by '|'.join(from-values) (null member => empty segment, e.g. 'Pendurada||'). default is a literal or the single sigil $from[i] (the i-th source value). after = the step id this derive runs immediately after.",
+      "description": "RAIL. A computed value. Lookup table keyed by '|'.join(from-values) (null member => empty segment, e.g. 'Hanging||'). default is a literal or the single sigil $from[i] (the i-th source value). after = the step id this derive runs immediately after.",
       "type": "object", "additionalProperties": false, "required": ["writes", "from", "lookup"],
       "properties": {
         "writes": { "$ref": "#/$defs/identifier", "description": "data key the result is written to (a derived slot, never asked)." },
@@ -520,7 +520,7 @@
         "slot": { "$ref": "#/$defs/identifier", "description": "bool slot that records confirmation." },
         "prompt": { "$ref": "#/$defs/promptDef", "description": "Compatibility copy of the matching correctable path prompt; when both are present they must be identical." },
         "interactive": { "$ref": "#/$defs/choiceInteractiveDef", "description": "Compatibility copy of the matching correctable path interactive definition; when both are present they must be identical." },
-        "on_confirm": { "$ref": "#/$defs/identifier", "description": "step/anchor to go to on Sim (usually the terminal/sgrc anchor)." },
+        "on_confirm": { "$ref": "#/$defs/identifier", "description": "step/anchor to go to on Yes (usually the terminal/requests anchor)." },
         "correctable": { "description": "RAIL. The set of directly-correctable slots. The constrained decoder must return one exact identifier from this closed set; the compiler routes to its node and clears it + its transitive requires[]-dependents + reading derives. No clears[] list is hand-declared.", "type": "array", "items": { "$ref": "#/$defs/identifier" }, "minItems": 1, "uniqueItems": true }
       }
     },
@@ -528,10 +528,10 @@
       "type": "object", "additionalProperties": false, "required": ["step", "tool", "idempotent", "outcomes"],
       "properties": {
         "step": { "$ref": "#/$defs/identifier", "description": "node id (e.g. open_ticket)." },
-        "tool": { "$ref": "#/$defs/identifier", "description": "registered fulfillment tool (e.g. sgrc_open_ticket)." },
+        "tool": { "$ref": "#/$defs/identifier", "description": "registered fulfillment tool (e.g. open_service_request)." },
         "idempotent": { "type": "boolean", "description": "true => compiler computes sha256 key over inputs + replay-caches. Recipe stays in library." },
         "input": { "description": "RAIL. param -> slot binding for the tool call.", "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["param", "slot"], "properties": { "param": { "$ref": "#/$defs/fieldIdentifier" }, "slot": { "$ref": "#/$defs/identifier" } } } },
-        "outputs": { "description": "RAIL. Mapping from destination state key to a canonical result.* tool-result path (e.g. protocol_id: result.protocolo).", "type": "object", "propertyNames": { "$ref": "#/$defs/identifier" }, "additionalProperties": { "type": "string", "pattern": "^result\\.[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)*$" } },
+        "outputs": { "description": "RAIL. Mapping from destination state key to a canonical result.* tool-result path (e.g. protocol_id: result.protocol_id).", "type": "object", "propertyNames": { "$ref": "#/$defs/identifier" }, "additionalProperties": { "type": "string", "pattern": "^result\\.[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)*$" } },
         "outcomes": {
           "description": "RAIL. The outcome trichotomy. success: set+reset_next. retryable: preserve_state, re-enter. fatal: reset_next, END.",
           "type": "object", "additionalProperties": false, "required": ["success", "retryable", "fatal"],
@@ -548,7 +548,7 @@
       "type": "object", "additionalProperties": false, "required": ["meta_flow_ref", "send_when", "recovery"],
       "properties": {
         "meta_flow_ref": { "$ref": "#/$defs/fieldIdentifier", "description": "registered Meta Flow id (config.yaml whatsapp.flow.registry)." },
-        "send_when": { "$ref": "#/$defs/predicate", "description": "send the Flow envelope (pre-graph) iff true, e.g. not is_present(slots.luminaria_defeito)." },
+        "send_when": { "$ref": "#/$defs/predicate", "description": "send the Flow envelope (pre-graph) iff true, e.g. not is_present(slots.streetlight_issue)." },
         "prefill_from": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" }, "description": "slots carried into flow_token (${data.X} prefill)." },
         "resume_at": { "$ref": "#/$defs/identifier", "description": "path step id to resume at after nfm_reply submission." },
         "on_submit_source": { "type": "string", "const": "whatsapp_flow" },

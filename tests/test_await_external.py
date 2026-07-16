@@ -34,7 +34,7 @@ def _await_flow() -> dict[str, Any]:
             {
                 "step": "await_payment",
                 "await_external": True,
-                "prompt": {"text": "Complete o pagamento."},
+                "prompt": {"text": "Complete the payment."},
                 "interactive": {
                     "kind": "cta_url",
                     "field": "payment_token",
@@ -44,7 +44,7 @@ def _await_flow() -> dict[str, Any]:
             {
                 "step": "collect_fallback_reference",
                 "slot": "fallback_reference",
-                "prompt": {"text": "Informe a referência alternativa."},
+                "prompt": {"text": "Provide the alternate reference."},
             },
         ],
         "capabilities": {
@@ -169,7 +169,7 @@ async def test_explicit_path_wait_maps_token_and_enrichment_result_atomically():
     assert state.data["payment_source"] == "external"
     assert state.data["payment_confirmed"] is True
     assert state.data["receipt_code"] == "REC-42"
-    assert "referência alternativa" in require_agent_response(state).description
+    assert "alternate reference" in require_agent_response(state).description
 
     state = await runtime.execute(state, {"fallback_reference": "manual-8"})
     assert state.status == "completed"
@@ -394,7 +394,7 @@ async def test_required_enrichment_can_recover_on_the_next_token_turn():
     assert state.status == "progress"
     assert state.data["payment_id"] == "PAY-7"
     assert state.data["receipt_code"] == "REC-RECOVERED"
-    assert "referência alternativa" in require_agent_response(state).description
+    assert "alternate reference" in require_agent_response(state).description
 
 
 async def test_optional_enrichment_failure_is_logged_and_keeps_token_writes(caplog):
@@ -429,7 +429,7 @@ async def test_duplicate_resume_with_ignore_policy_does_not_repeat_enrichment():
     assert state.status == "progress"
     assert calls == [{"payment_id": "PAY-7", "attempt": 1}]
     assert state.data["payment_id"] == "PAY-7"
-    assert "referência alternativa" in require_agent_response(state).description
+    assert "alternate reference" in require_agent_response(state).description
 
 
 async def test_duplicate_resume_with_reject_policy_is_atomic():
@@ -477,7 +477,7 @@ async def test_different_correlation_uses_declared_late_policy_atomically(
             require_agent_response(state).error_message or ""
         )
     else:
-        assert "referência alternativa" in require_agent_response(state).description
+        assert "alternate reference" in require_agent_response(state).description
 
 
 async def test_completed_lifecycle_classifies_duplicate_before_reset():
@@ -524,10 +524,10 @@ async def test_timeout_requires_a_host_event_and_resend_reemits_the_marker():
     assert state.metadata.await_resume is not None
     assert state.metadata.await_resume.deadline == initial_deadline
 
-    state = await runtime.execute(state, {"message": "ainda estou pagando"})
+    state = await runtime.execute(state, {"message": "I am still paying"})
     assert "payment_timed_out" not in state.data
     assert require_agent_response(state).interactive is None
-    assert "Complete o pagamento" in require_agent_response(state).description
+    assert "Complete the payment" in require_agent_response(state).description
 
     state = await runtime.execute(state, {"_external_event": "resend"})
     assert (require_agent_response(state).interactive or {})["out_of_band_sent"] is True
@@ -535,7 +535,7 @@ async def test_timeout_requires_a_host_event_and_resend_reemits_the_marker():
     current_time[0] = initial_deadline
     state = await runtime.execute(state, {"_external_event": "timeout"})
     assert state.data["payment_timed_out"] is True
-    assert "referência alternativa" in require_agent_response(state).description
+    assert "alternate reference" in require_agent_response(state).description
 
 
 async def test_declared_resend_budget_is_persisted_exposed_and_enforced_atomically():
@@ -656,9 +656,9 @@ async def test_configured_recovery_events_route_atomically(
     assert state.data[expected_key] is True
     assert state.status == expected_status
     if event == "switch":
-        assert "referência alternativa" in require_agent_response(state).description
+        assert "alternate reference" in require_agent_response(state).description
     else:
-        assert require_agent_response(state).description == "A ação externa foi cancelada."
+        assert require_agent_response(state).description == "The external action was canceled."
 
 
 async def test_end_recovery_resets_the_flow_on_the_next_call():
@@ -792,36 +792,38 @@ def _govbr_resume_contract() -> dict[str, Any]:
             "type": "object",
             "additionalProperties": False,
             "properties": {
-                "cpf": {"type": "string", "pattern": "^[0-9]{11}$"},
-                "nome": {"type": "string", "minLength": 2},
+                "brazilian_tax_id": {"type": "string", "pattern": "^[0-9]{11}$"},
+                "name": {"type": "string", "minLength": 2},
                 "email": {"type": "string", "format": "email"},
             },
-            "required": ["cpf"],
+            "required": ["brazilian_tax_id"],
         },
-        "correlation": "$token.cpf",
+        "correlation": "$token.brazilian_tax_id",
         "duplicate": "ignore",
         "late": "reject",
     }
 
 
-async def test_legacy_cpf_lookup_failure_is_logged_best_effort(caplog):
+async def test_legacy_brazilian_tax_id_lookup_failure_is_logged_best_effort(caplog):
     registry = default_tool_registry()
 
-    async def failing_cpf_lookup(**_: Any) -> dict[str, Any]:
+    async def failing_brazilian_tax_id_lookup(**_: Any) -> dict[str, Any]:
         raise RuntimeError("registry unavailable")
 
-    registry.register("cpf_lookup", failing_cpf_lookup)
+    registry.register("brazilian_tax_id_lookup", failing_brazilian_tax_id_lookup)
     runtime = FlowRuntime(_identification_flow(), tools=registry)
-    state = await runtime.execute(runtime.new_state("citizen"), {"identification_method": "cpf"})
+    state = await runtime.execute(
+        runtime.new_state("citizen"), {"identification_method": "brazilian_tax_id"}
+    )
 
     with caplog.at_level(logging.WARNING, logger="flowspec2.subflows.identification"):
-        state = await runtime.execute(state, {"cpf": "52998224725"})
+        state = await runtime.execute(state, {"brazilian_tax_id": "52998224725"})
 
-    assert state.data["cpf"] == "52998224725"
-    assert "e-mail" in require_agent_response(state).description.lower()
+    assert state.data["brazilian_tax_id"] == "52998224725"
+    assert "email" in require_agent_response(state).description.lower()
     assert any(
         record.message == "Optional identification enrichment failed"
-        and getattr(record, "tool", None) == "cpf_lookup"
+        and getattr(record, "tool", None) == "brazilian_tax_id_lookup"
         and str(getattr(record, "log_id", "")).isdigit()
         for record in caplog.records
     )
@@ -842,9 +844,9 @@ async def test_legacy_govbr_enrichment_failure_is_logged_best_effort(caplog):
             state,
             {
                 "govbr_token": {
-                    "cpf": "52998224725",
-                    "nome": "Maria Silva",
-                    "email": "maria@example.com",
+                    "brazilian_tax_id": "52998224725",
+                    "name": "Mary Smith",
+                    "email": "mary@example.com",
                 }
             },
         )
@@ -865,22 +867,22 @@ async def test_malformed_optional_tool_results_are_logged_and_ignored(caplog):
     async def malformed_result(**_: Any) -> list[str]:
         return ["not", "an", "object"]
 
-    registry.register("cpf_lookup", cast(Tool, malformed_result))
+    registry.register("brazilian_tax_id_lookup", cast(Tool, malformed_result))
     registry.register("get_user_info", cast(Tool, malformed_result))
     runtime = FlowRuntime(_identification_flow(), tools=registry)
 
-    cpf_state = await runtime.execute(
-        runtime.new_state("cpf-citizen"),
-        {"identification_method": "cpf"},
+    tax_id_state = await runtime.execute(
+        runtime.new_state("brazilian_tax_id-citizen"),
+        {"identification_method": "brazilian_tax_id"},
     )
     with caplog.at_level(
         logging.WARNING,
         logger="flowspec2.subflows.identification",
     ):
-        cpf_state = await runtime.execute(cpf_state, {"cpf": "52998224725"})
+        tax_id_state = await runtime.execute(tax_id_state, {"brazilian_tax_id": "52998224725"})
 
-    assert cpf_state.data["cpf"] == "52998224725"
-    assert "e-mail" in require_agent_response(cpf_state).description.lower()
+    assert tax_id_state.data["brazilian_tax_id"] == "52998224725"
+    assert "email" in require_agent_response(tax_id_state).description.lower()
 
     govbr_state = await runtime.execute(
         runtime.new_state("govbr-citizen"),
@@ -888,7 +890,7 @@ async def test_malformed_optional_tool_results_are_logged_and_ignored(caplog):
     )
     govbr_state = await runtime.execute(
         govbr_state,
-        {"govbr_token": {"cpf": "52998224725"}},
+        {"govbr_token": {"brazilian_tax_id": "52998224725"}},
     )
 
     assert govbr_state.data["govbr_authenticated"] is True
@@ -929,15 +931,15 @@ async def test_legacy_invalid_govbr_response_has_correlated_log_id():
         {"identification_method": "govbr"},
     )
 
-    state = await runtime.execute(state, {"govbr_token": {"nome": "Untrusted"}})
+    state = await runtime.execute(state, {"govbr_token": {"name": "Untrusted"}})
 
     agent_response = require_agent_response(state)
-    assert "cpf" in agent_response.description.lower()
+    assert "brazilian tax id" in agent_response.description.lower()
     assert agent_response.log_id is not None
     assert agent_response.log_id.isdigit()
 
 
-async def test_govbr_token_without_cpf_has_no_writes_or_enrichment():
+async def test_govbr_token_without_brazilian_tax_id_has_no_writes_or_enrichment():
     flow_document = _identification_flow()
     flow_document["capabilities"] = {
         "await_external": {
@@ -946,19 +948,19 @@ async def test_govbr_token_without_cpf_has_no_writes_or_enrichment():
             "resume": _govbr_resume_contract(),
             "on_resume": {
                 "set": {
-                    "cpf": "$token.cpf",
-                    "name": "$token.nome",
+                    "brazilian_tax_id": "$token.brazilian_tax_id",
+                    "name": "$token.name",
                     "email": "$token.email",
                 },
                 "enrich": {
                     "tool": "get_user_info",
                     "optional": True,
-                    "input": {"cpf": "$token.cpf"},
+                    "input": {"brazilian_tax_id": "$token.brazilian_tax_id"},
                     "set": {"phone": "$result.phones.0"},
                 },
             },
             "recovery": {
-                "switch": {"goto": "collect_cpf"},
+                "switch": {"goto": "collect_tax_id"},
             },
         }
     }
@@ -979,15 +981,15 @@ async def test_govbr_token_without_cpf_has_no_writes_or_enrichment():
 
     state = await runtime.execute(
         state,
-        {"govbr_token": {"nome": "Untrusted", "email": "bad@example.com"}},
+        {"govbr_token": {"name": "Untrusted", "email": "bad@example.com"}},
     )
 
     assert enrichment_calls == 0
-    assert state.data["identification_method"] == "cpf"
+    assert state.data["identification_method"] == "brazilian_tax_id"
     assert "name" not in state.data
     assert "email" not in state.data
     assert "phone" not in state.data
-    assert "cpf" in require_agent_response(state).description.lower()
+    assert "brazilian tax id" in require_agent_response(state).description.lower()
 
 
 async def test_typed_subflow_wait_binding_and_enrichment_execute():
@@ -999,21 +1001,21 @@ async def test_typed_subflow_wait_binding_and_enrichment_execute():
             "resume": _govbr_resume_contract(),
             "on_resume": {
                 "set": {
-                    "cpf": "$token.cpf",
-                    "name": "$token.nome",
+                    "brazilian_tax_id": "$token.brazilian_tax_id",
+                    "name": "$token.name",
                     "email": "$token.email",
                 },
                 "enrich": {
                     "tool": "get_user_info",
                     "optional": True,
-                    "input": {"cpf": "$token.cpf"},
+                    "input": {"brazilian_tax_id": "$token.brazilian_tax_id"},
                     "set": {"phone": "$result.phones.0"},
                 },
             },
             "recovery": {
                 "abort": {"goto": "select_identification_method"},
                 "resend": {"goto": "authenticate_govbr"},
-                "switch": {"goto": "collect_cpf"},
+                "switch": {"goto": "collect_tax_id"},
             },
         }
     }
@@ -1024,9 +1026,9 @@ async def test_typed_subflow_wait_binding_and_enrichment_execute():
         state,
         {
             "govbr_token": {
-                "cpf": "52998224725",
-                "nome": "Maria Silva",
-                "email": "maria@example.com",
+                "brazilian_tax_id": "52998224725",
+                "name": "Mary Smith",
+                "email": "mary@example.com",
             }
         },
     )

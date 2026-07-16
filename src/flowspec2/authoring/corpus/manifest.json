@@ -10,7 +10,7 @@
     {
       "identifier": "await_and_correction",
       "path": "await_correction.case.json",
-      "sha256": "68d254106aa2ee68c8de41df849b2d3ba618388f63b6322ff7330c231939ff6c"
+      "sha256": "d36e8f98ce9832029595600b093a062e29ff34d37bd84c5a3c9ada87a5745711"
     },
     {
       "identifier": "gated_derivation",
@@ -25,7 +25,7 @@
     {
       "identifier": "terminal_fulfillment",
       "path": "terminal.case.json",
-      "sha256": "a745731bd94d9a098ac387b384e51e8118d6b5acc5b1dad01ef66ebb369fcb61"
+      "sha256": "988b703c5d595346b9a3c0c0fdded54aea74b02d967a6c3330553c183d18da91"
     }
   ]
 }

@@ -165,7 +165,7 @@ def derive_contracts(
             ):
                 return False
             return True
-        string_kinds = {"cpf", "email", "name", "free_text"}
+        string_kinds = {"brazilian_tax_id", "email", "name", "free_text"}
         if source_kind not in string_kinds or target_kind not in string_kinds:
             return False if source_kind != target_kind else None
         if target_kind == "free_text":
@@ -174,7 +174,7 @@ def derive_contracts(
             return source_kind != "free_text" or not source_domain.get("optional")
         if source_kind == target_kind:
             return True
-        if source_kind == "cpf" and target_kind == "name":
+        if source_kind == "brazilian_tax_id" and target_kind == "name":
             return True
         return False
 

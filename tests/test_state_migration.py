@@ -31,7 +31,7 @@ def _flow_ir_pair(flow_document: dict[str, Any]) -> tuple[FlowIR, FlowIR]:
     source_ir = build_flow_ir(flow_document)
     target_document = copy.deepcopy(flow_document)
     target_document["version"] = "1.1.0"
-    target_document["slots"]["buraco_tipo"]["persist"] = "internal"
+    target_document["slots"]["pothole_type"]["persist"] = "internal"
     return source_ir, build_flow_ir(target_document)
 
 
@@ -72,35 +72,35 @@ def _complete_plan(
         copies=(
             StateCopy(StatePath("data", "service"), StatePath("data", "service")),
             StateCopy(
-                StatePath("data", "buraco_tipo"),
-                StatePath("internal", "buraco_tipo"),
+                StatePath("data", "pothole_type"),
+                StatePath("internal", "pothole_type"),
             ),
             StateCopy(
                 StatePath("internal", "_started"),
                 StatePath("internal", "_started"),
             ),
         ),
-        defaults=(StateDefault(StatePath("data", "buraco_tamanho"), "Grande"),),
+        defaults=(StateDefault(StatePath("data", "pothole_size"), "Large"),),
         drops=(
-            StatePath("data", "buraco_tamanho"),
+            StatePath("data", "pothole_size"),
             StatePath("payload", "latest_input"),
         ),
     )
 
 
 def test_migration_is_atomic_fresh_deterministic_and_verifiable(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     source_state = _state_for_ir(
         source_ir,
         data={
             "service": copy.deepcopy(source_ir.to_document()["service"]),
-            "buraco_tipo": "Cratera",
-            "buraco_tamanho": "Pequeno",
+            "pothole_type": "Crater",
+            "pothole_size": "Small",
         },
         internal={"_started": True},
-        payload={"latest_input": {"text": "cratera grande"}},
+        payload={"latest_input": {"text": "large crater"}},
         agent_response=AgentResponse(description="Stale source prompt"),
     )
     source_snapshot = source_state.model_copy(deep=True)
@@ -127,9 +127,9 @@ def test_migration_is_atomic_fresh_deterministic_and_verifiable(
     assert json.loads(plan.canonical_json())["digest"] == plan.digest
     assert first_result.state.data == {
         "service": target_ir.to_document()["service"],
-        "buraco_tamanho": "Grande",
+        "pothole_size": "Large",
     }
-    assert first_result.state.internal == {"buraco_tipo": "Cratera", "_started": True}
+    assert first_result.state.internal == {"pothole_type": "Crater", "_started": True}
     assert first_result.state.payload == {}
     assert first_result.state.agent_response is None
     assert first_result.state.metadata.created_at == _CREATED_AT
@@ -140,10 +140,10 @@ def test_migration_is_atomic_fresh_deterministic_and_verifiable(
     assert first_result.state.metadata.profile_digest == target_ir.profile_digest
     assert plan.source.ir_format == source_ir.ir_format
     assert plan.target.ir_format == target_ir.ir_format
-    assert first_result.report.defaulted == ("/data/buraco_tamanho",)
+    assert first_result.report.defaulted == ("/data/pothole_size",)
     assert first_result.report.dropped == (
         "/agent_response",
-        "/data/buraco_tamanho",
+        "/data/pothole_size",
         "/payload/latest_input",
     )
     first_result.report.verify(
@@ -163,9 +163,9 @@ def test_migration_is_atomic_fresh_deterministic_and_verifiable(
 
 
 def test_plan_digest_is_independent_of_declaration_order(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     plan = _complete_plan(source_ir, target_ir)
     reordered_plan = StateMigrationPlan(
         source=plan.source,
@@ -187,17 +187,17 @@ def test_plan_digest_is_independent_of_declaration_order(
 
 
 async def test_migrated_state_restores_only_against_its_exact_target_runtime(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
-    source_state = _state_for_ir(source_ir, data={"buraco_tipo": "Cratera"})
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
+    source_state = _state_for_ir(source_ir, data={"pothole_type": "Crater"})
     plan = StateMigrationPlan(
         source=FlowStateContract.from_ir(source_ir),
         target=FlowStateContract.from_ir(target_ir),
         copies=(
             StateCopy(
-                StatePath("data", "buraco_tipo"),
-                StatePath("internal", "buraco_tipo"),
+                StatePath("data", "pothole_type"),
+                StatePath("internal", "pothole_type"),
             ),
         ),
     )
@@ -234,11 +234,11 @@ async def test_migrated_state_restores_only_against_its_exact_target_runtime(
     ],
 )
 def test_migration_rejects_stale_source_provenance(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
     metadata_field: str,
     invalid_value: str,
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     source_state = _state_for_ir(source_ir)
     setattr(source_state.metadata, metadata_field, invalid_value)
     plan = StateMigrationPlan(
@@ -257,9 +257,9 @@ def test_migration_rejects_stale_source_provenance(
 
 
 def test_migration_rejects_plan_contract_that_does_not_pin_supplied_ir(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     source_contract = replace(FlowStateContract.from_ir(source_ir), source_digest="0" * 64)
     plan = StateMigrationPlan(
         source=source_contract,
@@ -293,8 +293,8 @@ def test_migration_rejects_plan_contract_that_does_not_pin_supplied_ir(
         )
 
 
-def test_source_state_schema_uses_format_checker(luminaria_doc: dict[str, Any]) -> None:
-    flow_ir = build_flow_ir(luminaria_doc)
+def test_source_state_schema_uses_format_checker(streetlight_document: dict[str, Any]) -> None:
+    flow_ir = build_flow_ir(streetlight_document)
     source_state = _state_for_ir(flow_ir, data={"email": "not-an-email"})
     plan = StateMigrationPlan(
         source=FlowStateContract.from_ir(flow_ir),
@@ -327,16 +327,16 @@ def test_source_state_schema_uses_format_checker(luminaria_doc: dict[str, Any]) 
 
 
 def test_migration_rejects_missing_and_unaccounted_source_paths(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     missing_plan = StateMigrationPlan(
         source=FlowStateContract.from_ir(source_ir),
         target=FlowStateContract.from_ir(target_ir),
         copies=(
             StateCopy(
-                StatePath("data", "buraco_tipo"),
-                StatePath("internal", "buraco_tipo"),
+                StatePath("data", "pothole_type"),
+                StatePath("internal", "pothole_type"),
             ),
         ),
     )
@@ -351,9 +351,9 @@ def test_migration_rejects_missing_and_unaccounted_source_paths(
 
 
 def test_migration_rejects_unknown_target_path_in_closed_partition_schema(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     target_state_schema = target_ir.state_schema()
     target_state_schema["properties"]["internal"]["additionalProperties"] = False
     closed_target_ir = replace(
@@ -403,16 +403,16 @@ def test_migration_rejects_unknown_target_path_in_closed_partition_schema(
 
 
 def test_migration_rejects_schema_incompatible_copy_even_when_value_would_fit(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
-    source_state = _state_for_ir(source_ir, data={"buraco_tamanho": "Pequeno"})
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
+    source_state = _state_for_ir(source_ir, data={"pothole_size": "Small"})
     plan = StateMigrationPlan(
         source=FlowStateContract.from_ir(source_ir),
         target=FlowStateContract.from_ir(target_ir),
         copies=(
             StateCopy(
-                StatePath("data", "buraco_tamanho"),
+                StatePath("data", "pothole_size"),
                 StatePath("data", "ticket_data_confirmed"),
             ),
         ),
@@ -429,9 +429,9 @@ def test_migration_rejects_schema_incompatible_copy_even_when_value_would_fit(
 
 
 def test_migration_does_not_treat_inclusive_bound_as_exclusive_proof(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     source_ir = _with_member_schema(source_ir, "score", {"type": "number", "minimum": 0})
     target_ir = _with_member_schema(
         target_ir,
@@ -456,9 +456,9 @@ def test_migration_does_not_treat_inclusive_bound_as_exclusive_proof(
 
 
 def test_migration_proves_target_all_of_sibling_constraints(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     source_ir = _with_member_schema(source_ir, "label", {"type": "string"})
     target_ir = _with_member_schema(
         target_ir,
@@ -483,9 +483,9 @@ def test_migration_proves_target_all_of_sibling_constraints(
 
 
 def test_migration_checks_named_source_properties_against_target_additional_schema(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     source_ir = _with_member_schema(
         source_ir,
         "record",
@@ -521,13 +521,13 @@ def test_migration_checks_named_source_properties_against_target_additional_sche
 
 
 def test_migration_rejects_invalid_default_and_conflicting_plan_paths(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     invalid_default_plan = StateMigrationPlan(
         source=FlowStateContract.from_ir(source_ir),
         target=FlowStateContract.from_ir(target_ir),
-        defaults=(StateDefault(StatePath("data", "buraco_tamanho"), "Gigante"),),
+        defaults=(StateDefault(StatePath("data", "pothole_size"), "Gigante"),),
     )
     with pytest.raises(StateMigrationError, match="violates its target schema"):
         migrate_service_state(
@@ -538,22 +538,22 @@ def test_migration_rejects_invalid_default_and_conflicting_plan_paths(
             clock=lambda: _MIGRATED_AT,
         )
 
-    duplicate_target = StatePath("data", "buraco_tamanho")
+    duplicate_target = StatePath("data", "pothole_size")
     with pytest.raises(StateMigrationError, match="one producer"):
         StateMigrationPlan(
             source=FlowStateContract.from_ir(source_ir),
             target=FlowStateContract.from_ir(target_ir),
             defaults=(
-                StateDefault(duplicate_target, "Pequeno"),
-                StateDefault(duplicate_target, "Grande"),
+                StateDefault(duplicate_target, "Small"),
+                StateDefault(duplicate_target, "Large"),
             ),
         )
 
 
 def test_migration_preserves_safe_local_reference_contracts(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     referenced_schema = {
         "$id": "urn:flowspec2:migration:contact",
         "$defs": {
@@ -594,9 +594,9 @@ def test_migration_preserves_safe_local_reference_contracts(
 
 
 def test_migration_rejects_ambiguous_accepted_resume_state(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    source_ir, target_ir = _flow_ir_pair(buraco_doc)
+    source_ir, target_ir = _flow_ir_pair(pothole_document)
     source_state = _state_for_ir(source_ir)
     source_state.metadata.await_resume = AwaitResumeProvenance(
         step="authenticate",

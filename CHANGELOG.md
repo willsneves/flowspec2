@@ -6,11 +6,11 @@ Table of Contents:
 - Version 1.0.0 — 2026-07-16: 29 <!-- section:version-1-0-0 -->
     - Added: 33 <!-- section:version-1-0-0-added -->
     - Changed: 60 <!-- section:version-1-0-0-changed -->
-    - Security: 115 <!-- section:version-1-0-0-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 130 <!-- section:version-0-2-0 -->
-    - Added: 134 <!-- section:version-0-2-0-added -->
-    - Changed: 151 <!-- section:version-0-2-0-changed -->
-    - Security: 166 <!-- section:version-0-2-0-security -->
+    - Security: 119 <!-- section:version-1-0-0-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 134 <!-- section:version-0-2-0 -->
+    - Added: 138 <!-- section:version-0-2-0-added -->
+    - Changed: 155 <!-- section:version-0-2-0-changed -->
+    - Security: 170 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -59,6 +59,10 @@ All notable project changes are recorded here. Versioning follows
 
 ### Changed
 
+- Converted the maintained source, schemas, runtime messages, examples,
+  documentation, fixtures, and tests to English. This intentionally replaces
+  Portuguese public identifiers and accepted aliases with explicit English
+  contracts, and adds a repository-wide regression check for language drift.
 - Moved project-owned schema and compatibility-profile identifiers to the
   `wllsena.github.io/flowspec2` namespace, replaced operational-looking example
   hosts with reserved domains, and removed internal editorial annotations.

@@ -26,9 +26,9 @@
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string" },
-        "codigo_servico_1746": { "type": "string" },
+        "service_code": { "type": "string" },
         "knowledge_service_id": { "type": "string" },
-        "identificacao_obrigatoria_1746": { "type": "boolean" },
+        "identification_required": { "type": "boolean" },
         "slugs": {
           "type": "array",
           "items": { "type": "string" }
@@ -357,7 +357,7 @@
           "additionalProperties": false,
           "required": ["type"],
           "properties": {
-            "type": { "enum": ["cpf", "email", "name"] }
+            "type": { "enum": ["brazilian_tax_id", "email", "name"] }
           }
         },
         {

@@ -1164,7 +1164,7 @@ def _domain_state_schema(domain_definition: dict[str, Any], nullable: bool) -> d
         return numeric_schema
     state_type: str | list[str] = ["string", "null"] if nullable else "string"
     state_schema: dict[str, Any] = {"type": state_type}
-    if domain_type == "cpf":
+    if domain_type == "brazilian_tax_id":
         state_schema["pattern"] = r"^[0-9]{11}$"
     elif domain_type == "email":
         state_schema["format"] = "email"

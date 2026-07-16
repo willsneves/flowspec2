@@ -350,7 +350,7 @@ async def test_confirmation_skip_remains_satisfied_across_later_turns(
         runtime.new_state(f"confirmation-skip-{confirmation_kind}"),
         {"answer": "provided"} if confirmation_kind == "hub" else {},
     )
-    confirmation_field = "confirmacao" if confirmation_kind == "hub" else "confirmed"
+    confirmation_field = "confirmation" if confirmation_kind == "hub" else "confirmed"
 
     state = await runtime.execute(state, {confirmation_field: "invalid"})
 

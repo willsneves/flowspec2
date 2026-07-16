@@ -18,9 +18,9 @@ def _codes(flow_document: dict[str, Any]) -> set[str]:
 
 
 def test_semantic_linker_aggregates_independent_reference_errors(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["overrides"]["gates"]["missing_step"] = {"eq": ["slots.missing", True]}
     invalid_flow["derive"][0]["after"] = "missing_anchor"
     invalid_flow["auto_flow"]["resume_at"] = "missing_resume"
@@ -37,9 +37,9 @@ def test_semantic_linker_aggregates_independent_reference_errors(
 
 
 def test_semantic_linker_rejects_orphan_and_duplicate_subflow_contracts(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["uses"].append(copy.deepcopy(invalid_flow["uses"][0]))
     invalid_flow["uses"].append({"ref": "unused@1"})
 
@@ -50,23 +50,23 @@ def test_semantic_linker_rejects_orphan_and_duplicate_subflow_contracts(
 
 
 def test_semantic_linker_rejects_terminal_marker_inconsistency(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["path"].insert(0, invalid_flow["path"].pop())
 
     assert "FLOWSPEC_SEMANTIC_UNREACHABLE_PATH_AFTER_TERMINAL" in _codes(invalid_flow)
 
 
 def test_semantic_linker_validates_embedded_entry_json_schema(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_schema_flow = copy.deepcopy(buraco_doc)
+    invalid_schema_flow = copy.deepcopy(pothole_document)
     invalid_schema_flow["route"]["entry_args_schema"] = {"type": 42}
-    open_schema_flow = copy.deepcopy(buraco_doc)
+    open_schema_flow = copy.deepcopy(pothole_document)
     open_schema_flow["route"]["entry_args_schema"] = {
         "type": "object",
-        "properties": {"buraco_tipo": {"type": "string"}},
+        "properties": {"pothole_type": {"type": "string"}},
     }
 
     assert "FLOWSPEC_SEMANTIC_INVALID_ENTRY_SCHEMA" in _codes(invalid_schema_flow)
@@ -74,13 +74,13 @@ def test_semantic_linker_validates_embedded_entry_json_schema(
 
 
 def test_semantic_linker_rejects_domain_and_dependency_ambiguity(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    invalid_flow["domains"]["BuracoTipo"]["values"].append("BURACO NO ASFALTO")
-    invalid_flow["domains"]["BuracoTipo"]["normalize"]["accent_fold"] = True
-    invalid_flow["slots"]["buraco_tipo"]["requires"] = ["buraco_tamanho"]
-    invalid_flow["slots"]["buraco_tamanho"]["requires"] = ["buraco_tipo"]
+    invalid_flow = copy.deepcopy(pothole_document)
+    invalid_flow["domains"]["PotholeType"]["values"].append("ASPHALT POTHOLE")
+    invalid_flow["domains"]["PotholeType"]["normalize"]["accent_fold"] = True
+    invalid_flow["slots"]["pothole_type"]["requires"] = ["pothole_size"]
+    invalid_flow["slots"]["pothole_size"]["requires"] = ["pothole_type"]
 
     assert {
         "FLOWSPEC_SEMANTIC_AMBIGUOUS_NORMALIZED_VALUE",
@@ -90,22 +90,22 @@ def test_semantic_linker_rejects_domain_and_dependency_ambiguity(
 
 
 def test_semantic_linker_rejects_aliases_that_shadow_canonical_inputs(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    invalid_flow["domains"]["BuracoTipo"]["normalize"]["synonyms"]["buraco no asfalto"] = "Cratera"
+    invalid_flow = copy.deepcopy(pothole_document)
+    invalid_flow["domains"]["PotholeType"]["normalize"]["synonyms"]["asphalt pothole"] = "Crater"
 
     assert "FLOWSPEC_SEMANTIC_AMBIGUOUS_NORMALIZED_ALIAS" in _codes(invalid_flow)
 
 
 def test_semantic_linker_rejects_normalized_alias_and_number_word_collisions(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    size_normalization = invalid_flow["domains"]["Tamanho"]["normalize"]
-    size_normalization["synonyms"]["um"] = "Grande"
-    size_normalization["synonyms"]["não"] = "Pequeno"
-    size_normalization["synonyms"]["nao"] = "Grande"
+    invalid_flow = copy.deepcopy(pothole_document)
+    size_normalization = invalid_flow["domains"]["Size"]["normalize"]
+    size_normalization["synonyms"]["one"] = "Large"
+    size_normalization["synonyms"]["tiny"] = "Small"
+    size_normalization["synonyms"]["tiny"] = "Large"
 
     assert {
         "FLOWSPEC_SEMANTIC_AMBIGUOUS_NORMALIZED_ALIAS",
@@ -113,10 +113,10 @@ def test_semantic_linker_rejects_normalized_alias_and_number_word_collisions(
 
 
 def test_semantic_linker_rejects_boolean_alias_conflicting_with_veto(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    normalization = invalid_flow["domains"]["SimNao"]["normalize"]
+    invalid_flow = copy.deepcopy(pothole_document)
+    normalization = invalid_flow["domains"]["YesNo"]["normalize"]
     normalization["emoji_veto"] = True
     normalization["synonyms"] = {"👎": True}
 
@@ -124,47 +124,47 @@ def test_semantic_linker_rejects_boolean_alias_conflicting_with_veto(
 
 
 def test_semantic_linker_rejects_wrong_predicate_partition(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    invalid_flow["slots"]["buraco_tipo"]["persist"] = "internal"
-    invalid_flow["path"][0]["ask_when"] = {"is_present": "slots.buraco_tipo"}
+    invalid_flow = copy.deepcopy(pothole_document)
+    invalid_flow["slots"]["pothole_type"]["persist"] = "internal"
+    invalid_flow["path"][0]["ask_when"] = {"is_present": "slots.pothole_type"}
 
     assert "FLOWSPEC_SEMANTIC_WRONG_PREDICATE_PARTITION" in _codes(invalid_flow)
 
 
 def test_semantic_linker_rejects_duplicate_gate_sources(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    invalid_flow["path"][0]["ask_when"] = {"is_present": "slots.buraco_tamanho"}
-    invalid_flow["overrides"] = {"gates": {"collect_tipo": {"is_present": "slots.buraco_tamanho"}}}
+    invalid_flow = copy.deepcopy(pothole_document)
+    invalid_flow["path"][0]["ask_when"] = {"is_present": "slots.pothole_size"}
+    invalid_flow["overrides"] = {"gates": {"collect_type": {"is_present": "slots.pothole_size"}}}
 
     assert "FLOWSPEC_SEMANTIC_DUPLICATE_GATE_SOURCE" in _codes(invalid_flow)
 
 
 def test_semantic_linker_does_not_treat_literal_objects_as_predicates(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    valid_flow = copy.deepcopy(buraco_doc)
+    valid_flow = copy.deepcopy(pothole_document)
     valid_flow["terminal"]["outcomes"]["success"]["set"] = {"metadata": {"is_present": "literal"}}
 
     assert semantic_diagnostics(valid_flow) == ()
 
 
 def test_semantic_linker_requires_boolean_confirmation_domain(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
-    invalid_flow["slots"]["ticket_data_confirmed"]["domain"] = "Tamanho"
+    invalid_flow = copy.deepcopy(pothole_document)
+    invalid_flow["slots"]["ticket_data_confirmed"]["domain"] = "Size"
 
     assert "FLOWSPEC_SEMANTIC_CONFIRM_DOMAIN_NOT_BOOLEAN" in _codes(invalid_flow)
 
 
 def test_semantic_linker_rejects_invalid_derive_contracts(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["derive"][0]["default"] = "$from[8]"
     invalid_flow["derive"][0]["lookup"]["wrong|arity"] = "invalid"
 
@@ -175,23 +175,23 @@ def test_semantic_linker_rejects_invalid_derive_contracts(
 
 
 def test_semantic_linker_rejects_auto_flow_alias_to_subflow_exposure(
-    luminaria_doc: dict[str, Any],
+    streetlight_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(luminaria_doc)
+    invalid_flow = copy.deepcopy(streetlight_document)
     invalid_flow["auto_flow"]["alias_map"]["external_address"] = {"address": "$value"}
 
     assert "FLOWSPEC_SEMANTIC_NON_NATIVE_AUTO_FLOW_DESTINATION" in _codes(invalid_flow)
 
 
 def test_semantic_linker_requires_explicit_derive_placement(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["derive"] = [
         {
             "writes": "classification",
-            "from": ["buraco_tipo"],
-            "lookup": {"Buraco no asfalto": "mapped"},
+            "from": ["pothole_type"],
+            "lookup": {"Asphalt pothole": "mapped"},
             "default": "$from[0]",
         }
     ]
@@ -200,15 +200,15 @@ def test_semantic_linker_requires_explicit_derive_placement(
 
 
 def test_semantic_linker_rejects_ambiguous_multi_source_derive_encoding(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["derive"] = [
         {
             "writes": "classification",
-            "from": ["buraco_tipo", "address"],
+            "from": ["pothole_type", "address"],
             "after": "confirm_address",
-            "lookup": {"Buraco no asfalto|street": "mapped"},
+            "lookup": {"Asphalt pothole|street": "mapped"},
         }
     ]
 
@@ -238,9 +238,9 @@ def test_semantic_linker_rejects_derive_before_its_producer() -> None:
 
 
 def test_semantic_linker_rejects_required_slot_without_a_producer(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["slots"]["orphan_required_slot"] = {
         "domain": "TextoLivre",
         "required": True,
@@ -250,22 +250,22 @@ def test_semantic_linker_rejects_required_slot_without_a_producer(
 
 
 def test_semantic_linker_rejects_derive_target_owned_by_profile(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["derive"] = [
         {
             "writes": "address",
-            "from": ["buraco_tipo"],
-            "after": "collect_tipo",
-            "lookup": {"Buraco no asfalto": "derived"},
+            "from": ["pothole_type"],
+            "after": "collect_type",
+            "lookup": {"Asphalt pothole": "derived"},
             "default": "$from[0]",
         }
     ]
 
     diagnostics = semantic_diagnostics(
         invalid_flow,
-        external_slots=frozenset({"address", "cpf", "email", "name"}),
+        external_slots=frozenset({"address", "brazilian_tax_id", "email", "name"}),
     )
 
     assert "FLOWSPEC_SEMANTIC_DERIVE_OVERWRITES_PROFILE_SLOT" in {
@@ -274,9 +274,9 @@ def test_semantic_linker_rejects_derive_target_owned_by_profile(
 
 
 def test_semantic_linker_validates_derive_lookup_and_target_domains(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["domains"]["Classification"] = {
         "type": "categorical",
         "values": ["mapped"],
@@ -288,7 +288,7 @@ def test_semantic_linker_validates_derive_lookup_and_target_domains(
     invalid_flow["derive"] = [
         {
             "writes": "classification",
-            "from": ["buraco_tipo"],
+            "from": ["pothole_type"],
             "lookup": {"unreachable": "outside-target-domain"},
         }
     ]
@@ -305,9 +305,9 @@ def test_semantic_linker_validates_derive_lookup_and_target_domains(
 
 
 def test_semantic_linker_accepts_total_closed_required_derive(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    valid_flow = copy.deepcopy(buraco_doc)
+    valid_flow = copy.deepcopy(pothole_document)
     valid_flow["domains"]["Classification"] = {
         "type": "categorical",
         "values": ["mapped"],
@@ -319,10 +319,10 @@ def test_semantic_linker_accepts_total_closed_required_derive(
     valid_flow["derive"] = [
         {
             "writes": "classification",
-            "from": ["buraco_tipo"],
+            "from": ["pothole_type"],
             "lookup": {
                 source_value: "mapped"
-                for source_value in valid_flow["domains"]["BuracoTipo"]["values"]
+                for source_value in valid_flow["domains"]["PotholeType"]["values"]
             },
         }
     ]
@@ -437,11 +437,11 @@ def test_semantic_linker_rejects_incompatible_source_fallback_domain() -> None:
 
 
 def test_predicate_literals_are_checked_against_closed_slot_domains(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["path"][0]["ask_when"] = {
-        "in": ["slots.buraco_tipo", ["Buraco no asfalto", "not-a-token"]]
+        "in": ["slots.pothole_type", ["Asphalt pothole", "not-a-token"]]
     }
 
     diagnostics = semantic_diagnostics(invalid_flow)
@@ -454,11 +454,11 @@ def test_predicate_literals_are_checked_against_closed_slot_domains(
 
 
 def test_predicate_rejects_disjoint_declared_slot_references(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["path"][0]["ask_when"] = {
-        "eq": ["slots.buraco_tipo", "slots.ticket_data_confirmed"]
+        "eq": ["slots.pothole_type", "slots.ticket_data_confirmed"]
     }
 
     diagnostics = semantic_diagnostics(invalid_flow)
@@ -471,9 +471,9 @@ def test_predicate_rejects_disjoint_declared_slot_references(
 
 
 def test_predicate_validates_config_and_address_contracts(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    invalid_flow = copy.deepcopy(buraco_doc)
+    invalid_flow = copy.deepcopy(pothole_document)
     invalid_flow["path"][0]["ask_when"] = {
         "and": [
             {"eq": ["config.identification_required", "false"]},
@@ -496,9 +496,9 @@ def test_predicate_validates_config_and_address_contracts(
 
 
 def test_predicate_config_contract_is_not_narrowed_to_configured_value(
-    buraco_doc: dict[str, Any],
+    pothole_document: dict[str, Any],
 ) -> None:
-    valid_flow = copy.deepcopy(buraco_doc)
+    valid_flow = copy.deepcopy(pothole_document)
     valid_flow["config"]["identification_required"] = True
     valid_flow["path"][0]["ask_when"] = {"eq": ["config.identification_required", False]}
 

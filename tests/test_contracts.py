@@ -705,9 +705,9 @@ def test_default_tool_registry_exposes_closed_contracts_and_effects() -> None:
     definitions = default_tool_registry().definitions
 
     assert definitions["hub_search"].effects.read_only is True
-    assert definitions["sgrc_open_ticket"].effects.read_only is False
-    assert definitions["sgrc_open_ticket"].input_schema["additionalProperties"] is False
-    assert "protocolo" in definitions["sgrc_open_ticket"].output_schema["properties"]
+    assert definitions["open_service_request"].effects.read_only is False
+    assert definitions["open_service_request"].input_schema["additionalProperties"] is False
+    assert "protocol_id" in definitions["open_service_request"].output_schema["properties"]
 
 
 @pytest.mark.asyncio
@@ -716,14 +716,16 @@ async def test_default_tool_contracts_reject_unusable_success_and_invalid_identi
     registry.register("geocode", _incomplete_geocode_tool)
 
     with pytest.raises(ValueError, match=r"geocode@1.*output.*required"):
-        await registry.call("geocode", address="Rua A")
+        await registry.call("geocode", address="Street A")
 
-    registry.register("cpf_lookup", _invalid_contact_tool)
-    with pytest.raises(ValueError, match=r"cpf_lookup@1.*output at /email"):
-        await registry.call("cpf_lookup", cpf="52998224725")
+    registry.register("brazilian_tax_id_lookup", _invalid_contact_tool)
+    with pytest.raises(ValueError, match=r"brazilian_tax_id_lookup@1.*output at /email"):
+        await registry.call("brazilian_tax_id_lookup", brazilian_tax_id="52998224725")
 
-    with pytest.raises(ValueError, match=r"cpf_lookup@1.*input at /cpf \(pattern\)"):
-        await registry.call("cpf_lookup", cpf="invalid")
+    with pytest.raises(
+        ValueError, match=r"brazilian_tax_id_lookup@1.*input at /brazilian_tax_id \(pattern\)"
+    ):
+        await registry.call("brazilian_tax_id_lookup", brazilian_tax_id="invalid")
 
 
 @pytest.mark.asyncio
@@ -1693,12 +1695,14 @@ def test_compiler_allows_terminal_result_path_absent_from_non_success_branch() -
     )
 
 
-def test_compiler_proves_default_sgrc_conditional_success_result_path() -> None:
-    sgrc_output_schema = default_tool_registry().definition("sgrc_open_ticket").output_schema
+def test_compiler_proves_default_ticketing_conditional_success_result_path() -> None:
+    ticketing_output_schema = (
+        default_tool_registry().definition("open_service_request").output_schema
+    )
 
     compile_flow(
-        _terminal_flow(result_path="result.protocolo"),
-        tools=_terminal_registry_with_output_schema(dict(sgrc_output_schema)),
+        _terminal_flow(result_path="result.protocol_id"),
+        tools=_terminal_registry_with_output_schema(dict(ticketing_output_schema)),
     )
 
 
@@ -1815,7 +1819,9 @@ def test_default_subflow_manifests_expose_configuration_slots_and_capabilities()
 
     assert definitions["address@1"].exposed_slots == frozenset({"address"})
     assert definitions["address@1"].capabilities == frozenset({"geocoding"})
-    assert definitions["identification@2"].exposed_slots == frozenset({"cpf", "email", "name"})
+    assert definitions["identification@2"].exposed_slots == frozenset(
+        {"brazilian_tax_id", "email", "name"}
+    )
     catalog_entry = json.loads(json.dumps(definitions["address@1"].as_dict()))
     assert catalog_entry["exposed_slots"] == ["address"]
     with pytest.raises(TypeError):

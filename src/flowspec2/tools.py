@@ -902,9 +902,9 @@ async def _fake_hub_search(**kwargs: Any) -> dict[str, Any]:
     """Best-effort knowledge load (entry.tool). Never blocks the flow."""
     return {
         "status": "ok",
-        "nome": "Reparo de luminária",
-        "resumo": "Conserto de iluminação pública.",
-        "prazo": "3 dias úteis",
+        "name": "Streetlight repair",
+        "summary": "Repair public lighting infrastructure.",
+        "estimated_resolution": "Three business days",
     }
 
 
@@ -912,40 +912,38 @@ async def _fake_geocode(address: str = "", **_: Any) -> dict[str, Any]:
     """Geocode/validate an address string (address subflow backend)."""
     text = (address or "").strip()
     if not text:
-        return {"status": "not_found", "error": "endereço vazio"}
+        return {"status": "not_found", "error": "empty address"}
     folded = text.lower()
-    kind = (
-        "praca" if ("praca" in folded or "praça" in folded or folded.startswith("praça")) else "rua"
-    )
+    kind = "square" if "square" in folded else "street"
     return {
         "status": "ok",
         "needs_confirmation": True,
         "address": {
-            "logradouro": text,
+            "street": text,
             "kind": kind,
-            "bairro": "Centro",
-            "municipio": "Rio de Janeiro",
+            "district": "Downtown",
+            "city": "Example City",
         },
     }
 
 
-async def _fake_cpf_lookup(cpf: str = "", **_: Any) -> dict[str, Any]:
-    """Look up a citizen's registry by CPF (identification backend)."""
+async def _fake_brazilian_tax_id_lookup(brazilian_tax_id: str = "", **_: Any) -> dict[str, Any]:
+    """Look up a citizen's registry by Brazilian tax ID (identification backend)."""
     return {"status": "ok", "name": "", "email": "", "phones": []}
 
 
-async def _fake_govbr_enrich(cpf: str = "", **_: Any) -> dict[str, Any]:
+async def _fake_govbr_enrich(brazilian_tax_id: str = "", **_: Any) -> dict[str, Any]:
     """Enrich gov.br data with internal registry (await_external.on_resume.enrich)."""
     return {"status": "ok", "phones": ["5521999999999"]}
 
 
-async def _fake_sgrc_open_ticket(**inputs: Any) -> dict[str, Any]:
-    """Open an SGRC ticket (terminal.tool). Returns a protocol id."""
+async def _fake_open_service_request(**inputs: Any) -> dict[str, Any]:
+    """Open a ticketing-system request (terminal.tool). Return its protocol ID."""
     digest = hashlib.sha256(_canonical_json(inputs).encode()).hexdigest()
     return {
         "status": "success",
-        "protocolo": f"SGRC-{digest[:10].upper()}",
-        "message": "Chamado aberto com sucesso.",
+        "protocol_id": f"REQ-{digest[:10].upper()}",
+        "message": "Service request opened successfully.",
     }
 
 
@@ -966,9 +964,9 @@ def _default_tool_definitions() -> dict[str, ToolDefinition]:
                 "additionalProperties": False,
                 "properties": {
                     "status": {"const": "ok"},
-                    "nome": {"type": "string"},
-                    "resumo": {"type": "string"},
-                    "prazo": {"type": "string"},
+                    "name": {"type": "string"},
+                    "summary": {"type": "string"},
+                    "estimated_resolution": {"type": "string"},
                 },
                 "required": ["status"],
             },
@@ -995,12 +993,12 @@ def _default_tool_definitions() -> dict[str, ToolDefinition]:
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
-                            "logradouro": {"type": "string", "minLength": 1},
+                            "street": {"type": "string", "minLength": 1},
                             "kind": {"type": "string", "minLength": 1},
-                            "bairro": {"type": "string"},
-                            "municipio": {"type": "string"},
+                            "district": {"type": "string"},
+                            "city": {"type": "string"},
                         },
-                        "required": ["logradouro"],
+                        "required": ["street"],
                     },
                 },
                 "required": ["status"],
@@ -1017,15 +1015,15 @@ def _default_tool_definitions() -> dict[str, ToolDefinition]:
             },
             effects=read_only_external,
         ),
-        "cpf_lookup": ToolDefinition(
-            name="cpf_lookup",
+        "brazilian_tax_id_lookup": ToolDefinition(
+            name="brazilian_tax_id_lookup",
             version="1",
-            description="Look up optional citizen contact data by CPF.",
+            description="Look up optional citizen contact data by Brazilian tax ID.",
             input_schema={
                 "type": "object",
                 "additionalProperties": False,
-                "properties": {"cpf": {"type": "string", "pattern": "^[0-9]{11}$"}},
-                "required": ["cpf"],
+                "properties": {"brazilian_tax_id": {"type": "string", "pattern": "^[0-9]{11}$"}},
+                "required": ["brazilian_tax_id"],
             },
             output_schema={
                 "type": "object",
@@ -1060,8 +1058,8 @@ def _default_tool_definitions() -> dict[str, ToolDefinition]:
             input_schema={
                 "type": "object",
                 "additionalProperties": False,
-                "properties": {"cpf": {"type": "string", "pattern": "^[0-9]{11}$"}},
-                "required": ["cpf"],
+                "properties": {"brazilian_tax_id": {"type": "string", "pattern": "^[0-9]{11}$"}},
+                "required": ["brazilian_tax_id"],
             },
             output_schema={
                 "type": "object",
@@ -1089,22 +1087,22 @@ def _default_tool_definitions() -> dict[str, ToolDefinition]:
             },
             effects=read_only_external,
         ),
-        "sgrc_open_ticket": ToolDefinition(
-            name="sgrc_open_ticket",
+        "open_service_request": ToolDefinition(
+            name="open_service_request",
             version="2",
-            description="Create a service request in SGRC and return its protocol.",
+            description="Create a service request in the ticketing system and return its protocol.",
             input_schema={
                 "type": "object",
                 "additionalProperties": False,
                 "properties": {
-                    "defeitoLuminaria": {"type": "string", "minLength": 1},
-                    "endereco": {"type": "object", "minProperties": 1},
-                    "pontoReferencia": {"type": ["string", "null"]},
-                    "dentroQuadraEsporte": {"type": ["boolean", "null"]},
-                    "solicitante": {"type": ["string", "null"]},
-                    "tipoBuraco": {"type": "string", "minLength": 1},
-                    "tamanho": {"type": "string", "minLength": 1},
-                    "problema": {"type": "string", "minLength": 1},
+                    "streetlightIssue": {"type": "string", "minLength": 1},
+                    "address": {"type": "object", "minProperties": 1},
+                    "referencePoint": {"type": ["string", "null"]},
+                    "nearSportsCourt": {"type": ["boolean", "null"]},
+                    "requester": {"type": ["string", "null"]},
+                    "potholeType": {"type": "string", "minLength": 1},
+                    "size": {"type": "string", "minLength": 1},
+                    "problem": {"type": "string", "minLength": 1},
                 },
             },
             output_schema={
@@ -1112,7 +1110,7 @@ def _default_tool_definitions() -> dict[str, ToolDefinition]:
                 "additionalProperties": False,
                 "properties": {
                     "status": _status_schema("success", "retryable", "fatal"),
-                    "protocolo": {"type": "string", "minLength": 1},
+                    "protocol_id": {"type": "string", "minLength": 1},
                     "message": {"type": "string", "minLength": 1},
                     "error": {"type": "string", "minLength": 1},
                 },
@@ -1123,7 +1121,7 @@ def _default_tool_definitions() -> dict[str, ToolDefinition]:
                             "properties": {"status": {"const": "success"}},
                             "required": ["status"],
                         },
-                        "then": {"required": ["protocolo"]},
+                        "then": {"required": ["protocol_id"]},
                     }
                 ],
             },
@@ -1142,11 +1140,15 @@ def default_tool_registry() -> ToolRegistry:
     definitions = _default_tool_definitions()
     reg.register("hub_search", _fake_hub_search, definition=definitions["hub_search"])
     reg.register("geocode", _fake_geocode, definition=definitions["geocode"])
-    reg.register("cpf_lookup", _fake_cpf_lookup, definition=definitions["cpf_lookup"])
+    reg.register(
+        "brazilian_tax_id_lookup",
+        _fake_brazilian_tax_id_lookup,
+        definition=definitions["brazilian_tax_id_lookup"],
+    )
     reg.register("get_user_info", _fake_govbr_enrich, definition=definitions["get_user_info"])
     reg.register(
-        "sgrc_open_ticket",
-        _fake_sgrc_open_ticket,
-        definition=definitions["sgrc_open_ticket"],
+        "open_service_request",
+        _fake_open_service_request,
+        definition=definitions["open_service_request"],
     )
     return reg

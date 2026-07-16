@@ -4,7 +4,7 @@ A subflow splices its own nodes/slots/routers into the compiled graph at its
 anchor, returns its slot-to-collector mapping for compiler-validated upward
 references, and inherits idempotency/reset/attempt defaults. Each ends with
 a ``<name>_done`` no-op exit node whose router returns ``NEXT`` — that single
-exit lets internal branches (``anonimo``, confirmed-address) skip the remaining
+exit lets internal branches (``anonymous``, confirmed-address) skip the remaining
 internal nodes cleanly.
 """
 
@@ -996,12 +996,12 @@ def _address_definition() -> SubflowDefinition:
             {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["logradouro"],
+                "required": ["street"],
                 "properties": {
-                    "logradouro": {"type": "string", "minLength": 1},
+                    "street": {"type": "string", "minLength": 1},
                     "kind": {"type": "string", "minLength": 1},
-                    "bairro": {"type": "string", "minLength": 1},
-                    "municipio": {"type": "string", "minLength": 1},
+                    "district": {"type": "string", "minLength": 1},
+                    "city": {"type": "string", "minLength": 1},
                 },
             },
             {"type": "null"},
@@ -1038,14 +1038,14 @@ def _address_definition() -> SubflowDefinition:
 
 
 def _identification_definition() -> SubflowDefinition:
-    cpf_schema = {"type": "string", "pattern": "^[0-9]{11}$"}
+    tax_id_schema = {"type": "string", "pattern": "^[0-9]{11}$"}
     email_schema = {"type": "string", "format": "email"}
     name_schema = {"type": "string", "minLength": 2}
     boolean_state = {"type": "boolean"}
     attempts_state = {"type": "integer", "minimum": 1}
     return SubflowDefinition(
         ref="identification@2",
-        description="Collect citizen identity through CPF, gov.br, or anonymous continuation.",
+        description="Collect citizen identity through Brazilian tax ID, gov.br, or anonymous continuation.",
         configuration_schema={
             "type": "object",
             "additionalProperties": False,
@@ -1055,38 +1055,40 @@ def _identification_definition() -> SubflowDefinition:
                     "type": "array",
                     "minItems": 1,
                     "uniqueItems": True,
-                    "items": {"enum": ["cpf", "govbr", "anonimo"]},
+                    "items": {"enum": ["brazilian_tax_id", "govbr", "anonymous"]},
                 },
                 "max_attempts": {"type": "integer", "minimum": 1},
                 "on_exhaust": {"enum": _EXHAUSTION_MODES},
             },
         },
-        exposed_slots=frozenset({"cpf", "email", "name"}),
+        exposed_slots=frozenset({"brazilian_tax_id", "email", "name"}),
         exposed_slot_schemas={
-            "cpf": cpf_schema,
+            "brazilian_tax_id": tax_id_schema,
             "email": email_schema,
             "name": name_schema,
         },
         capabilities=frozenset({"external_authentication", "identity_lookup"}),
-        required_tools={"cpf_lookup": "1", "get_user_info": "1"},
+        required_tools={"brazilian_tax_id_lookup": "1", "get_user_info": "1"},
         state_keys={
-            "cpf": SubflowStateKey("data", cpf_schema),
+            "brazilian_tax_id": SubflowStateKey("data", tax_id_schema),
             "email": SubflowStateKey("data", email_schema),
             "name": SubflowStateKey("data", name_schema),
             "phone": SubflowStateKey("data", {"type": "string"}),
-            "identification_method": SubflowStateKey("data", {"enum": ["cpf", "govbr", "anonimo"]}),
-            "identificacao_pulada": SubflowStateKey("data", boolean_state),
-            "cadastro_verificado": SubflowStateKey("data", boolean_state),
+            "identification_method": SubflowStateKey(
+                "data", {"enum": ["brazilian_tax_id", "govbr", "anonymous"]}
+            ),
+            "identification_skipped": SubflowStateKey("data", boolean_state),
+            "identity_verified": SubflowStateKey("data", boolean_state),
             "email_processed": SubflowStateKey("data", boolean_state),
             "name_processed": SubflowStateKey("data", boolean_state),
             "govbr_auth_sent": SubflowStateKey("data", boolean_state),
             "govbr_authenticated": SubflowStateKey("data", boolean_state),
             "_attempts_method": SubflowStateKey("data", attempts_state),
-            "_attempts_cpf": SubflowStateKey("data", attempts_state),
+            "_attempts_brazilian_tax_id": SubflowStateKey("data", attempts_state),
             "_attempts_email": SubflowStateKey("data", attempts_state),
             "_attempts_name": SubflowStateKey("data", attempts_state),
-            "_cpf_lookup_derived:email": SubflowStateKey("internal", boolean_state),
-            "_cpf_lookup_derived:name": SubflowStateKey("internal", boolean_state),
+            "_brazilian_tax_id_lookup_derived:email": SubflowStateKey("internal", boolean_state),
+            "_brazilian_tax_id_lookup_derived:name": SubflowStateKey("internal", boolean_state),
             "_await_external_sent:authenticate_govbr": SubflowStateKey("internal", boolean_state),
             "_await_external_completed:authenticate_govbr": SubflowStateKey(
                 "internal", boolean_state
@@ -1096,7 +1098,7 @@ def _identification_definition() -> SubflowDefinition:
             {
                 "select_identification_method",
                 "authenticate_govbr",
-                "collect_cpf",
+                "collect_tax_id",
                 "collect_email",
                 "collect_name",
                 "identification_done",

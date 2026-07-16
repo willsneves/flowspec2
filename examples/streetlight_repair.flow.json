@@ -1,0 +1,625 @@
+{
+  "schema": "flowspec/2",
+  "flow": "streetlight_repair",
+  "version": "1.8.0",
+  "service": {
+    "id": "streetlight-repair",
+    "service_code": "streetlight-repair",
+    "knowledge_service_id": "streetlight-repair-knowledge",
+    "identification_required": false
+  },
+  "route": {
+    "description": "Repair public streetlights that are not working, flickering, on during daylight, hanging, damaged, or noisy.",
+    "trigger_phrases": [
+      "streetlight is not working",
+      "street has no lighting",
+      "streetlight is flickering",
+      "damaged public lighting"
+    ],
+    "entry_args_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "streetlight_issue": {
+          "enum": [
+            "Not working",
+            "Flickering",
+            "On during daylight",
+            "Hanging",
+            "Damaged",
+            "Noisy"
+          ]
+        }
+      }
+    }
+  },
+  "config": {
+    "address_required": true,
+    "identification_required": false,
+    "max_attempts": 3
+  },
+  "entry": {
+    "tool": "hub_search",
+    "blocking": false,
+    "writes": "service_info"
+  },
+  "domains": {
+    "StreetlightIssue": {
+      "type": "categorical",
+      "values": [
+        "Not working",
+        "Flickering",
+        "On during daylight",
+        "Hanging",
+        "Damaged",
+        "Noisy"
+      ],
+      "rows": [
+        {
+          "value": "Not working",
+          "description": "The streetlight does not turn on"
+        },
+        {
+          "value": "Flickering",
+          "description": "The light keeps flickering"
+        },
+        {
+          "value": "On during daylight",
+          "description": "The light stays on during daylight"
+        },
+        {
+          "value": "Hanging",
+          "description": "The streetlight is hanging or loose"
+        },
+        {
+          "value": "Damaged",
+          "description": "The structure is broken or damaged"
+        },
+        {
+          "value": "Noisy",
+          "description": "The streetlight makes noise or hums"
+        }
+      ],
+      "normalize": {
+        "accent_fold": true,
+        "number_words": true,
+        "synonyms": {
+          "no light": "Not working",
+          "burned out": "Not working",
+          "does not turn on": "Not working",
+          "blinking": "Flickering",
+          "on during the day": "On during daylight",
+          "humming": "Noisy"
+        }
+      }
+    },
+    "Quantity": {
+      "type": "categorical",
+      "values": [
+        "single",
+        "group"
+      ],
+      "normalize": {
+        "number_words": true,
+        "synonyms": {
+          "several": "group",
+          "all": "group",
+          "only one": "single"
+        }
+      }
+    },
+    "OutagePattern": {
+      "type": "categorical",
+      "values": [
+        "block",
+        "alternating"
+      ],
+      "normalize": {
+        "synonyms": {
+          "together": "block",
+          "sequence": "block",
+          "spaced": "alternating",
+          "alternating": "alternating"
+        }
+      }
+    },
+    "StreetlightLocation": {
+      "type": "categorical",
+      "values": [
+        "Sidewalk",
+        "Facade",
+        "Monument",
+        "Park",
+        "Public square",
+        "Sports court",
+        "Street",
+        null
+      ],
+      "normalize": {
+        "accent_fold": true,
+        "synonyms": {
+          "pavement": "Sidewalk",
+          "square": "Public square",
+          "sports_court": "Sports court"
+        }
+      }
+    },
+    "ReferencePoint": {
+      "type": "free_text",
+      "optional": true
+    },
+    "YesNo": {
+      "type": "bool",
+      "normalize": {
+        "affirmation": true,
+        "emoji_veto": true
+      }
+    }
+  },
+  "slots": {
+    "service_confirmed": {
+      "domain": "YesNo",
+      "persist": "data"
+    },
+    "streetlight_issue": {
+      "domain": "StreetlightIssue",
+      "persist": "data",
+      "required": true,
+      "fill_only_when_asked": true,
+      "prefill_sources": [
+        "whatsapp_flow"
+      ],
+      "max_attempts": 3,
+      "on_exhaust": "reask"
+    },
+    "streetlight_count": {
+      "domain": "Quantity",
+      "persist": "data",
+      "required": true,
+      "requires": [
+        "streetlight_issue"
+      ]
+    },
+    "streetlight_outage_pattern": {
+      "domain": "OutagePattern",
+      "persist": "data",
+      "required": true,
+      "requires": [
+        "streetlight_count"
+      ]
+    },
+    "streetlight_location": {
+      "domain": "StreetlightLocation",
+      "persist": "data",
+      "required": false,
+      "fill_only_when_asked": true,
+      "prefill_sources": [
+        "whatsapp_flow"
+      ]
+    },
+    "near_sports_court": {
+      "domain": "YesNo",
+      "persist": "data",
+      "required": true,
+      "requires": [
+        "address"
+      ]
+    },
+    "reference_point": {
+      "domain": "ReferencePoint",
+      "persist": "data",
+      "required": true,
+      "requires": [
+        "address"
+      ]
+    },
+    "ticket_data_confirmed": {
+      "domain": "YesNo",
+      "persist": "data"
+    }
+  },
+  "path": [
+    {
+      "step": "show_service_summary",
+      "confirm": "service_confirmed",
+      "prompt": {
+        "text": "Do you want to open a streetlight repair request?"
+      },
+      "interactive": {
+        "kind": "buttons",
+        "field": "service_confirmation",
+        "from_domain": "YesNo"
+      },
+      "skip_when": {
+        "eq": [
+          "payload._source",
+          "whatsapp_flow"
+        ]
+      },
+      "on_reject": {
+        "end": "Understood. I will not open the request. You can return if you change your mind."
+      }
+    },
+    {
+      "step": "collect_issue",
+      "slot": "streetlight_issue",
+      "prompt": {
+        "text": "What is wrong with the streetlight?",
+        "extract_hint": "one closed StreetlightIssue token; map numbers/synonyms/accents and infer from a photo if sent"
+      },
+      "interactive": {
+        "kind": "list",
+        "field": "streetlight_issue",
+        "from_domain": "StreetlightIssue"
+      }
+    },
+    {
+      "step": "collect_count",
+      "slot": "streetlight_count",
+      "prompt": {
+        "text": "Is this one streetlight or a group of streetlights?"
+      },
+      "ask_when": {
+        "in": [
+          "slots.streetlight_issue",
+          [
+            "Not working",
+            "Flickering",
+            "On during daylight"
+          ]
+        ]
+      }
+    },
+    {
+      "step": "collect_outage_pattern",
+      "slot": "streetlight_outage_pattern",
+      "prompt": {
+        "text": "Are the affected streetlights together in one block or alternating?"
+      },
+      "ask_when": {
+        "eq": [
+          "slots.streetlight_count",
+          "group"
+        ]
+      }
+    },
+    {
+      "step": "collect_location",
+      "slot": "streetlight_location",
+      "prompt": {
+        "text": "Where is the streetlight located (sidewalk, facade, public square, park, or street)?"
+      }
+    },
+    {
+      "use": "address@1"
+    },
+    {
+      "step": "collect_near_sports_court",
+      "confirm": "near_sports_court",
+      "prompt": {
+        "text": "Is the streetlight near a sports court?"
+      },
+      "interactive": {
+        "kind": "buttons",
+        "field": "near_sports_court",
+        "from_domain": "YesNo"
+      }
+    },
+    {
+      "step": "collect_reference_point",
+      "slot": "reference_point",
+      "prompt": {
+        "text": "Is there a reference point near the streetlight?"
+      }
+    },
+    {
+      "use": "identification@2"
+    },
+    {
+      "step": "confirm_ticket_data",
+      "confirm": "ticket_data_confirmed",
+      "correctable": true,
+      "prompt": {
+        "text": "Do you confirm the service-request information?"
+      },
+      "interactive": {
+        "kind": "buttons",
+        "field": "confirmation",
+        "from_domain": "YesNo"
+      }
+    },
+    {
+      "terminal": true
+    }
+  ],
+  "uses": [
+    {
+      "ref": "address@1",
+      "with": {
+        "required": true,
+        "needs_confirmation": true,
+        "max_attempts": 3
+      }
+    },
+    {
+      "ref": "identification@2",
+      "with": {
+        "required": false,
+        "methods": [
+          "brazilian_tax_id",
+          "govbr",
+          "anonymous"
+        ],
+        "max_attempts": 3,
+        "on_exhaust": "default"
+      }
+    }
+  ],
+  "derive": [
+    {
+      "writes": "classified_streetlight_issue",
+      "from": [
+        "streetlight_issue",
+        "streetlight_count",
+        "streetlight_outage_pattern"
+      ],
+      "after": "collect_location",
+      "lookup": {
+        "Not working|single|null": "Not working",
+        "Not working|group|block": "A block or group of streetlights that are not working",
+        "Not working|group|alternating": "Alternating streetlights that are not working",
+        "Flickering|single|null": "Flickering",
+        "Flickering|group|block": "A block or group of flickering streetlights",
+        "Flickering|group|alternating": "Alternating flickering streetlights",
+        "On during daylight|single|null": "On during daylight",
+        "On during daylight|group|block": "A block or group of streetlights on during daylight",
+        "On during daylight|group|alternating": "Alternating streetlights on during daylight",
+        "Hanging|null|null": "Hanging",
+        "Damaged|null|null": "Damaged",
+        "Noisy|null|null": "Noisy"
+      },
+      "default": "$from[0]"
+    }
+  ],
+  "confirm": {
+    "step": "confirm_ticket_data",
+    "slot": "ticket_data_confirmed",
+    "on_confirm": "open_ticket",
+    "prompt": {
+      "text": "Do you confirm the service-request information?"
+    },
+    "interactive": {
+      "kind": "buttons",
+      "field": "confirmation",
+      "from_domain": "YesNo"
+    },
+    "correctable": [
+      "streetlight_issue",
+      "streetlight_location",
+      "address",
+      "reference_point",
+      "brazilian_tax_id",
+      "email",
+      "name"
+    ]
+  },
+  "terminal": {
+    "step": "open_ticket",
+    "tool": "open_service_request",
+    "idempotent": true,
+    "input": [
+      {
+        "param": "streetlightIssue",
+        "slot": "classified_streetlight_issue"
+      },
+      {
+        "param": "address",
+        "slot": "address"
+      },
+      {
+        "param": "referencePoint",
+        "slot": "reference_point"
+      },
+      {
+        "param": "nearSportsCourt",
+        "slot": "near_sports_court"
+      },
+      {
+        "param": "requester",
+        "slot": "brazilian_tax_id"
+      }
+    ],
+    "outputs": {
+      "protocol_id": "result.protocol_id"
+    },
+    "outcomes": {
+      "success": {
+        "set": {
+          "ticket_created": true
+        },
+        "reset_next": true
+      },
+      "retryable": {
+        "preserve_state": true
+      },
+      "fatal": {
+        "reset_next": true
+      }
+    },
+    "empty_payload": {
+      "never_saved": "reset",
+      "in_progress": "ignore"
+    }
+  },
+  "overrides": {
+    "gates": {
+      "collect_near_sports_court": {
+        "or": [
+          {
+            "eq": [
+              "address.kind",
+              "square"
+            ]
+          },
+          {
+            "eq": [
+              "slots.streetlight_location",
+              "Public square"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "auto_flow": {
+    "meta_flow_ref": "flow_streetlight_id",
+    "send_when": {
+      "not": {
+        "is_present": "slots.streetlight_issue"
+      }
+    },
+    "prefill_from": [
+      "streetlight_issue",
+      "streetlight_location"
+    ],
+    "resume_at": "collect_issue",
+    "on_submit_source": "whatsapp_flow",
+    "recovery": {
+      "fallback_at": "show_service_summary",
+      "cancel": "END",
+      "timeout": "fallback",
+      "max_resends": 2,
+      "timeout_seconds": 900
+    },
+    "alias_map": {
+      "defect_type": {
+        "streetlight_issue": "$value"
+      },
+      "location": {
+        "streetlight_location": "$value"
+      },
+      "qty_pattern": {
+        "single": {
+          "streetlight_count": "single"
+        },
+        "block": {
+          "streetlight_count": "group",
+          "streetlight_outage_pattern": "block"
+        },
+        "alternating": {
+          "streetlight_count": "group",
+          "streetlight_outage_pattern": "alternating"
+        }
+      },
+      "near_sports_court": {
+        "yes": {
+          "streetlight_location": "Sports court"
+        }
+      }
+    }
+  },
+  "capabilities": {
+    "media_in": {
+      "analyze": [
+        "image",
+        "audio",
+        "video"
+      ],
+      "route_by": "suggested_workflow"
+    },
+    "media_out": [
+      "image",
+      "location"
+    ],
+    "tts": true,
+    "location_in": true,
+    "handoff": {
+      "target": "support",
+      "when": "llm_decides"
+    },
+    "session_reset": true,
+    "await_external": {
+      "kind": "cta_url",
+      "step": "authenticate_govbr",
+      "resume_on": "govbr_token",
+      "resume": {
+        "version": "1",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "brazilian_tax_id": {
+              "type": "string",
+              "pattern": "^[0-9]{11}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 2
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          "required": [
+            "brazilian_tax_id"
+          ]
+        },
+        "correlation": "$token.brazilian_tax_id",
+        "duplicate": "ignore",
+        "late": "reject"
+      },
+      "prompt": {
+        "text": "To identify through gov.br, use the login button I sent. 🔐",
+        "verbatim": true
+      },
+      "interactive": {
+        "kind": "cta_url",
+        "field": "govbr_token",
+        "out_of_band": true,
+        "next_step": "authenticate_govbr"
+      },
+      "on_resume": {
+        "set": {
+          "brazilian_tax_id": "$token.brazilian_tax_id",
+          "name": "$token.name",
+          "email": "$token.email",
+          "govbr_authenticated": true,
+          "identity_verified": true
+        },
+        "enrich": {
+          "tool": "get_user_info",
+          "optional": true,
+          "input": {
+            "brazilian_tax_id": "$token.brazilian_tax_id"
+          },
+          "set": {
+            "phone": "$result.phones.0"
+          }
+        }
+      },
+      "timeout": {
+        "goto": "collect_tax_id",
+        "set": {
+          "identification_method": "brazilian_tax_id"
+        }
+      },
+      "timeout_seconds": 900,
+      "recovery": {
+        "abort": {
+          "goto": "select_identification_method"
+        },
+        "resend": {
+          "goto": "authenticate_govbr"
+        },
+        "switch": {
+          "goto": "collect_tax_id",
+          "set": {
+            "identification_method": "brazilian_tax_id"
+          }
+        }
+      }
+    }
+  }
+}

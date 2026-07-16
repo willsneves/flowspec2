@@ -138,8 +138,8 @@ def test_export_projects_linear_collection_profile() -> None:
         "payload": "/SetSlots(category=a=b)",
     }
     assert exported_domain["responses"]["utter_ask_portable_report_confirmed_3"][0]["buttons"] == [
-        {"title": "Sim", "payload": "/SetSlots(confirmed=true)"},
-        {"title": "Não", "payload": "/SetSlots(confirmed=false)"},
+        {"title": "Yes", "payload": "/SetSlots(confirmed=true)"},
+        {"title": "No", "payload": "/SetSlots(confirmed=false)"},
     ]
 
 

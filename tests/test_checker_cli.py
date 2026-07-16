@@ -11,15 +11,15 @@ import pytest
 
 from flowspec2.cli import main
 
-LUMINARIA_FLOW = Path(__file__).resolve().parents[1] / "examples" / "reparo_luminaria.flow.json"
+STREETLIGHT_FLOW = Path(__file__).resolve().parents[1] / "examples" / "streetlight_repair.flow.json"
 
 
 def test_check_json_output_is_deterministic(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(["check", str(LUMINARIA_FLOW), "--json"]) == 0
+    assert main(["check", str(STREETLIGHT_FLOW), "--json"]) == 0
     first_output = capsys.readouterr()
-    assert main(["check", str(LUMINARIA_FLOW), "--json"]) == 0
+    assert main(["check", str(STREETLIGHT_FLOW), "--json"]) == 0
     second_output = capsys.readouterr()
 
     assert first_output.err == second_output.err == ""
@@ -76,7 +76,7 @@ def test_check_reports_semantic_failure_before_compilation(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    flow_document = json.loads(LUMINARIA_FLOW.read_text(encoding="utf-8"))
+    flow_document = json.loads(STREETLIGHT_FLOW.read_text(encoding="utf-8"))
     flow_document["path"][0] = {"use": "missing@1"}
     invalid_flow_path = tmp_path / "invalid.flow.json"
     invalid_flow_path.write_text(json.dumps(flow_document), encoding="utf-8")

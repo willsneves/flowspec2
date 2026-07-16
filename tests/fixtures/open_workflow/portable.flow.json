@@ -23,7 +23,7 @@
     "Reference": {
       "type": "free_text"
     },
-    "SimNao": {
+    "YesNo": {
       "type": "bool"
     }
   },
@@ -39,7 +39,7 @@
       "domain": "Reference"
     },
     "payment_confirmed": {
-      "domain": "SimNao"
+      "domain": "YesNo"
     }
   },
   "path": [

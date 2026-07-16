@@ -97,7 +97,7 @@ that lack native preview syntax, and neutral compact-byte measurements.
 from flowspec2 import load_flow
 from flowspec2.experimental import migrate_v2_to_v3_preview_report
 
-source = load_flow("examples/reparo_luminaria.flow.json")
+source = load_flow("examples/streetlight_repair.flow.json")
 report = migrate_v2_to_v3_preview_report(source)
 
 preview = report.preview_document
