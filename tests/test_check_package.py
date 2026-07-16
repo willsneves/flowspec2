@@ -17,7 +17,12 @@ from unittest.mock import Mock, call
 import pytest
 
 PROJECT_ROOT = Path(__file__).parents[1]
-EXPECTED_VERSION = "1.0.0"
+with (PROJECT_ROOT / "pyproject.toml").open("rb") as project_file:
+    PROJECT_CONFIGURATION = tomllib.load(project_file)
+EXPECTED_VERSION: str = PROJECT_CONFIGURATION["project"]["version"]
+EXPECTED_WHEEL_NAME = f"flowspec2-{EXPECTED_VERSION}-py3-none-any.whl"
+EXPECTED_SOURCE_DISTRIBUTION_NAME = f"flowspec2-{EXPECTED_VERSION}.tar.gz"
+EXPECTED_SOURCE_ROOT = f"flowspec2-{EXPECTED_VERSION}"
 EXPECTED_SDIST_ONLY_INCLUDE = frozenset(
     {
         "src/flowspec2",
@@ -85,19 +90,18 @@ def _minimal_sdist(
     *,
     additional_members: tuple[tuple[str, bytes], ...] = (),
 ) -> None:
-    source_root = f"flowspec2-{EXPECTED_VERSION}"
     project_document = (f'[project]\nname = "flowspec2"\nversion = "{EXPECTED_VERSION}"\n').encode()
     with tarfile.open(source_distribution_path, mode="w:gz") as source_archive:
         for member_name in package_check.EXPECTED_SDIST_MEMBERS:
             member_content = project_document if member_name == "pyproject.toml" else b"contract"
-            _add_tar_member(source_archive, f"{source_root}/{member_name}", member_content)
+            _add_tar_member(source_archive, f"{EXPECTED_SOURCE_ROOT}/{member_name}", member_content)
         _add_tar_member(
             source_archive,
-            f"{source_root}/PKG-INFO",
+            f"{EXPECTED_SOURCE_ROOT}/PKG-INFO",
             (f"Metadata-Version: 2.4\nName: flowspec2\nVersion: {metadata_version}\n").encode(),
         )
         for member_name, member_content in additional_members:
-            _add_tar_member(source_archive, f"{source_root}/{member_name}", member_content)
+            _add_tar_member(source_archive, f"{EXPECTED_SOURCE_ROOT}/{member_name}", member_content)
 
 
 def test_sdist_build_uses_an_explicit_public_allowlist() -> None:
@@ -125,8 +129,8 @@ def test_checksum_manifest_is_canonical_and_detects_tampering(tmp_path: Path) ->
         source_distribution_path,
     )
     assert [line.split("  ", maxsplit=1)[1] for line in recorded_manifest.splitlines()] == [
-        "flowspec2-1.0.0-py3-none-any.whl",
-        "flowspec2-1.0.0.tar.gz",
+        EXPECTED_WHEEL_NAME,
+        EXPECTED_SOURCE_DISTRIBUTION_NAME,
     ]
     source_distribution_path.write_bytes(b"tampered")
     with pytest.raises(RuntimeError, match="checksum manifest"):
@@ -136,10 +140,10 @@ def test_checksum_manifest_is_canonical_and_detects_tampering(tmp_path: Path) ->
 @pytest.mark.parametrize(
     "invalid_manifest",
     [
-        "0" * 64 + "  ../flowspec2-1.0.0.tar.gz\n",
-        "0" * 64 + " *flowspec2-1.0.0.tar.gz\n",
-        "0" * 64 + "  flowspec2-1.0.0.tar.gz\n\n",
-        "A" * 64 + "  flowspec2-1.0.0.tar.gz\n",
+        "0" * 64 + f"  ../{EXPECTED_SOURCE_DISTRIBUTION_NAME}\n",
+        "0" * 64 + f" *{EXPECTED_SOURCE_DISTRIBUTION_NAME}\n",
+        "0" * 64 + f"  {EXPECTED_SOURCE_DISTRIBUTION_NAME}\n\n",
+        "A" * 64 + f"  {EXPECTED_SOURCE_DISTRIBUTION_NAME}\n",
     ],
 )
 def test_checksum_manifest_rejects_noncanonical_grammar(
@@ -288,8 +292,8 @@ def test_successful_release_build_promotes_only_verified_files(
     package_check._verify_checksum_manifest(artifact_directory, EXPECTED_VERSION)
     assert {artifact_path.name for artifact_path in artifact_directory.iterdir()} == {
         "SHA256SUMS",
-        "flowspec2-1.0.0-py3-none-any.whl",
-        "flowspec2-1.0.0.tar.gz",
+        EXPECTED_WHEEL_NAME,
+        EXPECTED_SOURCE_DISTRIBUTION_NAME,
     }
     artifact_checker.assert_called_once()
 
@@ -330,7 +334,7 @@ def test_release_check_never_builds(
 
 
 def test_wheel_version_must_match_expected_version(tmp_path: Path) -> None:
-    wheel_path = tmp_path / "flowspec2-1.0.0-py3-none-any.whl"
+    wheel_path = tmp_path / EXPECTED_WHEEL_NAME
     _minimal_wheel(wheel_path, "9.9.9")
 
     with pytest.raises(RuntimeError, match="wheel metadata version"):
@@ -342,7 +346,7 @@ def test_wheel_rejects_unsafe_paths(
     tmp_path: Path,
     unsafe_member_name: str,
 ) -> None:
-    wheel_path = tmp_path / "flowspec2-1.0.0-py3-none-any.whl"
+    wheel_path = tmp_path / EXPECTED_WHEEL_NAME
     with zipfile.ZipFile(wheel_path, mode="w") as wheel_archive:
         wheel_archive.writestr(unsafe_member_name, "unsafe")
 
@@ -351,7 +355,7 @@ def test_wheel_rejects_unsafe_paths(
 
 
 def test_wheel_rejects_symlink_member(tmp_path: Path) -> None:
-    wheel_path = tmp_path / "flowspec2-1.0.0-py3-none-any.whl"
+    wheel_path = tmp_path / EXPECTED_WHEEL_NAME
     symlink_entry = zipfile.ZipInfo("flowspec2/unsafe-link")
     symlink_entry.create_system = 3
     symlink_entry.external_attr = (stat.S_IFLNK | 0o777) << 16
@@ -363,7 +367,7 @@ def test_wheel_rejects_symlink_member(tmp_path: Path) -> None:
 
 
 def test_sdist_versions_must_match_expected_version(tmp_path: Path) -> None:
-    source_distribution_path = tmp_path / "flowspec2-1.0.0.tar.gz"
+    source_distribution_path = tmp_path / EXPECTED_SOURCE_DISTRIBUTION_NAME
     _minimal_sdist(source_distribution_path, "9.9.9")
 
     with pytest.raises(RuntimeError, match="source distribution metadata version"):
@@ -371,18 +375,18 @@ def test_sdist_versions_must_match_expected_version(tmp_path: Path) -> None:
 
 
 def test_sdist_rejects_path_traversal(tmp_path: Path) -> None:
-    source_distribution_path = tmp_path / "flowspec2-1.0.0.tar.gz"
+    source_distribution_path = tmp_path / EXPECTED_SOURCE_DISTRIBUTION_NAME
     with tarfile.open(source_distribution_path, mode="w:gz") as source_archive:
-        _add_tar_member(source_archive, "flowspec2-1.0.0/../escaped", b"unsafe")
+        _add_tar_member(source_archive, f"{EXPECTED_SOURCE_ROOT}/../escaped", b"unsafe")
 
     with pytest.raises(RuntimeError, match="unsafe member"):
         package_check._check_sdist(source_distribution_path, EXPECTED_VERSION)
 
 
 def test_sdist_rejects_unexpected_symlink(tmp_path: Path) -> None:
-    source_distribution_path = tmp_path / "flowspec2-1.0.0.tar.gz"
+    source_distribution_path = tmp_path / EXPECTED_SOURCE_DISTRIBUTION_NAME
     with tarfile.open(source_distribution_path, mode="w:gz") as source_archive:
-        archive_member = tarfile.TarInfo("flowspec2-1.0.0/unsafe-link")
+        archive_member = tarfile.TarInfo(f"{EXPECTED_SOURCE_ROOT}/unsafe-link")
         archive_member.type = tarfile.SYMTYPE
         archive_member.linkname = "../../outside"
         source_archive.addfile(archive_member)
@@ -392,7 +396,7 @@ def test_sdist_rejects_unexpected_symlink(tmp_path: Path) -> None:
 
 
 def test_sdist_rejects_unlisted_regular_member(tmp_path: Path) -> None:
-    source_distribution_path = tmp_path / "flowspec2-1.0.0.tar.gz"
+    source_distribution_path = tmp_path / EXPECTED_SOURCE_DISTRIBUTION_NAME
     _minimal_sdist(
         source_distribution_path,
         EXPECTED_VERSION,
@@ -417,18 +421,18 @@ def test_release_source_requires_clean_matching_tag(
     assert command_output.call_args_list == [
         call(("git", "status", "--porcelain", "--untracked-files=all")),
         call(("git", "rev-parse", "HEAD")),
-        call(("git", "rev-parse", "--verify", "refs/tags/v1.0.0^{commit}")),
+        call(("git", "rev-parse", "--verify", f"refs/tags/v{EXPECTED_VERSION}^{{commit}}")),
     ]
     release_metadata_verifier.assert_called_once_with(package_check.PROJECT_ROOT, EXPECTED_VERSION)
 
 
 def test_release_metadata_requires_matching_citation_and_changelog_date(tmp_path: Path) -> None:
     (tmp_path / "CITATION.cff").write_text(
-        "version: 1.0.0\ndate-released: 2026-07-15\n",
+        f"version: {EXPECTED_VERSION}\ndate-released: 2026-07-15\n",
         encoding="utf-8",
     )
     (tmp_path / "CHANGELOG.md").write_text(
-        "## Version 1.0.0 — 2026-07-15\n",
+        f"## Version {EXPECTED_VERSION} — 2026-07-15\n",
         encoding="utf-8",
     )
 
@@ -438,9 +442,12 @@ def test_release_metadata_requires_matching_citation_and_changelog_date(tmp_path
 
 
 def test_release_metadata_rejects_unpublished_citation(tmp_path: Path) -> None:
-    (tmp_path / "CITATION.cff").write_text("version: 1.0.0\n", encoding="utf-8")
+    (tmp_path / "CITATION.cff").write_text(
+        f"version: {EXPECTED_VERSION}\n",
+        encoding="utf-8",
+    )
     (tmp_path / "CHANGELOG.md").write_text(
-        "## Version 1.0.0 — prepared, not published\n",
+        f"## Version {EXPECTED_VERSION} — prepared, not published\n",
         encoding="utf-8",
     )
 

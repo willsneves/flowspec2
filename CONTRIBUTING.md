@@ -4,9 +4,9 @@ Table of Contents:
 
 - Development setup: 21 <!-- section:development-setup -->
 - Contract changes: 38 <!-- section:contract-changes -->
-- Verification: 53 <!-- section:verification -->
-- Pull requests: 70 <!-- section:pull-requests -->
-- Security reports: 83 <!-- section:security-reports -->
+- Verification: 58 <!-- section:verification -->
+- Pull requests: 75 <!-- section:pull-requests -->
+- Security reports: 88 <!-- section:security-reports -->
 
 <!-- /section:toc -->
 
@@ -23,7 +23,7 @@ rejects behavior outside those declared contracts.
 Clone the repository, install the locked environment, and run the project gate:
 
 ```bash
-uv sync --extra dev
+uv sync --locked --extra dev
 make ci
 make package-check
 ```
@@ -46,6 +46,11 @@ are never silently reinterpreted.
 Architecture decisions that change a public interface or impose migration cost
 require an ADR in `docs/adr/`. Experimental work remains isolated from the
 stable `flowspec/2` runtime contract.
+
+Since the public `1.0.0` release, an incompatible change to a stable public
+package surface requires a major package release as well as any new contract
+identifier or migration required by that surface. Patch and minor releases
+must preserve the documented stable compatibility boundary.
 
 <!-- /section:contract-changes -->
 <!-- section:verification -->

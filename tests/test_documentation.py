@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import re
+import tomllib
+from datetime import date
 from pathlib import Path
 
 import pytest
+import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTATION_PATHS = (
@@ -26,6 +29,11 @@ HEADING_PATTERN = re.compile(r"^(?P<markers>#{1,6}) (?P<title>.+)$")
 TOC_ENTRY_PATTERN = re.compile(
     rf"^\s*- .+: (?P<line_number>\d+) "
     rf"<!-- section:(?P<identifier>{SECTION_IDENTIFIER_PATTERN}) -->$"
+)
+MARKDOWN_LINK_PATTERN = re.compile(r"\]\((?P<target>[^)]+)\)")
+QUICKSTART_PATTERN = re.compile(
+    r"^<!-- section:quickstart -->\n\n## Quickstart\n\n```python\n(?P<source>.*?)\n```",
+    re.DOTALL | re.MULTILINE,
 )
 
 
@@ -99,3 +107,39 @@ def test_documentation_has_a_complete_generated_toc(documentation_path: Path) ->
     toc_line_numbers = dict(toc_entries)
     assert len(toc_entries) == len(toc_line_numbers)
     assert toc_line_numbers == heading_line_numbers
+
+
+def test_readme_links_survive_pypi_rendering() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    link_targets = [
+        markdown_link_match.group("target")
+        for markdown_link_match in MARKDOWN_LINK_PATTERN.finditer(readme)
+    ]
+
+    assert link_targets
+    assert all(link_target.startswith(("https://", "#")) for link_target in link_targets)
+
+
+def test_readme_quickstart_executes(capsys: pytest.CaptureFixture[str]) -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    quickstart_match = QUICKSTART_PATTERN.search(readme)
+
+    assert quickstart_match is not None
+    quickstart_source = quickstart_match.group("source")
+    exec(compile(quickstart_source, "README.md#quickstart", "exec"), {})
+
+    assert capsys.readouterr().out.splitlines() == ["How can we help?", "completed"]
+
+
+def test_citation_matches_package_release() -> None:
+    citation = yaml.safe_load((PROJECT_ROOT / "CITATION.cff").read_text(encoding="utf-8"))
+    with (PROJECT_ROOT / "pyproject.toml").open("rb") as project_file:
+        project_configuration = tomllib.load(project_file)
+
+    assert citation["version"] == project_configuration["project"]["version"]
+    assert isinstance(citation["date-released"], date)
+    release_heading = f"## Version {citation['version']} — {citation['date-released'].isoformat()}"
+    assert release_heading in (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "commit" not in citation
+    assert "repository-artifact" not in citation
+    assert "identifiers" not in citation

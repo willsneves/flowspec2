@@ -2,15 +2,17 @@
 
 Table of Contents:
 
-- Unreleased: 24 <!-- section:unreleased -->
-- Version 1.0.0 — 2026-07-16: 29 <!-- section:version-1-0-0 -->
-    - Added: 33 <!-- section:version-1-0-0-added -->
-    - Changed: 60 <!-- section:version-1-0-0-changed -->
-    - Security: 119 <!-- section:version-1-0-0-security -->
-- Version 0.2.0 — prepared 2026-07-13, not published: 134 <!-- section:version-0-2-0 -->
-    - Added: 138 <!-- section:version-0-2-0-added -->
-    - Changed: 155 <!-- section:version-0-2-0-changed -->
-    - Security: 170 <!-- section:version-0-2-0-security -->
+- Unreleased: 26 <!-- section:unreleased -->
+- Version 1.0.1 — 2026-07-16: 31 <!-- section:version-1-0-1 -->
+    - Changed: 38 <!-- section:version-1-0-1-changed -->
+- Version 1.0.0 — 2026-07-16: 48 <!-- section:version-1-0-0 -->
+    - Added: 55 <!-- section:version-1-0-0-added -->
+    - Changed: 82 <!-- section:version-1-0-0-changed -->
+    - Security: 141 <!-- section:version-1-0-0-security -->
+- Version 0.2.0 — prepared 2026-07-13, not published: 156 <!-- section:version-0-2-0 -->
+    - Added: 160 <!-- section:version-0-2-0-added -->
+    - Changed: 177 <!-- section:version-0-2-0-changed -->
+    - Security: 192 <!-- section:version-0-2-0-security -->
 
 <!-- /section:toc -->
 
@@ -24,9 +26,29 @@ All notable project changes are recorded here. Versioning follows
 ## Unreleased
 
 <!-- /section:unreleased -->
+<!-- section:version-1-0-1 -->
+
+## Version 1.0.1 — 2026-07-16
+
+Published on [PyPI](https://pypi.org/project/flowspec2/1.0.1/) and as
+[GitHub Release v1.0.1](https://github.com/wllsena/flowspec2/releases/tag/v1.0.1).
+
+<!-- section:version-1-0-1-changed -->
+
+### Changed
+
+- Reworked the PyPI project description and installed-package onboarding around
+  direct installation, optional extras, a self-contained executable quickstart,
+  portable documentation links, and regression checks for rendered metadata.
+
+<!-- /section:version-1-0-1-changed -->
+<!-- /section:version-1-0-1 -->
 <!-- section:version-1-0-0 -->
 
 ## Version 1.0.0 — 2026-07-16
+
+Published on [PyPI](https://pypi.org/project/flowspec2/1.0.0/) and as
+[GitHub Release v1.0.0](https://github.com/wllsena/flowspec2/releases/tag/v1.0.0).
 
 <!-- section:version-1-0-0-added -->
 
