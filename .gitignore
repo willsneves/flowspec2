@@ -5,16 +5,25 @@ __pycache__/
 .eggs/
 build/
 dist/
+
 # venv / uv
 .venv/
+
 # local environment files
 .env*
+
 # tooling caches
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
 # OS
 .DS_Store
+
 # editors
 .idea/
 .vscode/
+
+# Local harness documentation
+/AGENTS.md
+/CLAUDE.md
