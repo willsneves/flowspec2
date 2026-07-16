@@ -2,78 +2,61 @@
 
 Table of Contents:
 
-- Install: 80 <!-- section:install -->
-- LLM-driven (the engine side): 129 <!-- section:llm-driven -->
-- Quickstart: 198 <!-- section:quickstart -->
-- Real backends: 222 <!-- section:real-backends -->
-- Error correlation: 239 <!-- section:error-correlation -->
-- CLI: 262 <!-- section:cli -->
-- What it compiles: 322 <!-- section:what-it-compiles -->
-- Example: reparo de luminária: 348 <!-- section:example -->
-    - The flowspec/2 document: 355 <!-- section:example-document -->
-    - Compiled LangGraph: 993 <!-- section:example-compiled-langgraph -->
-- Layout: 1111 <!-- section:layout -->
-- Public contracts: 1160 <!-- section:public-contracts -->
-- Governance: 1183 <!-- section:governance -->
-- Status: 1200 <!-- section:status -->
+- Install: 63 <!-- section:install -->
+- LLM-driven (the engine side): 109 <!-- section:llm-driven -->
+- Quickstart: 167 <!-- section:quickstart -->
+- Real backends: 192 <!-- section:real-backends -->
+- Error correlation: 215 <!-- section:error-correlation -->
+- CLI: 232 <!-- section:cli -->
+- What it compiles: 281 <!-- section:what-it-compiles -->
+- Example: reparo de luminária: 307 <!-- section:example -->
+    - The flowspec/2 document: 314 <!-- section:example-document -->
+    - Compiled LangGraph: 952 <!-- section:example-compiled-langgraph -->
+- Layout: 1071 <!-- section:layout -->
+- Public contracts: 1125 <!-- section:public-contracts -->
+- Governance: 1145 <!-- section:governance -->
+- Status: 1159 <!-- section:status -->
 
 <!-- /section:toc -->
 
 # flowspec2
 
-**A JSON conversational-flow format that compiles to a [LangGraph](https://langchain-ai.github.io/langgraph/) `StateGraph` at runtime.**
+**A self-contained JSON format for bounded conversational flows, compiled at
+runtime into a [LangGraph](https://langchain-ai.github.io/langgraph/)
+`StateGraph`.** Each service is one document and becomes a callable tool or
+subgraph.
 
-You write one self-contained JSON document per service flow. A running agent
-loads it and `flowspec2` compiles it into an executable
-`StateGraph[ServiceState]` — the flow becomes immediately callable as a
-tool/subgraph. The package is a self-contained, dependency-light format and
-runtime compiler for bounded conversational service flows.
+> **Core idea: closed value domains separate rails from model freedom.** The
+> document fixes states, accepted values, transitions, guards, tool bindings,
+> pauses, idempotency, and recovery. The LLM chooses the flow, extracts a closed
+> token from natural input, phrases prompts, and selects permitted side actions.
+> It cannot invent transitions, widen a domain, or bypass a required slot unless
+> the author declared that route.
 
-> **One idea — the boundary is the closed value-domain.** The JSON pins the **rails** (states, value-domains, transitions, guards, tool bindings, interrupts, idempotency, guardrails); the LLM reasons and acts **freely within** them (which flow to enter, extracting the closed token from free text/voice/photo, phrasing, side actions). The LLM structurally *cannot* invent a transition, skip a required slot without an author-declared exhaustion route, or widen a value-domain.
+`flowspec/2` is stable and executable. `flowspec/3-draft` is an isolated,
+non-executable authoring experiment with typed loss accounting and analytical
+lowering to compile-checked v2; its supported fixed point is documented in the
+[preview](docs/FLOWSPEC3_DRAFT.md) and
+[lowering decision](docs/adr/0009-v3-preview-lowering-boundary.md).
 
-flowspec2 is deliberately specialized rather than a replacement for a general
-workflow language. See the [prior-art comparison](docs/PRIOR_ART.md), the
-[compatibility profiles](docs/COMPATIBILITY.md), and the
-[interoperability decision](docs/adr/0001-interoperability-boundaries.md). The
-[authoring/execution boundary](docs/adr/0002-format-authoring-execution-boundary.md)
-records why concise source is linked through a runtime profile and canonical IR
-before graph construction. The [AI authoring benchmark](docs/AUTHORING_BENCHMARK.md)
-defines the evidence protocol and executable conformance kit. The
-[evidence-authenticity decision](docs/adr/0004-evidence-authenticity.md)
-defines optional detached signatures and their external trust root. The
-[authoring-acceptance decision](docs/adr/0005-authoring-acceptance-semantics.md)
-defines why every graded semantic observation is public while fixture source
-syntax remains private. The
-[presentation-review decision](docs/adr/0006-authoring-presentation-review.md)
-separates source-bound human review of route and prompt prose from deterministic
-semantic success. The
-[operational-evidence decision](docs/adr/0007-operational-llm-evidence-boundary.md)
-keeps model-specific routing and extraction observations attributable and
-replayable without turning stochastic behavior into format conformance. Paired
-authored and counterfactual probes isolate whether trigger examples and
-extraction guidance change the observed model output. The
-[FlowSpec3 preview](docs/FLOWSPEC3_DRAFT.md) documents the isolated source
-experiment, typed loss accounting, and deterministic analytical lowering back
-to compile-checked v2. The
-[lowering-boundary decision](docs/adr/0009-v3-preview-lowering-boundary.md)
-defines the supported subset and fixed-point guarantee.
-The [external-wait resend decision](docs/adr/0010-external-wait-resend-policy.md)
-defines the opt-in runtime budget while preserving host-owned limiting for
-existing documents.
-The [public model transport decision](docs/adr/0011-public-model-transport-scope.md)
-keeps the repository self-contained by limiting integrated live-model execution
-to dependencies available through the public package contract.
-The [public namespace decision](docs/adr/0012-public-contract-namespace.md)
-places every project-owned schema and profile identifier under a namespace
-controlled by the repository owner. The deterministic GitHub Pages publication
-serves those identifiers directly from their canonical package sources. The
-[stable release decision](docs/adr/0013-stable-package-release-boundary.md)
-defines the compatibility boundary between stable `flowspec/2` and the isolated
-`flowspec/3-draft` experiment.
+Start with the [field reference](docs/SPEC.md), [design](docs/DESIGN.md),
+[prior-art comparison](docs/PRIOR_ART.md), and
+[compatibility profiles](docs/COMPATIBILITY.md). The
+[AI authoring benchmark](docs/AUTHORING_BENCHMARK.md) separates deterministic
+format conformance from real-model evidence. Releases and security are covered
+by the [changelog](CHANGELOG.md), [versioning policy](docs/VERSIONING.md), and
+[private vulnerability process](SECURITY.md).
 
-Release history and compatibility policy live in [CHANGELOG.md](CHANGELOG.md)
-and [VERSIONING.md](docs/VERSIONING.md). Report vulnerabilities through the
-private process in [SECURITY.md](SECURITY.md).
+Key decisions cover [interoperability](docs/adr/0001-interoperability-boundaries.md),
+[source/profile/IR separation](docs/adr/0002-format-authoring-execution-boundary.md),
+[evidence authenticity](docs/adr/0004-evidence-authenticity.md),
+[public acceptance semantics](docs/adr/0005-authoring-acceptance-semantics.md),
+[presentation review](docs/adr/0006-authoring-presentation-review.md),
+[report-only operational evidence](docs/adr/0007-operational-llm-evidence-boundary.md),
+[external-wait resend limits](docs/adr/0010-external-wait-resend-policy.md),
+[public model transports](docs/adr/0011-public-model-transport-scope.md),
+[contract namespaces](docs/adr/0012-public-contract-namespace.md), and the
+[stable package boundary](docs/adr/0013-stable-package-release-boundary.md).
 
 <!-- section:install -->
 
@@ -86,51 +69,47 @@ make package-check           # build, inspect, and smoke-test the wheel and sour
 uv run python examples/simulate.py   # 6 real citizen conversations over the HTTP backends
 ```
 
-Release preparation preserves the verified wheel and source distribution for
-publication instead of rebuilding them. From a clean checkout of the matching
-`vX.Y.Z` tag, the build target stages the wheel and source distribution,
-verifies their metadata, packaged contracts, locked dependencies, and installed
-behavior independently, then publishes the closed local set only after writing
-`SHA256SUMS`. It refuses an existing destination. The check target verifies the
-exact set and its integrity against the current `pyproject.toml` version without
-rebuilding:
+Release artifacts are built once from a clean checkout of the matching
+`vX.Y.Z` tag. The build verifies metadata, packaged contracts, locked
+dependencies, and installed behavior; writes `SHA256SUMS`; and refuses an
+existing destination. The check verifies the exact artifact set, integrity, and
+current `pyproject.toml` version without rebuilding:
 
 ```bash
 make release-build RELEASE_ARTIFACTS=build/release
 make release-check RELEASE_ARTIFACTS=build/release
 ```
 
-Pushing an immutable matching tag runs the same build-once verification in the
-release workflow. The verified wheel and source distribution are published to
-PyPI through OpenID Connect Trusted Publishing with provenance attestations;
-the same files and `SHA256SUMS` are then attached to the GitHub Release. The
-`pypi` environment must require maintainer approval and be registered as the
-project's PyPI Trusted Publisher before the first tag is pushed.
+An immutable tag publishes the verified wheel and source distribution to PyPI
+through OpenID Connect Trusted Publishing with provenance attestations, then
+attaches the same files and `SHA256SUMS` to the GitHub Release. Before the first
+tag, the `pypi` environment must require maintainer approval and be registered
+as the project's Trusted Publisher.
 
-Development tooling is pinned in `pyproject.toml` and `uv.lock`. `make lint`,
-`make typecheck`, and `make test` run independently; `make format` applies the
-configured Ruff fixes and formatter. Every target uses the locked `dev` extra
-without loading environment files. Pyright uses its packaged distribution and
-a signed, minimal Distroless Node runtime pinned by digest. The checker
-container runs without a shell or package manager and has no network,
-capabilities, writable root filesystem, or writable project mount. Docker is
-therefore the only additional prerequisite for `make typecheck` and `make ci`.
-GitHub Actions runs that same gate across every supported Python minor and runs
-`make package-check` separately. The workflow has read-only repository
-permissions, supports explicit manual dispatch, never loads secrets or
-live-model tests, and pins every Action and the uv toolchain to immutable
-versions.
+Tooling is pinned in `pyproject.toml` and `uv.lock`. `make lint`,
+`make typecheck`, and `make test` run independently; `make format` applies Ruff.
+All targets use the locked `dev` extra without loading environment files.
+Pyright runs through its packaged distribution and a signed, digest-pinned
+Distroless Node image with no shell, package manager, network, capabilities,
+writable root, or writable project mount. Docker is the only extra prerequisite
+for `make typecheck` and `make ci`. GitHub Actions runs the same gate across
+supported Python minors plus a separate package check, with read-only
+permissions, manual dispatch, no secrets or live-model tests, and immutable
+Action and uv pins.
 
-`examples/simulate.py` prints turn-by-turn transcripts of the reparo_luminaria flow as realistic conversations over the real HTTP backends (deterministic geocoder + SGRC via `MockTransport`): the production WhatsApp-Flow path, an address correction, gov.br auth, the praça→quadra branch, an SGRC outage (503 → retryable → recovers), and a duplicate submission replayed without a second backend call in the same registry. Durable cross-process exactly-once behavior remains a host-storage responsibility.
+`examples/simulate.py` prints six turn-by-turn `reparo_luminaria` conversations
+over deterministic HTTP backends via `MockTransport`: WhatsApp Flow, address
+correction, gov.br authentication, the praça→quadra branch, retry after an SGRC
+503, and duplicate submission replay within one registry. Durable cross-process
+exactly-once behavior remains the host's responsibility.
 
 <!-- /section:install -->
 <!-- section:llm-driven -->
 
 ## LLM-driven (the engine side)
 
-The simulations above feed already-extracted tokens. To exercise the
-*non-deterministic execution* side, `GeminiAgent` provides the
-production-shaped driver:
+The simulations use pre-extracted tokens. `GeminiAgent` exercises the
+non-deterministic side with free-text input:
 
 ```bash
 uv sync --extra llm                       # google-genai
@@ -138,31 +117,26 @@ export GEMINI_API_KEY=...
 uv run python examples/llm_bot.py         # the citizen speaks free text; the LLM routes + extracts
 ```
 
-The LLM does exactly two non-deterministic jobs, the rails hold everything else:
-- **route** — decide whether the citizen's free-text opener enters the flow
-  (from `route.description`, with `route.trigger_phrases` as non-exclusive
-  examples);
-- **extract** — read the messy message and the node's `payload_schema` / interactive options, and produce the **closed token** for the slot.
+The LLM has two jobs:
 
-flowspec2's validators then enforce the rail: an out-of-domain extraction is
-rejected and the node re-asks. Both transports receive a closed response JSON
-Schema built from the route catalog or active slot contract; parsed output is
-checked again locally before it reaches the runtime. The transcript shows the
-boundary per turn: `👤 free text → 🧠 LLM extraction → 🤖 the rail's next state`.
-Live-model tests are explicitly opted into; the default suite stays offline.
+- **Route:** choose a flow from `route.description`; `trigger_phrases` are
+  non-exclusive examples.
+- **Extract:** map natural input to the closed token defined by the active
+  `payload_schema` and interactive options.
 
-Authoring evaluation is a separate boundary. `GeminiAuthor` receives the
-packaged reference corpus, complete runtime-profile contract, and repair
-diagnostics, then returns source through the same closed authoring projection.
-A live run requires explicit network consent and writes one
-content-addressed evidence envelope containing exact emitted sources, report,
-corpus/profile digests, requested model configuration, any effective model
-identity exposed by the provider, prompt identity, package version, and the
-operator-supplied repository revision. The author request contains a versioned
-public acceptance contract: every graded semantic observation, required
-construct, forbidden construct, and intentionally variable presentation path.
-The private reference source remains unreachable from the model transport, and
-the evaluator grades only the public contract:
+Closed response schemas constrain both jobs, and local Draft 2020-12 validation
+still runs before runtime execution. Invalid values are rejected and re-asked.
+Live-model tests require explicit opt-in; the default suite is offline.
+
+Authoring evaluation is separate. `GeminiAuthor` receives the packaged corpus,
+complete runtime profile, public acceptance contract, prior source, and repair
+diagnostics—but never the private reference source—and returns exact source
+through the closed authoring projection. The public contract enumerates every
+graded observation, required and forbidden construct, and variable presentation
+path. With explicit network consent, the run writes a content-addressed envelope
+binding exact captures and the report to corpus/profile digests, model
+configuration and effective identity, prompt identity, package version,
+correction protocol, and repository revision:
 
 ```bash
 flowspec2 authoring-benchmark-gemini --allow-network --repository-revision <revision> --output authoring-evidence.json
@@ -173,24 +147,19 @@ flowspec2 operational-benchmark-gemini authoring-evidence.json --allow-network -
 flowspec2 operational-evidence-verify operational-evidence.json --authoring-evidence authoring-evidence.json --repository-revision <revision>
 ```
 
-The commands refuse to overwrite an existing artifact and write nothing when a
-provider fails. Gemini never records or prints its API key. Configured
-credentials alone never enable model execution.
-Verification is fully offline: it checks the closed envelope, content digest,
-package/corpus/profile identity, correction limit, exact capture hashes, and
-deterministic report replay. The digest proves integrity, not who created the
-artifact; authenticity is optional and uses a canonical detached Ed25519
-signature. The verifier takes the trusted public key explicitly, checks its
-derived key identifier, and never treats a key embedded beside the artifact as
-a trust root. Signing keys are read only from explicit PEM paths, are never
-serialized, and cannot be loaded from environment files.
+Commands never overwrite artifacts, emit partial output after provider failure,
+or record or print the API key. Configured credentials alone do not authorize
+network use. Verification is offline and replays every exact capture against
+the closed package, corpus, profile, and correction contracts. The content
+digest proves integrity, not identity; optional detached Ed25519 signatures use
+an explicit caller-trusted public key, while private keys come only from
+explicit PEM paths and are never serialized or loaded from environment files.
 
-Operational evidence is separately classified as `report_only`. It captures
-model-specific routing over trigger examples and extraction over schema-baked
-hints, including the exact request and raw response. A completed mismatch is
-preserved with `all_matched:false` under a successful report-only command; it
-does not change deterministic source conformance or presentation-review
-eligibility.
+Operational routing/extraction evidence remains `report_only`. It preserves
+exact requests and raw responses; paired authored/counterfactual probes isolate
+the effect of trigger examples and extraction hints. Completed mismatches remain
+successful report-only artifacts with `all_matched:false`, without changing
+deterministic conformance or presentation-review eligibility.
 
 <!-- /section:llm-driven -->
 <!-- section:quickstart -->
@@ -214,14 +183,17 @@ async def main():
 asyncio.run(main())
 ```
 
-`rt.as_tool()` returns a `multi_step_service`-style callable `(service_name, user_id, payload) -> dict` an outer agent dispatches to.
+`rt.as_tool()` returns a `multi_step_service`-style callable with the contract
+`(service_name, user_id, payload) -> dict`.
 
 <!-- /section:quickstart -->
 <!-- section:real-backends -->
 
 ## Real backends
 
-Tools (`geocode`, `cpf_lookup`, `get_user_info`, `sgrc_open_ticket`) default to in-memory fakes so the suite runs offline. Swap in real HTTP backends — `make_registry` overlays them onto the fakes per configured URL (partial config falls back per-tool, and the terminal's idempotency replay cache is preserved):
+`geocode`, `cpf_lookup`, `get_user_info`, and `sgrc_open_ticket` default to
+in-memory fakes. `make_registry` replaces only tools with configured URLs, so
+partial configurations retain the other fakes and the terminal replay cache:
 
 ```python
 from flowspec2 import FlowRuntime
@@ -231,30 +203,28 @@ cfg = BackendConfig.from_env()      # FLOWSPEC2_GEOCODE_URL / _CPF_LOOKUP_URL / 
 rt = FlowRuntime(doc, tools=make_registry(cfg))
 ```
 
-Install the HTTP extra with `uv sync --extra http`. The SGRC adapter maps HTTP semantics onto the terminal outcome trichotomy: **2xx → `success`**, **5xx / timeout / connection error → `retryable`** (the terminal node preserves state and re-fires next turn), **4xx → `fatal`** (resets). Backends are injectable (`transport=`) so they're tested offline with `httpx.MockTransport` — no network. Point each URL at an authorized service endpoint or a thin adapter conforming to the contracts in `backends/http.py`.
+Install HTTP support with `uv sync --extra http`. The SGRC adapter maps **2xx →
+`success`**, **5xx/timeout/connection error → `retryable`** with preserved state,
+and **4xx → `fatal`** with reset. Backends accept `transport=` for offline
+`httpx.MockTransport` tests. Each URL must target an authorized service or an
+adapter implementing `backends/http.py`.
 
 <!-- /section:real-backends -->
 <!-- section:error-correlation -->
 
 ## Error correlation
 
-Every runtime warning or error exposed to a caller carries a decimal Snowflake
-`log_id` that matches a structured Python log record. `AgentResponse` preserves
-the field, `FlowRuntime.as_tool()` returns both `error_message` and `log_id` when
-present, and CLI diagnostics render the identifier as `[log_id=…]`. Internal
-best-effort warnings use the same correlation contract.
+Every caller-visible warning or error carries a decimal Snowflake `log_id` that
+matches its structured log record. `AgentResponse` preserves it,
+`FlowRuntime.as_tool()` returns it with `error_message`, and the CLI renders
+`[log_id=…]`; internal best-effort warnings follow the same contract.
 
-`FlowRuntime` accepts an injectable `SnowflakeIdGenerator`, including an
-injectable clock for deterministic tests. The default generator derives a
-best-effort process-local worker identity. Concurrent processes must receive
-distinct `FLOWSPEC2_SNOWFLAKE_WORKER_ID` assignments to guarantee distributed
-uniqueness. Invalid worker configuration fails before an ID is emitted. The
-generator preserves ordering through wall-clock rollback and sequence
-saturation by advancing logical time under a lock.
-
-`FlowRuntime` also accepts an injectable `clock` for `ServiceMetadata` creation
-and update timestamps. The real UTC clock is only the default boundary adapter;
-tests and hosts can supply a deterministic clock without patching global state.
+`FlowRuntime` accepts injectable Snowflake generators and UTC clocks. The
+default generator derives a best-effort process-local worker identity;
+concurrent processes need distinct `FLOWSPEC2_SNOWFLAKE_WORKER_ID` values for
+distributed uniqueness. Invalid configuration fails before emission. Locked
+logical time preserves ordering across clock rollback and sequence saturation.
+The metadata clock is independently injectable for deterministic tests.
 
 <!-- /section:error-correlation -->
 <!-- section:cli -->
@@ -284,37 +254,26 @@ flowspec2 authoring-presentation-review-signature-verify build/authoring-evidenc
 flowspec2 authoring-promotion-verify build/authoring-evidence.json --review build/presentation-review.json --signature build/presentation-review.signature.json --public-key reviewer-public-key.pem --repository-revision <revision> --json
 ```
 
-Before finalization, edit only the `reviewer_identifier`, `decision`, and
-`rationale` fields in the draft.
-
-The Rasa adapter is a strict, versioned subset; `--allow-lossy` acknowledges its
-reported metadata and lifecycle differences. The Open Workflow adapter is a
-lossless profile envelope. See [COMPATIBILITY.md](docs/COMPATIBILITY.md) for the
-exact boundaries and Python API.
-
-`check --json` is the repair-loop interface for AI authors. Every finding has a
-stable code, severity, JSON Pointer, message, and optional related location or
-fix. Structural errors are aggregated first; semantic and runtime-profile
-linking run only when the source shape is safe to traverse; compilation is the
-final check. `normalize` and `ir` write only to standard output and never mutate
-the source document.
-
-`ir` and `mermaid` intentionally answer different topology questions. The
-canonical IR exposes source-linked compiler contracts and keeps registered
-subflows at their logical `use` anchors; it is the stable surface for digests,
-compatibility, and migration. `mermaid` inspects the executable graph after
-subflows and synthesized routers have been expanded, so it is the surface for
-reviewing actual fan-out, back-edges, and internal cycles. `graph` lists the
-node identifiers from that same expanded executable graph.
-
-Presentation-review initialization first verifies and replays the evidence,
-then writes an editable packet containing candidate prose and only public task,
-acceptance, and interaction context. Finalization rejects edits outside the
-reviewer identifier, criterion decisions, and rationales. Verification and
-signing repeat exact evidence and subject closure offline. Promotion
-verification reports the composite deterministic, review, and authentication
-decision; under [ADR 0006](docs/adr/0006-authoring-presentation-review.md) it is
-report-only until the documented promotion signal is satisfied.
+- `check --json` is the AI repair-loop interface. Findings have stable codes,
+  severity, JSON Pointer, message, and optional related location or fix.
+  Structural findings come first; safe sources then proceed through semantic,
+  profile, and compilation checks. `normalize` and `ir` write only to standard
+  output and never mutate source.
+- `ir` shows source-linked canonical contracts and logical subflow anchors for
+  digests, compatibility, and migration. `graph` and `mermaid` inspect the
+  expanded executable topology, including fan-out, back-edges, and internal
+  cycles.
+- Rasa conversion is a strict versioned subset; `--allow-lossy` acknowledges
+  reported metadata and lifecycle differences. Open Workflow uses a lossless
+  profile envelope. Exact boundaries and Python APIs are in
+  [COMPATIBILITY.md](docs/COMPATIBILITY.md).
+- Presentation-review initialization verifies and replays evidence before
+  creating a packet containing candidate prose and public context. Edit only
+  `reviewer_identifier`, `decision`, and `rationale`; finalization rejects other
+  changes. Verification and signing repeat evidence and subject closure
+  offline. Promotion verification combines deterministic, review, and
+  authentication results but remains report-only under
+  [ADR 0006](docs/adr/0006-authoring-presentation-review.md).
 
 <!-- /section:cli -->
 <!-- section:what-it-compiles -->
@@ -347,8 +306,8 @@ Full mapping + rationale + rejected alternatives: [`docs/DESIGN.md`](docs/DESIGN
 
 ## Example: reparo de luminária
 
-A full worked example — the flow behind the *reparo de luminária* guided
-attendance: the source flowspec/2 document and the LangGraph it compiles to.
+The complete source document and generated graph for a guided public-lighting
+repair service.
 
 <!-- section:example-document -->
 
@@ -992,9 +951,10 @@ attendance: the source flowspec/2 document and the LangGraph it compiles to.
 
 ### Compiled LangGraph
 
-`FlowRuntime(load_flow("examples/reparo_luminaria.flow.json"))` compiles that
-document into a single `StateGraph[ServiceState]`. The diagram below is the
-compiled graph, rendered straight from LangGraph:
+`FlowRuntime` compiles the document once into a `StateGraph[ServiceState]`.
+
+<details>
+<summary>Generated LangGraph (click to expand)</summary>
 
 ```python
 from flowspec2 import FlowRuntime, load_flow
@@ -1094,21 +1054,24 @@ graph TD;
 	classDef last fill:#bfb6fc
 ```
 
-Solid edge = `__start__ → __init__`. Dotted edges are the **synthesized
-conditional routers**: each step pauses by setting `agent_response` and routing
-to `__end__` (one turn = one question), otherwise it advances. The fan-out from
-`confirm_ticket_data` back to `collect_*` is the confirmation hub's non-linear
-back-edges (one per `confirm.correctable[]` slot); `address@1` and
-`identification@2` are the spliced subflows (collect_address/confirm_address and
-select_identification_method/collect_cpf/…). These internal subflow nodes and
-cycles appear here because Mermaid renders the expanded executable graph; the
-canonical IR retains each subflow as its logical `use` anchor.
+</details>
+
+The solid edge is `__start__ → __init__`. Dotted synthesized routers pause at
+`__end__` when `agent_response` is set—one question per invocation—and otherwise
+advance. The
+`confirm_ticket_data` fan-out contains one correction back-edge per
+`confirm.correctable[]` slot. Mermaid expands the internal nodes and cycles of
+`address@1` and `identification@2`; canonical IR keeps each subflow at its
+logical `use` anchor.
 
 <!-- /section:example-compiled-langgraph -->
 <!-- /section:example -->
 <!-- section:layout -->
 
 ## Layout
+
+<details>
+<summary>Source tree (click to expand)</summary>
 
 ```
 src/flowspec2/
@@ -1154,63 +1117,57 @@ examples/          reparo_luminaria.flow.json · reparo_buraco.flow.json
 tests/             schema · boundaries · linker · IR · authoring · compatibility · runtime E2E
 ```
 
+</details>
+
 <!-- /section:layout -->
 <!-- section:public-contracts -->
 
 ## Public contracts
 
-Every project-owned JSON Schema is published at its canonical `$id` under
+Project-owned JSON Schemas resolve at their canonical `$id` under
 [`wllsena.github.io/flowspec2`](https://wllsena.github.io/flowspec2/). The Open
-Workflow conversational-profile identifier resolves to a human-readable page
-linked to its schema and compatibility documentation.
-
-The site is generated from package sources rather than committed copies:
+Workflow profile identifier resolves to a page linking its schema and
+compatibility contract. The site is generated from package sources:
 
 ```bash
 make public-site-check
 make public-site-build PUBLIC_SITE=build/public-site
 ```
 
-The checker validates every schema, rejects duplicate or off-namespace
-identifiers, and proves that the generated resources equal the canonical
-documents. GitHub Pages deploys only the artifact built from `main` with
-short-lived identity and narrowly scoped permissions, then verifies over HTTP
-that every deployed resource still equals its canonical source.
+The checker validates schemas, rejects duplicate or off-namespace identifiers,
+and proves generated resources equal their canonical documents. GitHub Pages
+deploys only the `main` artifact with short-lived identity and narrow
+permissions, then verifies the deployed resources against source over HTTP.
 
 <!-- /section:public-contracts -->
 <!-- section:governance -->
 
 ## Governance
 
-Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md) and community
-interactions follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Cite the project
-with [CITATION.cff](CITATION.cff), report security issues through
-[SECURITY.md](SECURITY.md), and use the repository issue forms for public bug
-reports and feature proposals.
+See [CONTRIBUTING.md](CONTRIBUTING.md),
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [CITATION.cff](CITATION.cff), and
+[SECURITY.md](SECURITY.md); use the issue forms for public bugs and proposals.
 
-Development is substantially AI-assisted. The repository owner remains
-responsible for scope, review, verification, release decisions, and acceptance
-of every change. AI-generated commits carry an authorship trailer when
-applicable; no model output is accepted as evidence without the deterministic
-gates documented in this repository.
+Development is substantially AI-assisted, but the repository owner remains
+responsible for scope, review, verification, release, and acceptance.
+Substantially AI-authored commits carry an authorship trailer, and model output
+becomes evidence only through the repository's deterministic gates.
 
 <!-- /section:governance -->
 <!-- section:status -->
 
 ## Status
 
-Reference runtime for the stable flowspec/2 format. The isolated
-`flowspec/3-draft` package is an authoring experiment, not an executable or
-stable format. Its analytical lowerer accepts only the subset that can produce
-a compile-checked v2 source and migrate back to the exact preview; promotion
-still depends on comparative real-model benchmark evidence.
-The live runner emits the reproducible evidence artifact needed for that
-decision, but does not reinterpret fixture success as model-quality evidence.
-Subflows ship with in-memory fake backends so the suite runs offline; each
-backend is an injectable protocol that maps to the real production integration.
-Examples use civic-service scenarios and reserved demonstration endpoints; they
-do not represent an affiliation or a deployed integration.
+`flowspec/2` is stable and executable. `flowspec/3-draft` is neither: its
+analytical lowerer accepts only previews that can become compile-checked v2 and
+round-trip back exactly. Promotion still requires comparative real-model
+evidence; fixture success is not model-quality evidence.
 
-MIT licensed.
+The suite stays offline through injectable in-memory backends. Civic-service
+subflows ship with those fakes behind the same production-facing protocols. The
+live runner emits reproducible evidence for promotion decisions without treating
+fixture success as model-quality evidence. Civic-service examples use reserved
+demonstration endpoints and imply no affiliation or deployment. Licensed under
+MIT.
 
 <!-- /section:status -->
