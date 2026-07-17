@@ -27,7 +27,7 @@ recorded in
 
 The first public artifacts are recorded on
 [PyPI](https://pypi.org/project/flowspec2/1.0.0/) and the corresponding
-[GitHub Release](https://github.com/wllsena/flowspec2/releases/tag/v1.0.0).
+[GitHub Release](https://github.com/willsneves/flowspec2/releases/tag/v1.0.0).
 
 The package version is declared in `pyproject.toml`; `flowspec2.__version__`
 reads installed distribution metadata so it cannot drift from the built

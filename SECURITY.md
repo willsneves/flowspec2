@@ -29,7 +29,7 @@ outside the stable compatibility promise described in
 
 ## Reporting a vulnerability
 
-Use [GitHub private vulnerability reporting](https://github.com/wllsena/flowspec2/security/advisories/new).
+Use [GitHub private vulnerability reporting](https://github.com/willsneves/flowspec2/security/advisories/new).
 Do not open a public issue for an undisclosed vulnerability.
 
 Include the affected version, impact, minimal reproduction, relevant runtime
