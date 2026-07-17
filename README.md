@@ -44,37 +44,37 @@ required step that the flow did not authorize.
 experimental authoring preview: it is not registered with `FlowRuntime`, is
 outside the stable compatibility promise, and lowers only its documented subset
 to compile-checked v2 with an exact preview fixed-point proof. See the
-[preview contract](https://github.com/wllsena/flowspec2/blob/main/docs/FLOWSPEC3_DRAFT.md)
+[preview contract](https://github.com/willsneves/flowspec2/blob/main/docs/FLOWSPEC3_DRAFT.md)
 and
-[lowering decision](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0009-v3-preview-lowering-boundary.md).
+[lowering decision](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0009-v3-preview-lowering-boundary.md).
 
 The documentation entry points are the
-[field reference](https://github.com/wllsena/flowspec2/blob/main/docs/SPEC.md),
-[compiler and runtime design](https://github.com/wllsena/flowspec2/blob/main/docs/DESIGN.md),
-[compatibility profiles](https://github.com/wllsena/flowspec2/blob/main/docs/COMPATIBILITY.md),
-[prior-art comparison](https://github.com/wllsena/flowspec2/blob/main/docs/PRIOR_ART.md),
+[field reference](https://github.com/willsneves/flowspec2/blob/main/docs/SPEC.md),
+[compiler and runtime design](https://github.com/willsneves/flowspec2/blob/main/docs/DESIGN.md),
+[compatibility profiles](https://github.com/willsneves/flowspec2/blob/main/docs/COMPATIBILITY.md),
+[prior-art comparison](https://github.com/willsneves/flowspec2/blob/main/docs/PRIOR_ART.md),
 and
-[AI authoring benchmark](https://github.com/wllsena/flowspec2/blob/main/docs/AUTHORING_BENCHMARK.md).
+[AI authoring benchmark](https://github.com/willsneves/flowspec2/blob/main/docs/AUTHORING_BENCHMARK.md).
 Release history, compatibility policy, and private vulnerability reporting live
 in the
-[changelog](https://github.com/wllsena/flowspec2/blob/main/CHANGELOG.md),
-[versioning policy](https://github.com/wllsena/flowspec2/blob/main/docs/VERSIONING.md),
-and [security policy](https://github.com/wllsena/flowspec2/blob/main/SECURITY.md).
+[changelog](https://github.com/willsneves/flowspec2/blob/main/CHANGELOG.md),
+[versioning policy](https://github.com/willsneves/flowspec2/blob/main/docs/VERSIONING.md),
+and [security policy](https://github.com/willsneves/flowspec2/blob/main/SECURITY.md).
 
 The accepted decisions document
-[interoperability boundaries](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0001-interoperability-boundaries.md),
-[source/profile/IR separation](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0002-format-authoring-execution-boundary.md),
-[benchmark author trust](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0003-benchmark-author-trust-boundary.md),
-[evidence authenticity](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0004-evidence-authenticity.md),
-[public acceptance semantics](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0005-authoring-acceptance-semantics.md),
-[presentation review](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0006-authoring-presentation-review.md),
-[operational LLM evidence](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0007-operational-llm-evidence-boundary.md),
-[v3 loss accounting](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0008-v3-preview-loss-accounting.md),
-[external-wait resend policy](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0010-external-wait-resend-policy.md),
-[public model transport scope](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0011-public-model-transport-scope.md),
-[public contract namespaces](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0012-public-contract-namespace.md),
+[interoperability boundaries](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0001-interoperability-boundaries.md),
+[source/profile/IR separation](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0002-format-authoring-execution-boundary.md),
+[benchmark author trust](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0003-benchmark-author-trust-boundary.md),
+[evidence authenticity](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0004-evidence-authenticity.md),
+[public acceptance semantics](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0005-authoring-acceptance-semantics.md),
+[presentation review](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0006-authoring-presentation-review.md),
+[operational LLM evidence](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0007-operational-llm-evidence-boundary.md),
+[v3 loss accounting](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0008-v3-preview-loss-accounting.md),
+[external-wait resend policy](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0010-external-wait-resend-policy.md),
+[public model transport scope](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0011-public-model-transport-scope.md),
+[public contract namespaces](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0012-public-contract-namespace.md),
 and the
-[stable package boundary](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0013-stable-package-release-boundary.md).
+[stable package boundary](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0013-stable-package-release-boundary.md).
 
 <!-- section:install -->
 
@@ -114,14 +114,14 @@ Connect Trusted Publishing with provenance attestations. The preserved wheel
 and source distribution are available on
 [PyPI](https://pypi.org/project/flowspec2/1.0.1/); the same files and
 `SHA256SUMS` are attached to the
-[GitHub Release](https://github.com/wllsena/flowspec2/releases/tag/v1.0.1).
+[GitHub Release](https://github.com/willsneves/flowspec2/releases/tag/v1.0.1).
 
 Source-checkout setup, verification, and release instructions live in
-[CONTRIBUTING.md](https://github.com/wllsena/flowspec2/blob/main/CONTRIBUTING.md)
+[CONTRIBUTING.md](https://github.com/willsneves/flowspec2/blob/main/CONTRIBUTING.md)
 and the
-[versioning policy](https://github.com/wllsena/flowspec2/blob/main/docs/VERSIONING.md).
+[versioning policy](https://github.com/willsneves/flowspec2/blob/main/docs/VERSIONING.md).
 For release-exact source and documentation, use the
-[`v1.0.1` tag](https://github.com/wllsena/flowspec2/tree/v1.0.1); the default
+[`v1.0.1` tag](https://github.com/willsneves/flowspec2/tree/v1.0.1); the default
 branch may contain work prepared for a later package release.
 
 <!-- /section:install -->
@@ -350,7 +350,7 @@ flowspec2 authoring-promotion-verify build/authoring-evidence.json --review buil
   presentation, and host-adapter differences. Open Workflow uses a lossless
   profile envelope whose custom calls still require a profile-aware runtime.
   Exact boundaries and Python APIs are in the
-  [compatibility documentation](https://github.com/wllsena/flowspec2/blob/main/docs/COMPATIBILITY.md).
+  [compatibility documentation](https://github.com/willsneves/flowspec2/blob/main/docs/COMPATIBILITY.md).
 - Network-backed benchmark commands require `--allow-network`; verification,
   signing, and presentation-review commands do not call a provider.
   Presentation-review initialization verifies and replays evidence before
@@ -359,7 +359,7 @@ flowspec2 authoring-promotion-verify build/authoring-evidence.json --review buil
   changes. Verification and signing repeat evidence and subject closure
   offline. Promotion verification combines deterministic, review, and
   authentication results but remains report-only under
-  [ADR 0006](https://github.com/wllsena/flowspec2/blob/main/docs/adr/0006-authoring-presentation-review.md).
+  [ADR 0006](https://github.com/willsneves/flowspec2/blob/main/docs/adr/0006-authoring-presentation-review.md).
 
 <!-- /section:cli -->
 <!-- section:what-it-compiles -->
@@ -394,8 +394,8 @@ flowspec/2 JSON -> structural validation -> semantic linking -> runtime profile
 | `predicate` grammar | pure boolean function over `ServiceState` compiled into routers/early-returns |
 
 Full mapping, rationale, and rejected alternatives are in the
-[design](https://github.com/wllsena/flowspec2/blob/main/docs/DESIGN.md). The
-[field reference](https://github.com/wllsena/flowspec2/blob/main/docs/SPEC.md)
+[design](https://github.com/willsneves/flowspec2/blob/main/docs/DESIGN.md). The
+[field reference](https://github.com/willsneves/flowspec2/blob/main/docs/SPEC.md)
 documents every source contract.
 
 <!-- /section:what-it-compiles -->
@@ -404,7 +404,7 @@ documents every source contract.
 ## Example: streetlight repair
 
 The complete executable contract is available in the source repository as
-[`examples/streetlight_repair.flow.json`](https://github.com/wllsena/flowspec2/blob/main/examples/streetlight_repair.flow.json).
+[`examples/streetlight_repair.flow.json`](https://github.com/willsneves/flowspec2/blob/main/examples/streetlight_repair.flow.json).
 It demonstrates closed domains, conditional collection, corrections, address
 and identification subflows, typed external resume, idempotent submission, and
 recovery policies. Compile it from a source checkout to inspect the generated
@@ -510,11 +510,11 @@ permissions, then verifies the deployed resources against source over HTTP.
 ## Governance
 
 See the
-[contribution guide](https://github.com/wllsena/flowspec2/blob/main/CONTRIBUTING.md),
-[code of conduct](https://github.com/wllsena/flowspec2/blob/main/CODE_OF_CONDUCT.md),
-[citation metadata](https://github.com/wllsena/flowspec2/blob/main/CITATION.cff),
-and [security policy](https://github.com/wllsena/flowspec2/blob/main/SECURITY.md).
-[Support](https://github.com/wllsena/flowspec2/blob/main/SUPPORT.md) routes usage
+[contribution guide](https://github.com/willsneves/flowspec2/blob/main/CONTRIBUTING.md),
+[code of conduct](https://github.com/willsneves/flowspec2/blob/main/CODE_OF_CONDUCT.md),
+[citation metadata](https://github.com/willsneves/flowspec2/blob/main/CITATION.cff),
+and [security policy](https://github.com/willsneves/flowspec2/blob/main/SECURITY.md).
+[Support](https://github.com/willsneves/flowspec2/blob/main/SUPPORT.md) routes usage
 questions, public bugs, proposals, and private security reports.
 
 Development is substantially AI-assisted, but the repository owner remains
@@ -530,10 +530,10 @@ becomes evidence only through the repository's deterministic gates.
 The latest verified PyPI artifact is the stable `flowspec2 1.0.1` package,
 published on
 [PyPI](https://pypi.org/project/flowspec2/1.0.1/) and mirrored by the immutable
-[GitHub Release](https://github.com/wllsena/flowspec2/releases/tag/v1.0.1).
+[GitHub Release](https://github.com/willsneves/flowspec2/releases/tag/v1.0.1).
 Repository metadata may prepare a later version before publication; a prepared
 version is not a release until its verified artifacts exist on PyPI. The
-[changelog](https://github.com/wllsena/flowspec2/blob/main/CHANGELOG.md) labels
+[changelog](https://github.com/willsneves/flowspec2/blob/main/CHANGELOG.md) labels
 that distinction explicitly.
 
 `flowspec/2` is stable and executable. `flowspec/3-draft` is neither: its

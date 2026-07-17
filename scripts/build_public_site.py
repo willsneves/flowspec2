@@ -165,7 +165,7 @@ def _write_open_workflow_profile(site_directory: Path) -> None:
             "Open Workflow conversational profile",
             f"""    <p><code>{profile_identifier}</code> identifies the lossless flowspec2 conversational subset of Open Workflow Specification.</p>
     <p><a href="{schema_identifier}">Profile JSON Schema</a></p>
-    <p><a href="https://github.com/wllsena/flowspec2/blob/main/docs/COMPATIBILITY.md">Compatibility documentation</a></p>""",
+    <p><a href="https://github.com/willsneves/flowspec2/blob/main/docs/COMPATIBILITY.md">Compatibility documentation</a></p>""",
         ),
         encoding="utf-8",
     )

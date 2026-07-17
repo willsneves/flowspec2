@@ -5,9 +5,9 @@ type: software
 version: 1.0.1
 date-released: 2026-07-16
 authors:
-  - name: wllsena
-repository-code: "https://github.com/wllsena/flowspec2"
-url: "https://github.com/wllsena/flowspec2"
+  - name: William Neves
+repository-code: "https://github.com/willsneves/flowspec2"
+url: "https://github.com/willsneves/flowspec2"
 license: MIT
 keywords:
   - conversational-ai

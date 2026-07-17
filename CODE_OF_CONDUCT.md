@@ -50,7 +50,7 @@ Guidelines.
 ## Reporting
 
 Report repository conduct concerns privately to the maintainer through the
-contact options on the [maintainer's GitHub profile](https://github.com/wllsena).
+contact options on the [maintainer's GitHub profile](https://github.com/willsneves).
 Security vulnerabilities follow [SECURITY.md](SECURITY.md) instead. Reports are
 handled with the minimum disclosure needed to investigate and respond.
 

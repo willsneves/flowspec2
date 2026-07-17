@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "wllsena" }]
+authors = [{ name = "William Neves" }]
 keywords = ["langgraph", "conversational-ai", "slot-filling", "whatsapp", "dsl", "state-machine"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -27,11 +27,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/wllsena/flowspec2"
-Repository = "https://github.com/wllsena/flowspec2.git"
-Documentation = "https://github.com/wllsena/flowspec2#readme"
-Issues = "https://github.com/wllsena/flowspec2/issues"
-Changelog = "https://github.com/wllsena/flowspec2/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/willsneves/flowspec2"
+Repository = "https://github.com/willsneves/flowspec2.git"
+Documentation = "https://github.com/willsneves/flowspec2#readme"
+Issues = "https://github.com/willsneves/flowspec2/issues"
+Changelog = "https://github.com/willsneves/flowspec2/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 http = [
