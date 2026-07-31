@@ -27,3 +27,326 @@ dist/
 # Local harness documentation
 /AGENTS.md
 /CLAUDE.md
+
+# >>> agent-md (managed; do not edit by hand) >>>
+# agent-md-owned: .codex/rules/default.rules
+# agent-md-owned: .agents/model-routing.json
+# agent-md-owned: .make/shared.mk
+# agent-md-owned: .mcp.json
+# agent-md-owned: .cursor/mcp.json
+# agent-md-owned: .claude/skills/audit
+# agent-md-owned: .agents/skills/audit
+# agent-md-owned: .cursor/skills/audit
+# agent-md-owned: .claude/skills/doctor
+# agent-md-owned: .agents/skills/doctor
+# agent-md-owned: .cursor/skills/doctor
+# agent-md-owned: .claude/skills/prompt-architect
+# agent-md-owned: .agents/skills/prompt-architect
+# agent-md-owned: .cursor/skills/prompt-architect
+# agent-md-owned: .claude/skills/skill-author
+# agent-md-owned: .agents/skills/skill-author
+# agent-md-owned: .cursor/skills/skill-author
+# agent-md-owned: .claude/skills/update-toc
+# agent-md-owned: .agents/skills/update-toc
+# agent-md-owned: .cursor/skills/update-toc
+# agent-md-owned: .claude/skills/session-handoff
+# agent-md-owned: .agents/skills/session-handoff
+# agent-md-owned: .cursor/skills/session-handoff
+# agent-md-owned: .claude/skills/pre-commit-gate
+# agent-md-owned: .agents/skills/pre-commit-gate
+# agent-md-owned: .cursor/skills/pre-commit-gate
+# agent-md-owned: .claude/skills/pr-workflow
+# agent-md-owned: .agents/skills/pr-workflow
+# agent-md-owned: .cursor/skills/pr-workflow
+# agent-md-owned: .claude/skills/release-and-rollback
+# agent-md-owned: .agents/skills/release-and-rollback
+# agent-md-owned: .cursor/skills/release-and-rollback
+# agent-md-owned: .claude/skills/deploy-via-deployer
+# agent-md-owned: .agents/skills/deploy-via-deployer
+# agent-md-owned: .cursor/skills/deploy-via-deployer
+# agent-md-owned: .claude/skills/vet-dependency
+# agent-md-owned: .agents/skills/vet-dependency
+# agent-md-owned: .cursor/skills/vet-dependency
+# agent-md-owned: .claude/skills/write-adr
+# agent-md-owned: .agents/skills/write-adr
+# agent-md-owned: .cursor/skills/write-adr
+# agent-md-owned: .claude/skills/frontend-polish
+# agent-md-owned: .agents/skills/frontend-polish
+# agent-md-owned: .cursor/skills/frontend-polish
+# agent-md-owned: .claude/skills/rewrite-agents-md
+# agent-md-owned: .agents/skills/rewrite-agents-md
+# agent-md-owned: .cursor/skills/rewrite-agents-md
+# agent-md-owned: .claude/skills/rewrite-doc
+# agent-md-owned: .agents/skills/rewrite-doc
+# agent-md-owned: .cursor/skills/rewrite-doc
+# agent-md-owned: .claude/skills/prompt-tune
+# agent-md-owned: .agents/skills/prompt-tune
+# agent-md-owned: .cursor/skills/prompt-tune
+# agent-md-owned: .claude/skills/research-pass
+# agent-md-owned: .agents/skills/research-pass
+# agent-md-owned: .cursor/skills/research-pass
+# agent-md-owned: .claude/skills/propose-skill
+# agent-md-owned: .agents/skills/propose-skill
+# agent-md-owned: .cursor/skills/propose-skill
+# agent-md-owned: .claude/skills/harness-refresh
+# agent-md-owned: .agents/skills/harness-refresh
+# agent-md-owned: .cursor/skills/harness-refresh
+# agent-md-owned: .claude/skills/archive-skill
+# agent-md-owned: .agents/skills/archive-skill
+# agent-md-owned: .cursor/skills/archive-skill
+# agent-md-owned: .claude/skills/deep-research-prompt
+# agent-md-owned: .agents/skills/deep-research-prompt
+# agent-md-owned: .cursor/skills/deep-research-prompt
+# agent-md-owned: .claude/skills/onboard
+# agent-md-owned: .agents/skills/onboard
+# agent-md-owned: .cursor/skills/onboard
+# agent-md-owned: .claude/skills/close-session
+# agent-md-owned: .agents/skills/close-session
+# agent-md-owned: .cursor/skills/close-session
+# agent-md-owned: .claude/skills/reviews
+# agent-md-owned: .agents/skills/reviews
+# agent-md-owned: .cursor/skills/reviews
+# agent-md-owned: .claude/skills/quick-recap
+# agent-md-owned: .agents/skills/quick-recap
+# agent-md-owned: .cursor/skills/quick-recap
+# agent-md-owned: .claude/skills/agent-bus
+# agent-md-owned: .agents/skills/agent-bus
+# agent-md-owned: .cursor/skills/agent-bus
+# agent-md-owned: .claude/skills/codex-agent
+# agent-md-owned: .agents/skills/codex-agent
+# agent-md-owned: .cursor/skills/codex-agent
+# agent-md-owned: .claude/skills/plan-documentation
+# agent-md-owned: .agents/skills/plan-documentation
+# agent-md-owned: .cursor/skills/plan-documentation
+# agent-md-owned: .claude/skills/model-release
+# agent-md-owned: .agents/skills/model-release
+# agent-md-owned: .cursor/skills/model-release
+# agent-md-owned: .claude/skills/behavior-review
+# agent-md-owned: .agents/skills/behavior-review
+# agent-md-owned: .cursor/skills/behavior-review
+# agent-md-owned: .claude/skills/version
+# agent-md-owned: .agents/skills/version
+# agent-md-owned: .cursor/skills/version
+# agent-md-owned: .claude/agents/implementation.md
+# agent-md-owned: .codex/agents/implementation.toml
+# agent-md-owned: .cursor/agents/implementation.md
+# agent-md-owned: .claude/agents/debugging.md
+# agent-md-owned: .codex/agents/debugging.toml
+# agent-md-owned: .cursor/agents/debugging.md
+# agent-md-owned: .claude/agents/review.md
+# agent-md-owned: .codex/agents/review.toml
+# agent-md-owned: .cursor/agents/review.md
+# agent-md-owned: .claude/agents/refactoring.md
+# agent-md-owned: .codex/agents/refactoring.toml
+# agent-md-owned: .cursor/agents/refactoring.md
+# agent-md-owned: .claude/agents/architecture.md
+# agent-md-owned: .codex/agents/architecture.toml
+# agent-md-owned: .cursor/agents/architecture.md
+# agent-md-owned: .claude/agents/testing.md
+# agent-md-owned: .codex/agents/testing.toml
+# agent-md-owned: .cursor/agents/testing.md
+# agent-md-owned: .claude/agents/research.md
+# agent-md-owned: .codex/agents/research.toml
+# agent-md-owned: .cursor/agents/research.md
+# agent-md-owned: .claude/agents/documentation.md
+# agent-md-owned: .codex/agents/documentation.toml
+# agent-md-owned: .cursor/agents/documentation.md
+# agent-md-owned: .claude/agents/security.md
+# agent-md-owned: .codex/agents/security.toml
+# agent-md-owned: .cursor/agents/security.md
+# agent-md-owned: .claude/agents/data.md
+# agent-md-owned: .codex/agents/data.toml
+# agent-md-owned: .cursor/agents/data.md
+# agent-md-owned: .claude/agents/operations.md
+# agent-md-owned: .codex/agents/operations.toml
+# agent-md-owned: .cursor/agents/operations.md
+# agent-md-owned: .claude/agents/harness-doctor.md
+# agent-md-owned: .codex/agents/harness-doctor.toml
+# agent-md-owned: .cursor/agents/harness-doctor.md
+# agent-md-owned: .claude/agents/skill-reviewer.md
+# agent-md-owned: .codex/agents/skill-reviewer.toml
+# agent-md-owned: .cursor/agents/skill-reviewer.md
+# agent-md-owned: .claude/agents/corpus-pass.md
+# agent-md-owned: .codex/agents/corpus-pass.toml
+# agent-md-owned: .cursor/agents/corpus-pass.md
+# agent-md-owned: .claude/agents/runtime-auditor.md
+# agent-md-owned: .codex/agents/runtime-auditor.toml
+# agent-md-owned: .cursor/agents/runtime-auditor.md
+# agent-md-owned: .claude/agents/hook-doctor.md
+# agent-md-owned: .codex/agents/hook-doctor.toml
+# agent-md-owned: .cursor/agents/hook-doctor.md
+# agent-md-owned: .claude/agents/vendor-doc-refresh.md
+# agent-md-owned: .codex/agents/vendor-doc-refresh.toml
+# agent-md-owned: .cursor/agents/vendor-doc-refresh.md
+# agent-md-owned: .claude/agents/skill-router-reviewer.md
+# agent-md-owned: .codex/agents/skill-router-reviewer.toml
+# agent-md-owned: .cursor/agents/skill-router-reviewer.md
+# agent-md-owned: .agent-md-version
+# agent-md-owned: AGENTS.md
+# agent-md-owned: CLAUDE.md
+# agent-md-owned: .cursor/rules/agents-md-doctrine.mdc
+# agent-md-owned: .claude/skills/skill-eval
+# agent-md-owned: .agents/skills/skill-eval
+# agent-md-owned: .cursor/skills/skill-eval
+.claude/handoff.md
+.claude/settings.local.json
+.codex/rules/default.rules
+.agents/model-routing.json
+.make/shared.mk
+/.mcp.json
+.cursor/mcp.json
+.claude/skills/audit
+.agents/skills/audit
+.cursor/skills/audit
+.claude/skills/doctor
+.agents/skills/doctor
+.cursor/skills/doctor
+.claude/skills/prompt-architect
+.agents/skills/prompt-architect
+.cursor/skills/prompt-architect
+.claude/skills/skill-author
+.agents/skills/skill-author
+.cursor/skills/skill-author
+.claude/skills/update-toc
+.agents/skills/update-toc
+.cursor/skills/update-toc
+.claude/skills/session-handoff
+.agents/skills/session-handoff
+.cursor/skills/session-handoff
+.claude/skills/pre-commit-gate
+.agents/skills/pre-commit-gate
+.cursor/skills/pre-commit-gate
+.claude/skills/pr-workflow
+.agents/skills/pr-workflow
+.cursor/skills/pr-workflow
+.claude/skills/release-and-rollback
+.agents/skills/release-and-rollback
+.cursor/skills/release-and-rollback
+.claude/skills/deploy-via-deployer
+.agents/skills/deploy-via-deployer
+.cursor/skills/deploy-via-deployer
+.claude/skills/vet-dependency
+.agents/skills/vet-dependency
+.cursor/skills/vet-dependency
+.claude/skills/write-adr
+.agents/skills/write-adr
+.cursor/skills/write-adr
+.claude/skills/frontend-polish
+.agents/skills/frontend-polish
+.cursor/skills/frontend-polish
+.claude/skills/rewrite-agents-md
+.agents/skills/rewrite-agents-md
+.cursor/skills/rewrite-agents-md
+.claude/skills/rewrite-doc
+.agents/skills/rewrite-doc
+.cursor/skills/rewrite-doc
+.claude/skills/prompt-tune
+.agents/skills/prompt-tune
+.cursor/skills/prompt-tune
+.claude/skills/research-pass
+.agents/skills/research-pass
+.cursor/skills/research-pass
+.claude/skills/propose-skill
+.agents/skills/propose-skill
+.cursor/skills/propose-skill
+.claude/skills/harness-refresh
+.agents/skills/harness-refresh
+.cursor/skills/harness-refresh
+.claude/skills/archive-skill
+.agents/skills/archive-skill
+.cursor/skills/archive-skill
+.claude/skills/deep-research-prompt
+.agents/skills/deep-research-prompt
+.cursor/skills/deep-research-prompt
+.claude/skills/onboard
+.agents/skills/onboard
+.cursor/skills/onboard
+.claude/skills/close-session
+.agents/skills/close-session
+.cursor/skills/close-session
+.claude/skills/reviews
+.agents/skills/reviews
+.cursor/skills/reviews
+.claude/skills/quick-recap
+.agents/skills/quick-recap
+.cursor/skills/quick-recap
+.claude/skills/agent-bus
+.agents/skills/agent-bus
+.cursor/skills/agent-bus
+.claude/skills/codex-agent
+.agents/skills/codex-agent
+.cursor/skills/codex-agent
+.claude/skills/plan-documentation
+.agents/skills/plan-documentation
+.cursor/skills/plan-documentation
+.claude/skills/model-release
+.agents/skills/model-release
+.cursor/skills/model-release
+.claude/skills/behavior-review
+.agents/skills/behavior-review
+.cursor/skills/behavior-review
+.claude/skills/version
+.agents/skills/version
+.cursor/skills/version
+.claude/agents/implementation.md
+.codex/agents/implementation.toml
+.cursor/agents/implementation.md
+.claude/agents/debugging.md
+.codex/agents/debugging.toml
+.cursor/agents/debugging.md
+.claude/agents/review.md
+.codex/agents/review.toml
+.cursor/agents/review.md
+.claude/agents/refactoring.md
+.codex/agents/refactoring.toml
+.cursor/agents/refactoring.md
+.claude/agents/architecture.md
+.codex/agents/architecture.toml
+.cursor/agents/architecture.md
+.claude/agents/testing.md
+.codex/agents/testing.toml
+.cursor/agents/testing.md
+.claude/agents/research.md
+.codex/agents/research.toml
+.cursor/agents/research.md
+.claude/agents/documentation.md
+.codex/agents/documentation.toml
+.cursor/agents/documentation.md
+.claude/agents/security.md
+.codex/agents/security.toml
+.cursor/agents/security.md
+.claude/agents/data.md
+.codex/agents/data.toml
+.cursor/agents/data.md
+.claude/agents/operations.md
+.codex/agents/operations.toml
+.cursor/agents/operations.md
+.claude/agents/harness-doctor.md
+.codex/agents/harness-doctor.toml
+.cursor/agents/harness-doctor.md
+.claude/agents/skill-reviewer.md
+.codex/agents/skill-reviewer.toml
+.cursor/agents/skill-reviewer.md
+.claude/agents/corpus-pass.md
+.codex/agents/corpus-pass.toml
+.cursor/agents/corpus-pass.md
+.claude/agents/runtime-auditor.md
+.codex/agents/runtime-auditor.toml
+.cursor/agents/runtime-auditor.md
+.claude/agents/hook-doctor.md
+.codex/agents/hook-doctor.toml
+.cursor/agents/hook-doctor.md
+.claude/agents/vendor-doc-refresh.md
+.codex/agents/vendor-doc-refresh.toml
+.cursor/agents/vendor-doc-refresh.md
+.claude/agents/skill-router-reviewer.md
+.codex/agents/skill-router-reviewer.toml
+.cursor/agents/skill-router-reviewer.md
+/.agent-md-version
+/AGENTS.md
+/CLAUDE.md
+.cursor/rules/agents-md-doctrine.mdc
+.claude/skills/skill-eval
+.agents/skills/skill-eval
+.cursor/skills/skill-eval
+# <<< agent-md <<<
