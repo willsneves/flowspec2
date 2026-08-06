@@ -188,6 +188,153 @@ dist/
 # agent-md-owned: .claude/skills/skill-eval
 # agent-md-owned: .agents/skills/skill-eval
 # agent-md-owned: .cursor/skills/skill-eval
+# agent-md-owned: .claude/skills/audit.backup-20260805-223807
+# agent-md-owned: .agents/skills/audit.backup-20260805-223807
+# agent-md-owned: .cursor/skills/audit.backup-20260805-223808
+# agent-md-owned: .claude/skills/doctor.backup-20260805-223808
+# agent-md-owned: .agents/skills/doctor.backup-20260805-223808
+# agent-md-owned: .cursor/skills/doctor.backup-20260805-223808
+# agent-md-owned: .claude/skills/prompt-architect.backup-20260805-223808
+# agent-md-owned: .agents/skills/prompt-architect.backup-20260805-223808
+# agent-md-owned: .cursor/skills/prompt-architect.backup-20260805-223808
+# agent-md-owned: .claude/skills/skill-author.backup-20260805-223808
+# agent-md-owned: .agents/skills/skill-author.backup-20260805-223808
+# agent-md-owned: .cursor/skills/skill-author.backup-20260805-223808
+# agent-md-owned: .claude/skills/update-toc.backup-20260805-223809
+# agent-md-owned: .agents/skills/update-toc.backup-20260805-223809
+# agent-md-owned: .cursor/skills/update-toc.backup-20260805-223809
+# agent-md-owned: .claude/skills/session-handoff.backup-20260805-223809
+# agent-md-owned: .agents/skills/session-handoff.backup-20260805-223809
+# agent-md-owned: .cursor/skills/session-handoff.backup-20260805-223809
+# agent-md-owned: .claude/skills/pre-commit-gate.backup-20260805-223809
+# agent-md-owned: .agents/skills/pre-commit-gate.backup-20260805-223809
+# agent-md-owned: .cursor/skills/pre-commit-gate.backup-20260805-223809
+# agent-md-owned: .claude/skills/pr-workflow.backup-20260805-223810
+# agent-md-owned: .agents/skills/pr-workflow.backup-20260805-223810
+# agent-md-owned: .cursor/skills/pr-workflow.backup-20260805-223810
+# agent-md-owned: .claude/skills/release-and-rollback.backup-20260805-223810
+# agent-md-owned: .agents/skills/release-and-rollback.backup-20260805-223810
+# agent-md-owned: .cursor/skills/release-and-rollback.backup-20260805-223810
+# agent-md-owned: .claude/skills/deploy-via-deployer.backup-20260805-223810
+# agent-md-owned: .agents/skills/deploy-via-deployer.backup-20260805-223810
+# agent-md-owned: .cursor/skills/deploy-via-deployer.backup-20260805-223810
+# agent-md-owned: .claude/skills/vet-dependency.backup-20260805-223810
+# agent-md-owned: .agents/skills/vet-dependency.backup-20260805-223811
+# agent-md-owned: .cursor/skills/vet-dependency.backup-20260805-223811
+# agent-md-owned: .claude/skills/write-adr.backup-20260805-223811
+# agent-md-owned: .agents/skills/write-adr.backup-20260805-223811
+# agent-md-owned: .cursor/skills/write-adr.backup-20260805-223811
+# agent-md-owned: .claude/skills/frontend-polish.backup-20260805-223811
+# agent-md-owned: .agents/skills/frontend-polish.backup-20260805-223811
+# agent-md-owned: .cursor/skills/frontend-polish.backup-20260805-223811
+# agent-md-owned: .claude/skills/rewrite-agents-md.backup-20260805-223811
+# agent-md-owned: .agents/skills/rewrite-agents-md.backup-20260805-223811
+# agent-md-owned: .cursor/skills/rewrite-agents-md.backup-20260805-223812
+# agent-md-owned: .claude/skills/rewrite-doc.backup-20260805-223812
+# agent-md-owned: .agents/skills/rewrite-doc.backup-20260805-223812
+# agent-md-owned: .cursor/skills/rewrite-doc.backup-20260805-223812
+# agent-md-owned: .claude/skills/prompt-tune.backup-20260805-223812
+# agent-md-owned: .agents/skills/prompt-tune.backup-20260805-223812
+# agent-md-owned: .cursor/skills/prompt-tune.backup-20260805-223812
+# agent-md-owned: .claude/skills/research-pass.backup-20260805-223812
+# agent-md-owned: .agents/skills/research-pass.backup-20260805-223812
+# agent-md-owned: .cursor/skills/research-pass.backup-20260805-223812
+# agent-md-owned: .claude/skills/propose-skill.backup-20260805-223813
+# agent-md-owned: .agents/skills/propose-skill.backup-20260805-223813
+# agent-md-owned: .cursor/skills/propose-skill.backup-20260805-223813
+# agent-md-owned: .claude/skills/harness-refresh.backup-20260805-223813
+# agent-md-owned: .agents/skills/harness-refresh.backup-20260805-223813
+# agent-md-owned: .cursor/skills/harness-refresh.backup-20260805-223813
+# agent-md-owned: .claude/skills/archive-skill.backup-20260805-223813
+# agent-md-owned: .agents/skills/archive-skill.backup-20260805-223813
+# agent-md-owned: .cursor/skills/archive-skill.backup-20260805-223813
+# agent-md-owned: .claude/skills/deep-research-prompt.backup-20260805-223813
+# agent-md-owned: .agents/skills/deep-research-prompt.backup-20260805-223814
+# agent-md-owned: .cursor/skills/deep-research-prompt.backup-20260805-223814
+# agent-md-owned: .claude/skills/onboard.backup-20260805-223814
+# agent-md-owned: .agents/skills/onboard.backup-20260805-223814
+# agent-md-owned: .cursor/skills/onboard.backup-20260805-223814
+# agent-md-owned: .claude/skills/close-session.backup-20260805-223814
+# agent-md-owned: .agents/skills/close-session.backup-20260805-223814
+# agent-md-owned: .cursor/skills/close-session.backup-20260805-223814
+# agent-md-owned: .claude/skills/reviews.backup-20260805-223814
+# agent-md-owned: .agents/skills/reviews.backup-20260805-223815
+# agent-md-owned: .cursor/skills/reviews.backup-20260805-223815
+# agent-md-owned: .claude/skills/quick-recap.backup-20260805-223815
+# agent-md-owned: .agents/skills/quick-recap.backup-20260805-223815
+# agent-md-owned: .cursor/skills/quick-recap.backup-20260805-223815
+# agent-md-owned: .claude/skills/codex-agent.backup-20260805-223815
+# agent-md-owned: .agents/skills/codex-agent.backup-20260805-223815
+# agent-md-owned: .cursor/skills/codex-agent.backup-20260805-223815
+# agent-md-owned: .claude/skills/plan-documentation.backup-20260805-223815
+# agent-md-owned: .agents/skills/plan-documentation.backup-20260805-223815
+# agent-md-owned: .cursor/skills/plan-documentation.backup-20260805-223816
+# agent-md-owned: .claude/skills/model-release.backup-20260805-223816
+# agent-md-owned: .agents/skills/model-release.backup-20260805-223816
+# agent-md-owned: .cursor/skills/model-release.backup-20260805-223816
+# agent-md-owned: .claude/skills/behavior-review.backup-20260805-223816
+# agent-md-owned: .agents/skills/behavior-review.backup-20260805-223816
+# agent-md-owned: .cursor/skills/behavior-review.backup-20260805-223816
+# agent-md-owned: .claude/skills/version.backup-20260805-223816
+# agent-md-owned: .agents/skills/version.backup-20260805-223817
+# agent-md-owned: .cursor/skills/version.backup-20260805-223817
+# agent-md-owned: .agents/model-routing.json.backup-20260805-223817
+# agent-md-owned: .claude/agents/implementation.md.backup-20260805-223817
+# agent-md-owned: .codex/agents/implementation.toml.backup-20260805-223817
+# agent-md-owned: .cursor/agents/implementation.md.backup-20260805-223817
+# agent-md-owned: .claude/agents/debugging.md.backup-20260805-223817
+# agent-md-owned: .codex/agents/debugging.toml.backup-20260805-223817
+# agent-md-owned: .cursor/agents/debugging.md.backup-20260805-223818
+# agent-md-owned: .claude/agents/review.md.backup-20260805-223818
+# agent-md-owned: .codex/agents/review.toml.backup-20260805-223818
+# agent-md-owned: .cursor/agents/review.md.backup-20260805-223818
+# agent-md-owned: .claude/agents/refactoring.md.backup-20260805-223818
+# agent-md-owned: .codex/agents/refactoring.toml.backup-20260805-223818
+# agent-md-owned: .cursor/agents/refactoring.md.backup-20260805-223818
+# agent-md-owned: .claude/agents/architecture.md.backup-20260805-223818
+# agent-md-owned: .codex/agents/architecture.toml.backup-20260805-223818
+# agent-md-owned: .cursor/agents/architecture.md.backup-20260805-223819
+# agent-md-owned: .claude/agents/testing.md.backup-20260805-223819
+# agent-md-owned: .codex/agents/testing.toml.backup-20260805-223819
+# agent-md-owned: .cursor/agents/testing.md.backup-20260805-223819
+# agent-md-owned: .claude/agents/research.md.backup-20260805-223819
+# agent-md-owned: .codex/agents/research.toml.backup-20260805-223819
+# agent-md-owned: .cursor/agents/research.md.backup-20260805-223819
+# agent-md-owned: .claude/agents/documentation.md.backup-20260805-223819
+# agent-md-owned: .codex/agents/documentation.toml.backup-20260805-223819
+# agent-md-owned: .cursor/agents/documentation.md.backup-20260805-223819
+# agent-md-owned: .claude/agents/security.md.backup-20260805-223820
+# agent-md-owned: .codex/agents/security.toml.backup-20260805-223820
+# agent-md-owned: .cursor/agents/security.md.backup-20260805-223820
+# agent-md-owned: .claude/agents/data.md.backup-20260805-223820
+# agent-md-owned: .codex/agents/data.toml.backup-20260805-223820
+# agent-md-owned: .cursor/agents/data.md.backup-20260805-223820
+# agent-md-owned: .claude/agents/operations.md.backup-20260805-223820
+# agent-md-owned: .codex/agents/operations.toml.backup-20260805-223820
+# agent-md-owned: .cursor/agents/operations.md.backup-20260805-223820
+# agent-md-owned: .claude/agents/harness-doctor.md.backup-20260805-223821
+# agent-md-owned: .codex/agents/harness-doctor.toml.backup-20260805-223821
+# agent-md-owned: .cursor/agents/harness-doctor.md.backup-20260805-223821
+# agent-md-owned: .claude/agents/skill-reviewer.md.backup-20260805-223821
+# agent-md-owned: .codex/agents/skill-reviewer.toml.backup-20260805-223821
+# agent-md-owned: .cursor/agents/skill-reviewer.md.backup-20260805-223821
+# agent-md-owned: .claude/agents/corpus-pass.md.backup-20260805-223821
+# agent-md-owned: .codex/agents/corpus-pass.toml.backup-20260805-223821
+# agent-md-owned: .cursor/agents/corpus-pass.md.backup-20260805-223821
+# agent-md-owned: .claude/agents/runtime-auditor.md.backup-20260805-223822
+# agent-md-owned: .codex/agents/runtime-auditor.toml.backup-20260805-223822
+# agent-md-owned: .cursor/agents/runtime-auditor.md.backup-20260805-223822
+# agent-md-owned: .claude/agents/hook-doctor.md.backup-20260805-223822
+# agent-md-owned: .codex/agents/hook-doctor.toml.backup-20260805-223822
+# agent-md-owned: .cursor/agents/hook-doctor.md.backup-20260805-223822
+# agent-md-owned: .claude/agents/vendor-doc-refresh.md.backup-20260805-223822
+# agent-md-owned: .codex/agents/vendor-doc-refresh.toml.backup-20260805-223822
+# agent-md-owned: .cursor/agents/vendor-doc-refresh.md.backup-20260805-223822
+# agent-md-owned: .claude/agents/skill-router-reviewer.md.backup-20260805-223823
+# agent-md-owned: .codex/agents/skill-router-reviewer.toml.backup-20260805-223823
+# agent-md-owned: .cursor/agents/skill-router-reviewer.md.backup-20260805-223823
+# agent-md-owned: .codex/rules/default.rules.backup-20260805-223823
+# agent-md-owned: .make/shared.mk.backup-20260805-223823
 .claude/handoff.md
 .claude/settings.local.json
 .codex/rules/default.rules
@@ -349,4 +496,151 @@ dist/
 .claude/skills/skill-eval
 .agents/skills/skill-eval
 .cursor/skills/skill-eval
+.claude/skills/audit.backup-20260805-223807
+.agents/skills/audit.backup-20260805-223807
+.cursor/skills/audit.backup-20260805-223808
+.claude/skills/doctor.backup-20260805-223808
+.agents/skills/doctor.backup-20260805-223808
+.cursor/skills/doctor.backup-20260805-223808
+.claude/skills/prompt-architect.backup-20260805-223808
+.agents/skills/prompt-architect.backup-20260805-223808
+.cursor/skills/prompt-architect.backup-20260805-223808
+.claude/skills/skill-author.backup-20260805-223808
+.agents/skills/skill-author.backup-20260805-223808
+.cursor/skills/skill-author.backup-20260805-223808
+.claude/skills/update-toc.backup-20260805-223809
+.agents/skills/update-toc.backup-20260805-223809
+.cursor/skills/update-toc.backup-20260805-223809
+.claude/skills/session-handoff.backup-20260805-223809
+.agents/skills/session-handoff.backup-20260805-223809
+.cursor/skills/session-handoff.backup-20260805-223809
+.claude/skills/pre-commit-gate.backup-20260805-223809
+.agents/skills/pre-commit-gate.backup-20260805-223809
+.cursor/skills/pre-commit-gate.backup-20260805-223809
+.claude/skills/pr-workflow.backup-20260805-223810
+.agents/skills/pr-workflow.backup-20260805-223810
+.cursor/skills/pr-workflow.backup-20260805-223810
+.claude/skills/release-and-rollback.backup-20260805-223810
+.agents/skills/release-and-rollback.backup-20260805-223810
+.cursor/skills/release-and-rollback.backup-20260805-223810
+.claude/skills/deploy-via-deployer.backup-20260805-223810
+.agents/skills/deploy-via-deployer.backup-20260805-223810
+.cursor/skills/deploy-via-deployer.backup-20260805-223810
+.claude/skills/vet-dependency.backup-20260805-223810
+.agents/skills/vet-dependency.backup-20260805-223811
+.cursor/skills/vet-dependency.backup-20260805-223811
+.claude/skills/write-adr.backup-20260805-223811
+.agents/skills/write-adr.backup-20260805-223811
+.cursor/skills/write-adr.backup-20260805-223811
+.claude/skills/frontend-polish.backup-20260805-223811
+.agents/skills/frontend-polish.backup-20260805-223811
+.cursor/skills/frontend-polish.backup-20260805-223811
+.claude/skills/rewrite-agents-md.backup-20260805-223811
+.agents/skills/rewrite-agents-md.backup-20260805-223811
+.cursor/skills/rewrite-agents-md.backup-20260805-223812
+.claude/skills/rewrite-doc.backup-20260805-223812
+.agents/skills/rewrite-doc.backup-20260805-223812
+.cursor/skills/rewrite-doc.backup-20260805-223812
+.claude/skills/prompt-tune.backup-20260805-223812
+.agents/skills/prompt-tune.backup-20260805-223812
+.cursor/skills/prompt-tune.backup-20260805-223812
+.claude/skills/research-pass.backup-20260805-223812
+.agents/skills/research-pass.backup-20260805-223812
+.cursor/skills/research-pass.backup-20260805-223812
+.claude/skills/propose-skill.backup-20260805-223813
+.agents/skills/propose-skill.backup-20260805-223813
+.cursor/skills/propose-skill.backup-20260805-223813
+.claude/skills/harness-refresh.backup-20260805-223813
+.agents/skills/harness-refresh.backup-20260805-223813
+.cursor/skills/harness-refresh.backup-20260805-223813
+.claude/skills/archive-skill.backup-20260805-223813
+.agents/skills/archive-skill.backup-20260805-223813
+.cursor/skills/archive-skill.backup-20260805-223813
+.claude/skills/deep-research-prompt.backup-20260805-223813
+.agents/skills/deep-research-prompt.backup-20260805-223814
+.cursor/skills/deep-research-prompt.backup-20260805-223814
+.claude/skills/onboard.backup-20260805-223814
+.agents/skills/onboard.backup-20260805-223814
+.cursor/skills/onboard.backup-20260805-223814
+.claude/skills/close-session.backup-20260805-223814
+.agents/skills/close-session.backup-20260805-223814
+.cursor/skills/close-session.backup-20260805-223814
+.claude/skills/reviews.backup-20260805-223814
+.agents/skills/reviews.backup-20260805-223815
+.cursor/skills/reviews.backup-20260805-223815
+.claude/skills/quick-recap.backup-20260805-223815
+.agents/skills/quick-recap.backup-20260805-223815
+.cursor/skills/quick-recap.backup-20260805-223815
+.claude/skills/codex-agent.backup-20260805-223815
+.agents/skills/codex-agent.backup-20260805-223815
+.cursor/skills/codex-agent.backup-20260805-223815
+.claude/skills/plan-documentation.backup-20260805-223815
+.agents/skills/plan-documentation.backup-20260805-223815
+.cursor/skills/plan-documentation.backup-20260805-223816
+.claude/skills/model-release.backup-20260805-223816
+.agents/skills/model-release.backup-20260805-223816
+.cursor/skills/model-release.backup-20260805-223816
+.claude/skills/behavior-review.backup-20260805-223816
+.agents/skills/behavior-review.backup-20260805-223816
+.cursor/skills/behavior-review.backup-20260805-223816
+.claude/skills/version.backup-20260805-223816
+.agents/skills/version.backup-20260805-223817
+.cursor/skills/version.backup-20260805-223817
+.agents/model-routing.json.backup-20260805-223817
+.claude/agents/implementation.md.backup-20260805-223817
+.codex/agents/implementation.toml.backup-20260805-223817
+.cursor/agents/implementation.md.backup-20260805-223817
+.claude/agents/debugging.md.backup-20260805-223817
+.codex/agents/debugging.toml.backup-20260805-223817
+.cursor/agents/debugging.md.backup-20260805-223818
+.claude/agents/review.md.backup-20260805-223818
+.codex/agents/review.toml.backup-20260805-223818
+.cursor/agents/review.md.backup-20260805-223818
+.claude/agents/refactoring.md.backup-20260805-223818
+.codex/agents/refactoring.toml.backup-20260805-223818
+.cursor/agents/refactoring.md.backup-20260805-223818
+.claude/agents/architecture.md.backup-20260805-223818
+.codex/agents/architecture.toml.backup-20260805-223818
+.cursor/agents/architecture.md.backup-20260805-223819
+.claude/agents/testing.md.backup-20260805-223819
+.codex/agents/testing.toml.backup-20260805-223819
+.cursor/agents/testing.md.backup-20260805-223819
+.claude/agents/research.md.backup-20260805-223819
+.codex/agents/research.toml.backup-20260805-223819
+.cursor/agents/research.md.backup-20260805-223819
+.claude/agents/documentation.md.backup-20260805-223819
+.codex/agents/documentation.toml.backup-20260805-223819
+.cursor/agents/documentation.md.backup-20260805-223819
+.claude/agents/security.md.backup-20260805-223820
+.codex/agents/security.toml.backup-20260805-223820
+.cursor/agents/security.md.backup-20260805-223820
+.claude/agents/data.md.backup-20260805-223820
+.codex/agents/data.toml.backup-20260805-223820
+.cursor/agents/data.md.backup-20260805-223820
+.claude/agents/operations.md.backup-20260805-223820
+.codex/agents/operations.toml.backup-20260805-223820
+.cursor/agents/operations.md.backup-20260805-223820
+.claude/agents/harness-doctor.md.backup-20260805-223821
+.codex/agents/harness-doctor.toml.backup-20260805-223821
+.cursor/agents/harness-doctor.md.backup-20260805-223821
+.claude/agents/skill-reviewer.md.backup-20260805-223821
+.codex/agents/skill-reviewer.toml.backup-20260805-223821
+.cursor/agents/skill-reviewer.md.backup-20260805-223821
+.claude/agents/corpus-pass.md.backup-20260805-223821
+.codex/agents/corpus-pass.toml.backup-20260805-223821
+.cursor/agents/corpus-pass.md.backup-20260805-223821
+.claude/agents/runtime-auditor.md.backup-20260805-223822
+.codex/agents/runtime-auditor.toml.backup-20260805-223822
+.cursor/agents/runtime-auditor.md.backup-20260805-223822
+.claude/agents/hook-doctor.md.backup-20260805-223822
+.codex/agents/hook-doctor.toml.backup-20260805-223822
+.cursor/agents/hook-doctor.md.backup-20260805-223822
+.claude/agents/vendor-doc-refresh.md.backup-20260805-223822
+.codex/agents/vendor-doc-refresh.toml.backup-20260805-223822
+.cursor/agents/vendor-doc-refresh.md.backup-20260805-223822
+.claude/agents/skill-router-reviewer.md.backup-20260805-223823
+.codex/agents/skill-router-reviewer.toml.backup-20260805-223823
+.cursor/agents/skill-router-reviewer.md.backup-20260805-223823
+.codex/rules/default.rules.backup-20260805-223823
+.make/shared.mk.backup-20260805-223823
 # <<< agent-md <<<
