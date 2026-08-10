@@ -23,7 +23,7 @@ dependencies = [
     "pydantic>=2.7,<3",
     "jsonschema>=4.20,<5",
     "pyyaml>=6.0.3,<7",
-    "cryptography>=49.0.0,<50",
+    "cryptography>=49.0.0,<51",
 ]
 
 [project.urls]
@@ -47,9 +47,9 @@ dev = [
     "pyright==1.1.411",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
-    "ruff==0.15.21",
+    "ruff==0.16.1",
     "types-jsonschema==4.26.0.20260518",
-    "types-pyyaml==6.0.12.20260518",
+    "types-pyyaml==6.0.12.20260724",
 ]
 
 [project.scripts]
