@@ -335,6 +335,27 @@ dist/
 # agent-md-owned: .cursor/agents/skill-router-reviewer.md.backup-20260805-223823
 # agent-md-owned: .codex/rules/default.rules.backup-20260805-223823
 # agent-md-owned: .make/shared.mk.backup-20260805-223823
+# agent-md-owned: .claude/skills/frontend-design
+# agent-md-owned: .agents/skills/frontend-design
+# agent-md-owned: .cursor/skills/frontend-design
+# agent-md-owned: .claude/skills/grill-me
+# agent-md-owned: .agents/skills/grill-me
+# agent-md-owned: .cursor/skills/grill-me
+# agent-md-owned: .claude/skills/handoff
+# agent-md-owned: .agents/skills/handoff
+# agent-md-owned: .cursor/skills/handoff
+# agent-md-owned: .claude/skills/systematic-debugging
+# agent-md-owned: .agents/skills/systematic-debugging
+# agent-md-owned: .cursor/skills/systematic-debugging
+# agent-md-owned: .claude/skills/skill-creator
+# agent-md-owned: .agents/skills/skill-creator
+# agent-md-owned: .cursor/skills/skill-creator
+# agent-md-owned: .claude/skills/tdd
+# agent-md-owned: .agents/skills/tdd
+# agent-md-owned: .cursor/skills/tdd
+# agent-md-owned: .claude/skills/triage
+# agent-md-owned: .agents/skills/triage
+# agent-md-owned: .cursor/skills/triage
 .claude/handoff.md
 .claude/settings.local.json
 .codex/rules/default.rules
@@ -643,4 +664,25 @@ dist/
 .cursor/agents/skill-router-reviewer.md.backup-20260805-223823
 .codex/rules/default.rules.backup-20260805-223823
 .make/shared.mk.backup-20260805-223823
+.claude/skills/frontend-design
+.agents/skills/frontend-design
+.cursor/skills/frontend-design
+.claude/skills/grill-me
+.agents/skills/grill-me
+.cursor/skills/grill-me
+.claude/skills/handoff
+.agents/skills/handoff
+.cursor/skills/handoff
+.claude/skills/systematic-debugging
+.agents/skills/systematic-debugging
+.cursor/skills/systematic-debugging
+.claude/skills/skill-creator
+.agents/skills/skill-creator
+.cursor/skills/skill-creator
+.claude/skills/tdd
+.agents/skills/tdd
+.cursor/skills/tdd
+.claude/skills/triage
+.agents/skills/triage
+.cursor/skills/triage
 # <<< agent-md <<<
