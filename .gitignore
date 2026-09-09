@@ -356,6 +356,24 @@ dist/
 # agent-md-owned: .claude/skills/triage
 # agent-md-owned: .agents/skills/triage
 # agent-md-owned: .cursor/skills/triage
+# agent-md-owned: .claude/agents/integration.md
+# agent-md-owned: .codex/agents/integration.toml
+# agent-md-owned: .cursor/agents/integration.md
+# agent-md-owned: .claude/agents/test-design.md
+# agent-md-owned: .codex/agents/test-design.toml
+# agent-md-owned: .cursor/agents/test-design.md
+# agent-md-owned: .claude/agents/migration.md
+# agent-md-owned: .codex/agents/migration.toml
+# agent-md-owned: .cursor/agents/migration.md
+# agent-md-owned: .claude/agents/policy.md
+# agent-md-owned: .codex/agents/policy.toml
+# agent-md-owned: .cursor/agents/policy.md
+# agent-md-owned: .claude/agents/bounded-execution.md
+# agent-md-owned: .codex/agents/bounded-execution.toml
+# agent-md-owned: .cursor/agents/bounded-execution.md
+# agent-md-owned: .claude/agents/exploration.md
+# agent-md-owned: .codex/agents/exploration.toml
+# agent-md-owned: .cursor/agents/exploration.md
 .claude/handoff.md
 .claude/settings.local.json
 .codex/rules/default.rules
@@ -685,4 +703,22 @@ dist/
 .claude/skills/triage
 .agents/skills/triage
 .cursor/skills/triage
+.claude/agents/integration.md
+.codex/agents/integration.toml
+.cursor/agents/integration.md
+.claude/agents/test-design.md
+.codex/agents/test-design.toml
+.cursor/agents/test-design.md
+.claude/agents/migration.md
+.codex/agents/migration.toml
+.cursor/agents/migration.md
+.claude/agents/policy.md
+.codex/agents/policy.toml
+.cursor/agents/policy.md
+.claude/agents/bounded-execution.md
+.codex/agents/bounded-execution.toml
+.cursor/agents/bounded-execution.md
+.claude/agents/exploration.md
+.codex/agents/exploration.toml
+.cursor/agents/exploration.md
 # <<< agent-md <<<
