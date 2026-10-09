@@ -374,6 +374,14 @@ dist/
 # agent-md-owned: .claude/agents/exploration.md
 # agent-md-owned: .codex/agents/exploration.toml
 # agent-md-owned: .cursor/agents/exploration.md
+# agent-md-owned: .claude/skills/intelligence-routing
+# agent-md-owned: .agents/skills/intelligence-routing
+# agent-md-owned: .cursor/skills/intelligence-routing
+# agent-md-owned: .codex/agents/jev-worker.toml
+# agent-md-owned: .claude/agents/jev-worker-low.md
+# agent-md-owned: .claude/agents/jev-worker-medium.md
+# agent-md-owned: .claude/agents/jev-worker-high.md
+# agent-md-owned: .claude/agents/jev-worker-max.md
 .claude/handoff.md
 .claude/settings.local.json
 .codex/rules/default.rules
@@ -721,4 +729,12 @@ dist/
 .claude/agents/exploration.md
 .codex/agents/exploration.toml
 .cursor/agents/exploration.md
+.claude/skills/intelligence-routing
+.agents/skills/intelligence-routing
+.cursor/skills/intelligence-routing
+.codex/agents/jev-worker.toml
+.claude/agents/jev-worker-low.md
+.claude/agents/jev-worker-medium.md
+.claude/agents/jev-worker-high.md
+.claude/agents/jev-worker-max.md
 # <<< agent-md <<<
