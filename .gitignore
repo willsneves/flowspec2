@@ -382,6 +382,13 @@ dist/
 # agent-md-owned: .claude/agents/jev-worker-medium.md
 # agent-md-owned: .claude/agents/jev-worker-high.md
 # agent-md-owned: .claude/agents/jev-worker-max.md
+# agent-md-owned: .claude/skills/harness-check
+# agent-md-owned: .agents/skills/harness-check
+# agent-md-owned: .claude/skills/skill-register
+# agent-md-owned: .agents/skills/skill-register
+# agent-md-owned: .claude/skills/engineering-standards
+# agent-md-owned: .agents/skills/engineering-standards
+# agent-md-owned: .claude/agents/jev-worker.md
 .claude/handoff.md
 .claude/settings.local.json
 .codex/rules/default.rules
@@ -737,4 +744,11 @@ dist/
 .claude/agents/jev-worker-medium.md
 .claude/agents/jev-worker-high.md
 .claude/agents/jev-worker-max.md
+.claude/skills/harness-check
+.agents/skills/harness-check
+.claude/skills/skill-register
+.agents/skills/skill-register
+.claude/skills/engineering-standards
+.agents/skills/engineering-standards
+.claude/agents/jev-worker.md
 # <<< agent-md <<<
