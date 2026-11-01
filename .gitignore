@@ -389,6 +389,8 @@ dist/
 # agent-md-owned: .claude/skills/engineering-standards
 # agent-md-owned: .agents/skills/engineering-standards
 # agent-md-owned: .claude/agents/jev-worker.md
+# agent-md-owned: .claude/skills/macos-disk-reclaim
+# agent-md-owned: .agents/skills/macos-disk-reclaim
 .claude/handoff.md
 .claude/settings.local.json
 .codex/rules/default.rules
@@ -751,4 +753,6 @@ dist/
 .claude/skills/engineering-standards
 .agents/skills/engineering-standards
 .claude/agents/jev-worker.md
+.claude/skills/macos-disk-reclaim
+.agents/skills/macos-disk-reclaim
 # <<< agent-md <<<
