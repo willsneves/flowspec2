@@ -23,7 +23,7 @@ dependencies = [
     "pydantic>=2.7,<3",
     "jsonschema>=4.20,<5",
     "pyyaml>=6.0.3,<7",
-    "cryptography>=49.0.0,<50",
+    "cryptography>=49.0.0,<51",
 ]
 
 [project.urls]
